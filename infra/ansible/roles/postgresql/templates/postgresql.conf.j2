@@ -1,0 +1,36 @@
+# PostgreSQL 15 configuration
+# Managed by Ansible
+listen_addresses = '127.0.0.1'
+port = {{ pg_port | default(5432) }}
+max_connections = {{ pg_max_connections | default(200) }}
+
+# Memory settings
+shared_buffers = {{ pg_shared_buffers | default('256MB') }}
+effective_cache_size = {{ pg_effective_cache_size | default('1GB') }}
+work_mem = {{ pg_work_mem | default('4MB') }}
+maintenance_work_mem = {{ pg_maintenance_work_mem | default('128MB') }}
+
+# WAL settings
+wal_level = replica
+max_wal_size = 1GB
+min_wal_size = 80MB
+
+# Logging
+logging_collector = on
+log_directory = 'log'
+log_filename = 'postgresql-%Y-%m-%d.log'
+log_min_duration_statement = 1000
+log_checkpoints = on
+log_connections = on
+log_disconnections = on
+log_lock_waits = on
+log_temp_files = 0
+
+# Autovacuum
+autovacuum = on
+autovacuum_max_workers = 2
+autovacuum_naptime = 60
+
+# Data directory
+data_directory = '{{ pg_data_dir | default('/var/lib/postgresql/data') }}'
+hba_file = '{{ pg_data_dir | default('/var/lib/postgresql/data') }}/pg_hba.conf'

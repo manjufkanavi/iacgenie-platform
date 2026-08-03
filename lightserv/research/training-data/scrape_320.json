@@ -1,0 +1,7 @@
+{
+  "url": "https://medium.com/@ajaypan2/cost-optimization-on-aws-cloud-03522936edef",
+  "title": "Cost Optimization on AWS Cloud.",
+  "content": "Member-only story4 min readFeb 21, 2025--Wondering how to optimize cost for workloads running on AWS. Not anymore.Before we start looking at the ways and techniques to optimize costs I would like to start with one of my favorite mentor quotes “ The difference between a Good Solution Architect and a Great Solution Architect is the techniques being used by Architects to optimize cost and save money on AWS Bills.Let’s take a look at why Cost Optimization is important and what it matters.Cost optimization is crucial in AWS to ensure efficient resource utilization, maximize ROI, and prevent unnecessary expenses. Here’s why it matters:1. Reduces Unnecessary SpendingWithout cost control, AWS bills can quickly escalate due to over-provisioning, unused resources, and inefficient configurations.Example: Running an oversized EC2 instance when a smaller one could handle the workload leads to wasted money.2. Maximizes ROI on Cloud InvestmentsOptimizing AWS costs ensures that every dollar spent contributes to business value.Example: Choosing Spot Instances for batch jobs can reduce compute costs by up to 90% compared to On-Demand pricing3. Enables Scalability Without Cost SurprisesCost optimization allows businesses to scale efficiently without unexpected budget overruns.",
+  "contentLength": 1278,
+  "scrapedAt": "2026-06-16T15:32:52.772Z"
+}

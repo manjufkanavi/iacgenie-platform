@@ -1,0 +1,42 @@
+---
+# Common role - Prerequisites
+- name: "Common | Update apt cache"
+  ansible.builtin.apt:
+    update_cache: yes
+    cache_valid_time: 3600
+  when: ansible_os_family == "Debian"
+
+- name: "Common | Install common packages"
+  ansible.builtin.apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+      - software-properties-common
+      - cron
+      - jq
+      - vim
+      - htop
+      - net-tools
+      - iptraf-ng
+      - unattended-upgrades
+    state: present
+  when: ansible_os_family == "Debian"
+
+- name: "Common | Install fail2ban if enabled"
+  ansible.builtin.apt:
+    name: fail2ban
+    state: present
+  when:
+    - ansible_os_family == "Debian"
+    - fail2ban_enabled | default(true) | bool
+
+- name: "Common | Install ufw if enabled"
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+  when:
+    - ansible_os_family == "Debian"
+    - ufw_enabled | default(true) | bool

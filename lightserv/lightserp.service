@@ -1,0 +1,18 @@
+[Unit]
+Description=LightSerp MCP Services (API + WebUI)
+After=docker.service iacgenie-redis-1.service iacgenie-postgres-1.service
+Requires=docker.service
+# Wait for shared services to be reachable
+After=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=mkanavi
+WorkingDirectory=/home/mkanavi/workspace/LightSerp
+ExecStart=/usr/bin/docker compose -f docker-compose.lightserp-web.yml up -d
+ExecStop=/usr/bin/docker compose -f docker-compose.lightserp-web.yml down
+ExecReload=/usr/bin/docker compose -f docker-compose.lightserp-web.yml up -d --no-deps --build
+
+[Install]
+WantedBy=multi-user.target

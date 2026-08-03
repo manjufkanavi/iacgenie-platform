@@ -1,0 +1,7 @@
+{
+  "url": "https://aws.plainenglish.io/these-12-aws-best-practices-instantly-made-my-architecture-look-senior-level-f7a334b6ecf0?gi=5492f2a99518",
+  "title": "These 12 AWS Best Practices Instantly Made My Architecture Look Senior-Level",
+  "content": "Press enter or click to view image in full sizeMember-only storyWhat separates “it works” from “it scales” when nobody is watching4 min readFeb 5, 2026--I Didn’t Learn This From Tutorials. I Learned It From Breaking Things.Three years ago, I shipped an AWS setup that worked.Requests went through. Data was saved. The demo didn’t crash.Then traffic arrived.CloudWatch alarms screamed like a smoke detector with low batteries.Bills jumped for no reason.Deployments felt like defusing a bomb with oven mitts on.That’s when it hit me: Junior architecture works once. Senior architecture works forever.This article is a distillation of the 12 AWS practices that flipped that switch for me especially once I stopped treating AWS like “hosting” and started treating it like an automation engine.If you already know AWS, good.This is the stuff nobody writes about.1. If You Click in the Console, You’re Already Behind",
+  "contentLength": 910,
+  "scrapedAt": "2026-06-16T15:30:34.755Z"
+}

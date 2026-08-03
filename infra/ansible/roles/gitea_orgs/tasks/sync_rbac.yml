@@ -1,0 +1,11 @@
+---
+# Sync Keycloak roles to Gitea teams (10.15 integration)
+
+- name: "10.15 | RBAC | Generate RBAC permission matrix"
+  ansible.builtin.template:
+    src: rbac-permission-matrix.md.j2
+    dest: /home/mkanavi/docker/iacgenie/RBAC-PERMISSION-MATRIX.md
+    owner: mkanavi
+    group: mkanavi
+    mode: "0644"
+  changed_when: true

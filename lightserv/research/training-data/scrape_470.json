@@ -1,0 +1,7 @@
+{
+  "url": "https://docs.aws.amazon.com/solutions/data-lakes-on-aws/",
+  "title": "",
+  "content": "AWS Serverless Data Lake Framework: Deploy a serverless data lake framework that transforms raw data into actionable insights using AWS analytics services. Enable your business analysts to query processed data through Amazon Athena while maintaining comprehensive data governance through AWS Lake Formation. Multi-Source Analytics Lakehouse with AI-Powered Insights: Deploy a unified data lakehouse architecture that seamlessly ingests data from diverse sources including streaming inventory, relational databases, and enterprise systems like SAP. Reduce development time by leveraging zero-ETL capabilities and open table formats that eliminate complex data pipeline engineering.",
+  "contentLength": 680,
+  "scrapedAt": "2026-06-16T15:34:04.846Z"
+}

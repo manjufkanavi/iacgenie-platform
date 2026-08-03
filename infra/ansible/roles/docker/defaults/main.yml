@@ -1,0 +1,8 @@
+---
+# Docker role defaults
+docker_edition: ce
+docker_ce_version: "29.1"
+docker_compose_plugin_version: "2.29.0"
+# Ubuntu codename for Docker APT repo (auto-detected: noble, jammy, etc.)
+# Fallback: ansible_distribution_release
+ubuntu_codename: "noble"

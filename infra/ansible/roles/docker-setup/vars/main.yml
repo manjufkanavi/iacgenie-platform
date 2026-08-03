@@ -1,0 +1,10 @@
+---
+# =============================================================================
+# docker-setup role — vars (internal-only variables)
+# =============================================================================
+
+# All external/pinable values live in the global vars/main.yml and defaults.
+# This file holds internal role state variables.
+
+_docker_compose_validate_cmd: "docker compose -f {{ iacgenie_compose_dir }}/{{ iacgenie_compose_file }} config --quiet"
+_pre_deploy_health_cmd: "docker compose -f {{ iacgenie_compose_dir }}/{{ iacgenie_compose_file }} ps --format '{{`{{.Names}}: {{.Status}}`}}'"

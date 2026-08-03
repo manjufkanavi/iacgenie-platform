@@ -1,0 +1,17 @@
+---
+# Docker Compose Service role defaults
+# Systemd service configuration for docker compose infrastructure
+
+docker_compose_service_name: "iacgenie-docker-compose.service"
+docker_compose_dir: "/home/mkanavi/docker/iacgenie"
+docker_compose_file: "docker-compose.yml"
+docker_compose_project: "iacgenie"
+
+# Restart behavior: "always", "on-failure", "unless-stopped"
+# Using "on-failure" to avoid infinite restart loops when compose file is missing
+docker_compose_restart_policy: "on-failure"
+docker_compose_restart_sec: 30
+docker_compose_restart_max_retries: 5
+
+# Timeout for startup
+docker_compose_timeout_start_sec: 300

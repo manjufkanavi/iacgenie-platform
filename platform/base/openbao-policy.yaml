@@ -1,0 +1,208 @@
+---
+# ServiceAccount for the OpenBao pod
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: openbao
+  namespace: iacgenie
+  labels:
+    app: openbao
+automountServiceAccountToken: true
+---
+# ServiceAccount for the iacgenie-backend pods (used by K8s auth)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: iacgenie-backend
+  namespace: iacgenie
+  labels:
+    app: iacgenie-backend
+automountServiceAccountToken: true
+---
+# ClusterRoleBinding so OpenBao can validate service account tokens
+# via the Kubernetes TokenReview API (required for K8s auth backend)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: openbao-token-review
+  labels:
+    app: openbao
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+  - kind: ServiceAccount
+    name: openbao
+    namespace: iacgenie
+---
+# RBAC: allow openbao SA to read configmaps (for Raft snapshots)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: openbao-configmap-reader
+  namespace: iacgenie
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: openbao-configmap-reader
+  namespace: iacgenie
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: openbao-configmap-reader
+subjects:
+  - kind: ServiceAccount
+    name: openbao
+    namespace: iacgenie
+---
+# CronJob: take encrypted OpenBao Raft snapshots every 6 hours
+# Snapshots are uploaded to MinIO (s3-compatible) at artifacts/openbao-snapshots/
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: openbao-snapshot
+  namespace: iacgenie
+  labels:
+    app: openbao
+    component: backup
+spec:
+  schedule: "0 */6 * * *"   # Every 6 hours
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: openbao-snapshot
+        spec:
+          securityContext:
+            runAsNonRoot: true #:
+          restartPolicy: OnFailure
+          serviceAccountName: openbao
+          containers:
+            - securityContext:
+                allowPrivilegeEscalation: false
+              name: snapshot
+              image: curlimages/curl:8.6.0
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -euo pipefail
+                  TIMESTAMP=$(date +%Y%m%dT%H%M%SZ)
+                  SNAPSHOT_FILE="/tmp/openbao-snapshot-${TIMESTAMP}.snap"
+
+                  echo "==> Taking Raft snapshot..."
+                  curl -sf \
+                    -H "X-Vault-Token: ${OPENBAO_TOKEN}" \
+                    "${OPENBAO_ADDR}/v1/sys/storage/raft/snapshot" \
+                    -o "${SNAPSHOT_FILE}"
+
+                  SNAPSHOT_SIZE=$(wc -c < "${SNAPSHOT_FILE}")
+                  echo "==> Snapshot taken: ${SNAPSHOT_FILE} (${SNAPSHOT_SIZE} bytes)"
+
+                  echo "==> Uploading to MinIO..."
+                  curl -sf \
+                    --aws-sigv4 "aws:amz:us-east-1:s3" \
+                    --user "${MINIO_ACCESS_KEY}:${MINIO_SECRET_KEY}" \
+                    -T "${SNAPSHOT_FILE}" \
+                    "${MINIO_ENDPOINT}/artifacts/openbao-snapshots/${TIMESTAMP}.snap"
+
+                  echo "==> Snapshot upload complete."
+                  rm -f "${SNAPSHOT_FILE}"
+              env:
+                - name: OPENBAO_ADDR
+                  value: "http://openbao:8200"
+                - name: OPENBAO_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: openbao-credentials
+                      key: root-token
+                - name: MINIO_ENDPOINT
+                  value: "http://minio:9000"
+                - name: MINIO_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: minio-credentials
+                      key: access-key
+                - name: MINIO_SECRET_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: minio-credentials
+                      key: secret-key
+              resources:
+                requests:
+                  memory: "64Mi"
+                  cpu: "50m"
+                limits:
+                  memory: "128Mi"
+                  cpu: "100m"
+---
+# ConfigMap for Digger OpenBao Policy
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openbao-digger-policy
+  namespace: iacgenie
+data:
+  digger-policy.hcl: |
+    path "secret/data/digger/*" {
+      capabilities = ["read", "list"]
+    }
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: openbao-setup-digger
+  namespace: iacgenie
+spec:
+  template:
+    spec:
+      securityContext:
+        runAsNonRoot: true #:
+      serviceAccountName: openbao
+      restartPolicy: OnFailure
+      containers:
+      - securityContext:
+          allowPrivilegeEscalation: false
+        name: setup
+        image: curlimages/curl:8.6.0
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          echo "Setting up digger-execution-role in OpenBao..."
+          
+          # A proper escaping for JSON string payload
+          POLICY_CONTENT=$(cat /policies/digger-policy.hcl)
+          JSON_PAYLOAD=$(printf '{"policy": %s}' "$(jq -Rn --arg str "$POLICY_CONTENT" '$str')")
+          
+          curl -sf -H "X-Vault-Token: ${OPENBAO_TOKEN}" -X PUT -d "{\"policy\": \"path \\\"secret/data/digger/*\\\" { capabilities = [\\\"read\\\", \\\"list\\\"] }\"}" ${OPENBAO_ADDR}/v1/sys/policies/acl/digger-policy
+          
+          curl -sf -H "X-Vault-Token: ${OPENBAO_TOKEN}" -X POST -d '{"bound_service_account_names": ["default"], "bound_service_account_namespaces": ["default", "iacgenie"], "policies": ["digger-policy"], "ttl": "1h"}' ${OPENBAO_ADDR}/v1/auth/kubernetes/role/digger-execution-role
+          
+          echo "Done."
+        env:
+        - name: OPENBAO_ADDR
+          value: "http://openbao:8200"
+        - name: OPENBAO_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: openbao-credentials
+              key: root-token
+        volumeMounts:
+        - name: policies
+          mountPath: /policies
+      volumes:
+      - name: policies
+        configMap:
+          name: openbao-digger-policy

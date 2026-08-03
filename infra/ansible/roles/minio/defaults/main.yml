@@ -1,0 +1,12 @@
+minio_version: "latest"
+minio_api_port: 9000
+minio_console_port: 9001
+minio_root_user: iacgenie
+minio_root_password: CHANGE_ME_IN_VAULT
+minio_buckets:
+  - iacgenie/artifacts
+  - iacgenie/logs
+  - iacgenie/plans
+  - iacgenie/outputs
+  - lightsrp/artifacts
+  - lightsrp/logs

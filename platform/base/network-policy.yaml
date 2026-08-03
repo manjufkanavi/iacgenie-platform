@@ -1,0 +1,30 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: iacgenie-backend-policy
+spec:
+  podSelector:
+    matchLabels:
+      app: iacgenie-backend
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: iacgenie-frontend
+      ports:
+        - port: 8000
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - port: 8080
+  egress:
+    - to: []
+      ports:
+        - port: 5432
+        - port: 6379
+        - port: 443

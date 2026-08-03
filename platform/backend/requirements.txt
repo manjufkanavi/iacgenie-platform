@@ -1,0 +1,96 @@
+# Iacgenie AI Backend Requirements
+
+# Core dependencies
+fastapi>=0.111.0,<0.112.0
+uvicorn>=0.22.0,<0.23.0
+pydantic==2.12.5  # Use >= for Python 3.14 compatibility (2.6.0 build script uses old ForwardRef API)
+python-dotenv==1.2.2
+sqlalchemy==2.0.36  # >=2.0.36 for Python 3.14 compatibility (typing.Generic __init_subclass__ changes)
+pydantic-settings==2.1.0
+
+# Async support
+anyio==4.2.0
+asgiref==3.8.1
+
+# Database
+# Note: sqlite3 is bundled with Python - no pip package needed
+aiosqlite==0.20.0  # Async SQLite for sqlite_adapter (required by db import chain)
+psycopg2-binary==2.9.11  # PostgreSQL adapter for Python 3.14
+asyncpg==0.31.0  # Async PostgreSQL adapter for db_provider (required by auth chain)
+greenlet==3.3.2  # Required by psycopg2 for async operations on Python 3.14
+hiredis==2.4.0  # Redis async driver (optional, for redis cluster mode)
+alembic==1.14.0  # Database migrations
+
+# Caching and rate limiting
+redis==5.2.1  # Redis client for rate limiting middleware (must be <=5.2.1 for kombu[redis] compatibility)
+
+# Structured logging
+structlog==25.5.0  # Required by logging_middleware
+
+# Logging and observability
+python-json-logger==2.0.7
+opentelemetry-api==1.39.1  # >=1.25 for Python 3.14 compatibility (protobuf metaclass support)
+opentelemetry-sdk==1.39.1
+opentelemetry-exporter-otlp==1.39.1
+
+# Security
+cryptography>=42.0.5,<43.0.0
+PyJWT==2.12.1  # JWT token handling for local auth provider (Python 3.14 compatible)
+python-jose[cryptography]>=3.3.0  # JWT validation with JWKS for Keycloak OAuth2
+bcrypt==5.0.0  # Password hashing for local auth provider (Python 3.14 compatible)
+
+# Testing
+pytest==9.0.3
+pytest-asyncio==1.3.0
+httpx==0.26.0
+
+# LLM and AI
+openai>=1.27.0
+anthropic==0.25.0
+google-generativeai==0.8.5  # >=0.8 for Python 3.14 compatibility (protobuf metaclass support)
+litellm[proxy]==1.40.0  # Unified LLM gateway with Router, fallback, caching, and metrics
+
+# Terraform/OpenTofu
+# hcl2==5.0.0  # Not available on PyPI; remove if HCL parsing is needed
+
+# Artifact storage (MinIO S3-compatible object storage)
+minio==7.2.20
+
+# Email templating (optional - used by email services)
+jinja2==3.1.6
+
+# Git integration
+python-gitlab==8.1.0
+
+# Docker SDK for sandbox management
+docker==7.1.0
+
+# Async task queue
+celery[redis]==5.5.3
+
+# Utilities
+python-multipart>=0.0.9,<0.0.10
+aiofiles==23.2.1
+tenacity==8.2.3
+
+# Monitoring and metrics
+prometheus-client==0.19.0
+
+# Development
+black==26.3.1
+isort==5.13.2
+flake8==7.0.0
+mypy==1.8.0
+
+# Type checking
+types-python-dateutil==2.8.19.20240106
+types-requests==2.31.0.20240106
+types-setuptools==69.0.0.20240106
+types-pyOpenSSL==24.1.0.20240722
+slowapi==0.1.9
+
+# LangGraph workflow engine
+langgraph>=0.2.0
+langgraph-checkpoint-postgres>=2.0.0
+httpx_auth
+kubernetes>=30.1.0

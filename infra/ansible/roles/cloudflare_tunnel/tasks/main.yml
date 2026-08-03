@@ -1,0 +1,198 @@
+---
+# Cloudflare Tunnel role - Main entry point
+# Automatically handles tunnel login and creation if credentials are missing
+
+- name: "Cloudflare | Ensure Cloudflare config directory exists"
+  ansible.builtin.file:
+    path: /etc/cloudflared
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+# ========================
+# Cloudflared binary installation
+# ========================
+- name: "Cloudflare | Check if cloudflared binary exists"
+  ansible.builtin.stat:
+    path: /usr/bin/cloudflared
+  register: cloudflared_binary
+  failed_when: false
+
+- name: "Cloudflare | Download cloudflared binary"
+  ansible.builtin.get_url:
+    url: "https://github.com/cloudflare/cloudflared/releases/download/{{ cloudflared_version | default('2025.6.0') }}/cloudflared-linux-amd64"
+    dest: /tmp/cloudflared
+    mode: "0755"
+  when:
+    - ansible_architecture == "x86_64"
+    - cloudflared_binary.stat.exists | default(false) == false
+
+- name: "Cloudflare | Install cloudflared binary"
+  ansible.builtin.copy:
+    src: /tmp/cloudflared
+    dest: /usr/bin/cloudflared
+    mode: "0755"
+    remote_src: yes
+  when:
+    - ansible_architecture == "x86_64"
+    - cloudflared_binary.stat.exists | default(false) == false
+  notify: Restart cloudflared
+
+- name: "Cloudflare | Reload systemd daemon"
+  ansible.builtin.systemd:
+    daemon_reload: yes
+  when:
+    - ansible_architecture == "x86_64"
+    - cloudflared_binary.stat.exists | default(false) == false
+
+- name: "Cloudflare | Ensure user cloudflared dir exists"
+  ansible.builtin.file:
+    path: /home/mkanavi/.cloudflared
+    state: directory
+    owner: mkanavi
+    group: mkanavi
+    mode: "0755"
+
+# ========================
+# Tunnel auto-provisioning
+# ========================
+
+# Handle legacy argotunnel.json migration (pre-2025.3 format)
+# The old format stored credentials directly in argotunnel.json without cert.pem.
+# New format requires cloudflared tunnel login to generate cert.pem.
+# If argotunnel.json exists but cert.pem doesn't, we need to complete the login process.
+
+- name: "Cloudflare | Check if origin cert (cert.pem) exists"
+  ansible.builtin.stat:
+    path: /home/mkanavi/.cloudflared/cert.pem
+  register: cloudflared_cert
+  failed_when: false
+
+- name: "Cloudflare | Check for legacy argotunnel.json"
+  ansible.builtin.stat:
+    path: /home/mkanavi/.cloudflared/argotunnel.json
+  register: legacy_argotunnel
+  failed_when: false
+
+- name: "Cloudflare | Copy legacy argotunnel.json to system credentials"
+  ansible.builtin.command:
+    cmd: "cp /home/mkanavi/.cloudflared/argotunnel.json /etc/cloudflared/iacgenie-tunnel.json && chown root:root /etc/cloudflared/iacgenie-tunnel.json && chmod 600 /etc/cloudflared/iacgenie-tunnel.json"
+  when:
+    - legacy_argotunnel.stat.exists
+    - not cloudflared_cert.stat.exists
+  changed_when: true
+
+# ========================
+# Tunnel login (requires Cloudflare API Token)
+# ========================
+# cloudflared tunnel login generates:
+#   1. ~/.cloudflared/cert.pem (origin certificate)
+#   2. Updates tunnel credentials if API token has tunnel scope
+#
+# API Token required at: https://dash.cloudflare.com/profile/api-tokens
+# Permissions needed: Zone.Zone > Read, Cloudflare Tunnel > Manage
+
+- name: "Cloudflare | Tunnel login via API token"
+  ansible.builtin.shell: |
+    set -euo pipefail
+    echo "CfApiToken={{ cloudflared_api_token }}" | cloudflared tunnel login
+  environment:
+    CF_ACCOUNT_TAG: "{{ cloudflared_account_tag | default('') }}"
+  args:
+    creates: /home/mkanavi/.cloudflared/cert.pem
+  when:
+    - cloudflared_api_token is defined
+    - cloudflared_api_token != 'CHANGE_ME_IN_VAULT'
+    - not cloudflared_cert.stat.exists
+  failed_when: false
+
+- name: "Cloudflare | Tunnel login — interactive (manual step required)"
+  ansible.builtin.debug:
+    msg: |
+      WARNING: cloudflared tunnel login requires interactive browser authentication.
+      
+      Please run the following commands on the VM:
+      
+        ssh newvm
+        cloudflared tunnel login
+      
+      This will open a browser for Cloudflare authentication.
+      The generated cert.pem will be saved to ~/.cloudflared/cert.pem
+      
+      Then re-run this playbook to complete the setup.
+  when:
+    - not cloudflared_cert.stat.exists
+
+# ========================
+# Tunnel creation (if not already created)
+# ========================
+- name: "Cloudflare | Check if tunnel credentials file exists"
+  ansible.builtin.stat:
+    path: /etc/cloudflared/{{ cloudflared_tunnel_name }}.json
+  register: cloudflared_creds
+  failed_when: false
+
+- name: "Cloudflare | Create tunnel (if credentials file missing)"
+  ansible.builtin.command: "cloudflared tunnel create {{ cloudflared_tunnel_name }}"
+  args:
+    creates: /home/mkanavi/.cloudflared/{{ cloudflared_tunnel_name }}.json
+  when:
+    - not cloudflared_creds.stat.exists
+  register: cloudflared_create_result
+  changed_when: cloudflared_create_result is changed
+  failed_when: false
+
+- name: "Cloudflare | Check if tunnel was just created in user dir"
+  ansible.builtin.stat:
+    path: /home/mkanavi/.cloudflared/{{ cloudflared_tunnel_name }}.json
+  register: cloudflared_user_creds
+  failed_when: false
+
+- name: "Cloudflare | Move tunnel credentials to system dir"
+  ansible.builtin.command: >
+    mv /home/mkanavi/.cloudflared/{{ cloudflared_tunnel_name }}.json
+          /etc/cloudflared/{{ cloudflared_tunnel_name }}.json
+  when:
+    - not cloudflared_creds.stat.exists
+    - cloudflared_user_creds.stat.exists | default(false)
+  notify: Restart cloudflared
+
+# ========================
+# Config & service deployment
+# ========================
+- name: "Cloudflare | Deploy Cloudflare Tunnel configuration"
+  ansible.builtin.template:
+    src: cloudflared.yaml.j2
+    dest: /etc/cloudflared/config.yml
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart cloudflared
+
+- name: "Cloudflare | Deploy Cloudflare Tunnel service file"
+  ansible.builtin.template:
+    src: cloudflared.service.j2
+    dest: /etc/systemd/system/cloudflared.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart cloudflared
+
+- name: "Cloudflare | Enable and start Cloudflare Tunnel service"
+  ansible.builtin.systemd:
+    name: cloudflared
+    state: started
+    enabled: yes
+    daemon_reload: yes
+  ignore_errors: true
+
+- name: "Cloudflare | Verify Cloudflare Tunnel is running"
+  ansible.builtin.command: systemctl is-active cloudflared
+  register: cloudflared_status
+  changed_when: false
+  failed_when: false
+
+- name: "Cloudflare | Show Cloudflare status"
+  ansible.builtin.debug:
+    var: cloudflared_status.stdout

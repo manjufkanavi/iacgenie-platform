@@ -1,0 +1,100 @@
+# Prometheus Configuration — Monitoring Stack
+# Phase 10.18: Monitoring Stack (Prometheus + Grafana)
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - "localhost:9093"
+
+rule_files:
+  - /etc/prometheus/prometheus-alerts.yml
+
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # Loki (itself has /metrics endpoint)
+  - job_name: "loki"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["loki:3100"]
+
+  # Promtail metrics
+  - job_name: "promtail"
+    static_configs:
+      - targets: ["promtail:9080"]
+
+  # Nginx metrics (via nginx-exporter if available)
+  - job_name: "nginx"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["nginx:9113"]
+
+  # PostgreSQL (via postgres_exporter)
+  - job_name: "postgres"
+    static_configs:
+      - targets: ["postgres:9187"]
+
+  # Redis (via redis_exporter)
+  - job_name: "redis"
+    static_configs:
+      - targets: ["redis:9121"]
+
+  # Keycloak metrics
+  - job_name: "keycloak"
+    static_configs:
+      - targets: ["keycloak:9090"]
+
+  # Gitea metrics
+  - job_name: "gitea"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["gitea:3000"]
+
+  # SearXNG metrics
+  - job_name: "searxng"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["searxng:8080"]
+
+  # MinIO metrics
+  - job_name: "minio"
+    metrics_path: /minio/v2/metrics/cluster
+    static_configs:
+      - targets: ["minio:9000"]
+
+  # OpenBao metrics
+  - job_name: "openbao"
+    metrics_path: /v1/sys/metrics
+    params:
+      format: ["prometheus"]
+    static_configs:
+      - targets: ["openbao:8200"]
+
+  # Grafana metrics
+  - job_name: "grafana"
+    static_configs:
+      - targets: ["grafana:3000"]
+
+  # Cloudflare Tunnel metrics
+  - job_name: "cloudflared"
+    static_configs:
+      - targets: ["cloudflared:2000"]
+
+  # LightSerp API metrics
+  - job_name: "lightserp-api"
+    static_configs:
+      - targets: ["lightserp-api:3071"]
+
+  # PageZen metrics
+  - job_name: "pagezen"
+    static_configs:
+      - targets: ["pagezen:8082"]

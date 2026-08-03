@@ -1,0 +1,36 @@
+---
+# Docker Compose Service - Manage systemd unit for docker compose infrastructure
+
+- name: "Compose Service | Deploy systemd service file"
+  ansible.builtin.template:
+    src: docker-compose.service.j2
+    dest: "/etc/systemd/system/{{ docker_compose_service_name }}"
+    mode: "0644"
+    owner: root
+    group: root
+  notify: Reload systemd daemon
+
+- name: "Compose Service | Enable and start docker compose service"
+  ansible.builtin.systemd:
+    name: "{{ docker_compose_service_name }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+    masked: false
+  tags:
+    - compose-service
+
+- name: "Compose Service | Check service status"
+  ansible.builtin.command: "systemctl status {{ docker_compose_service_name }} --no-pager"
+  register: service_status
+  changed_when: false
+  failed_when: false
+  tags:
+    - compose-service
+
+- name: "Compose Service | Show status summary"
+  ansible.builtin.debug:
+    var: service_status.stdout_lines
+  when: service_status is success
+  tags:
+    - compose-service

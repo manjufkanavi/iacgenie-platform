@@ -1,0 +1,20 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://127.0.0.1:{{ loki_port }}/loki/api/v1/push
+
+scrape_configs:
+{% for log_path in promtail_log_paths %}
+  - job_name: {{ log_path | regex_replace('/', '-') }}
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: docker_logs
+          __path__: {{ log_path }}
+{% endfor %}

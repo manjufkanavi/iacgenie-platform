@@ -1,0 +1,7 @@
+{
+  "url": "https://aws.amazon.com/blogs/architecture/",
+  "title": "AWS Architecture Blog",
+  "content": "How Samsung achieved real-time pricing with AWS Lambda Response Streaming by Vijay Naik , Christopher Chan , and Sathish Kumar Soundharajan on 15 JUN 2026 in Amazon CloudFront , AWS Lambda , Customer Solutions , Hi-Tech and Electronics , Industries , Intermediate (200) , Technical How-to Permalink Comments Share In this post, we walk through the legacy architecture challenges, the stateless streaming solution, key implementation patterns, and performance results—a pattern you can apply if you’re building high-traffic APIs that aggregate data from multiple backend sources.",
+  "contentLength": 578,
+  "scrapedAt": "2026-06-16T15:32:05.950Z"
+}

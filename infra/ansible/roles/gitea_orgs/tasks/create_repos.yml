@@ -1,0 +1,23 @@
+---
+# Create default repositories per organization
+
+- name: "10.12 | Gitea orgs | Create repositories for {{ target_org.org_name }}"
+  ansible.builtin.uri:
+    url: "{{ gitea_api_url }}/api/v1/orgs/{{ target_org.org_name }}/repos"
+    method: POST
+    headers:
+      Authorization: "token {{ gitea_api_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      name: "{{ item.name }}"
+      description: "{{ item.description }}"
+      auto_init: "{{ item.auto_init | default(false) | bool }}"
+      private: "{{ item.private | default(true) | bool }}"
+      default_branch: "{{ item.default_branch | default('main') }}"
+    status_code: [201]
+  loop: "{{ gitea_auto_create_repos.get(target_org.org_name, []) }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: repo_created
+  changed_when: true

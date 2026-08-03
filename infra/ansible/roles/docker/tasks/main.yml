@@ -1,0 +1,16 @@
+---
+# Docker role - Main entry point
+- name: "Docker | Install prerequisites"
+  ansible.builtin.import_tasks: prerequisites.yml
+
+- name: "Docker | Add Docker GPG key and repository"
+  ansible.builtin.import_tasks: add_repo.yml
+
+- name: "Docker | Install Docker packages"
+  ansible.builtin.import_tasks: install.yml
+
+- name: "Docker | Configure Docker daemon"
+  ansible.builtin.import_tasks: configure_daemon.yml
+
+- name: "Docker | Install Docker Compose plugin"
+  ansible.builtin.import_tasks: install_compose.yml

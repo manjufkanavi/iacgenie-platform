@@ -1,0 +1,17 @@
+---
+# Docker Compose Generator - Deploy and verify
+# Note: Path changed from /home/mkanavi/docker/iacgenie/ to /home/mkanavi/docker/iacgenie/
+- name: "Compose Gen | Check if containers are running"
+  ansible.builtin.command: docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.yml -p iacgenie ps --format json
+  register: compose_running
+  changed_when: false
+  failed_when: false
+
+- name: "Compose Gen | Deploy if compose file changed"
+  ansible.builtin.command: "docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.yml up -d"
+  when: compose_changed | default(false) | bool
+  notify: Wait for containers to be healthy
+
+- name: "Compose Gen | Show deployment summary"
+  ansible.builtin.debug:
+    msg: "Docker compose deployment complete. Verify with: docker compose ps"

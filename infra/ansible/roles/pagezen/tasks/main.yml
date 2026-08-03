@@ -1,0 +1,20 @@
+---
+# PageZen role - Main entry point
+- name: "PageZen | Deploy environment file"
+  ansible.builtin.template:
+    src: .env.j2
+    dest: /home/mkanavi/docker/iacgenie/.env.pagezen
+    owner: mkanavi
+    group: mkanavi
+    mode: "0600"
+  notify: Reload docker compose
+
+- name: "PageZen | Verify PageZen container is running"
+  ansible.builtin.command: docker ps -a --filter "name=iacgenie-pagezen" --format "{{ '{{.Names}}' }}"
+  register: pagezen_status
+  changed_when: false
+  failed_when: false
+
+- name: "PageZen | Show PageZen status"
+  ansible.builtin.debug:
+    var: pagezen_status.stdout_lines | default(['N/A - managed by docker-compose-generator'])

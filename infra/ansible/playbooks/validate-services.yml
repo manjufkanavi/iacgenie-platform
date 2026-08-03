@@ -1,0 +1,70 @@
+---
+# Shared service validation playbook - validates all core infrastructure services
+- hosts: all
+  become: true
+  become_method: sudo
+
+  tasks:
+    - name: "Validate | Verify Docker Compose is running"
+      ansible.builtin.command: docker compose -p iacgenie ps
+      register: compose_output
+      changed_when: false
+
+    - name: "Validate | Show container status"
+      ansible.builtin.debug:
+        var: compose_output.stdout
+
+    - name: "Validate | Check PostgreSQL health"
+      ansible.builtin.command: docker compose -p iacgenie exec postgres pg_isready -U lightsrp -d lightsrp
+      register: pg_health
+      changed_when: false
+      retries: 3
+      delay: 10
+
+    - name: "Validate | Check Redis health"
+      ansible.builtin.command: docker compose -p iacgenie exec redis redis-cli ping
+      register: redis_health
+      changed_when: false
+      retries: 3
+      delay: 10
+
+    - name: "Validate | Check MinIO health"
+      ansible.builtin.command: docker compose -p iacgenie exec minio mc admin info local
+      register: minio_health
+      changed_when: false
+      retries: 3
+      delay: 10
+
+    - name: "Validate | Check OpenBao health"
+      ansible.builtin.uri:
+        url: http://127.0.0.1:8200/v1/sys/health
+        status_code: 200
+      register: openbao_health
+      retries: 5
+      delay: 10
+
+    - name: "Validate | Check Keycloak health"
+      ansible.builtin.uri:
+        url: http://127.0.0.1:8080/health/ready
+        status_code: 200
+      register: keycloak_health
+      retries: 5
+      delay: 10
+
+    - name: "Validate | Display validation results"
+      ansible.builtin.debug:
+        msg: >
+          PostgreSQL: {{ pg_health.stdout_lines | last if pg_health.stdout_lines else 'N/A' }}
+          Redis: {{ redis_health.stdout_lines | last if redis_health.stdout_lines else 'N/A' }}
+          MinIO: {{ minio_health.stdout_lines | last if minio_health.stdout_lines else 'N/A' }}
+          OpenBao: {{ openbao_health.status }}
+          Keycloak: {{ keycloak_health.status }}
+
+    - name: "Validate | Fail if core services are unhealthy"
+      ansible.builtin.assert:
+        that:
+          - pg_health.rc == 0
+          - redis_health.rc == 0
+          - keycloak_health.status == 200
+        fail_msg: "Core services validation failed"
+        success_msg: "All core services are healthy"

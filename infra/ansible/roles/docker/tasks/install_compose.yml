@@ -1,0 +1,15 @@
+---
+# Docker role - Install Docker Compose plugin
+- name: "Docker | Verify Docker Compose plugin is installed"
+  ansible.builtin.command: docker compose version
+  register: docker_compose_version
+  changed_when: false
+
+- name: "Docker | Log Docker Compose version"
+  ansible.builtin.debug:
+    msg: "Docker Compose version: {{ docker_compose_version.stdout }}"
+
+- name: "Docker | Create Docker group (if not exists)"
+  ansible.builtin.group:
+    name: docker
+    state: present

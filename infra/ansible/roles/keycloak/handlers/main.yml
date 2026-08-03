@@ -1,0 +1,4 @@
+---
+- name: "No-op: restart keycloak (use docker-compose-generator reload instead)"
+  ansible.builtin.debug:
+    msg: "Container restart handled by docker-compose-generator. No separate restart needed."

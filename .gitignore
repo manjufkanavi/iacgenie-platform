@@ -1,0 +1,68 @@
+# Node modules
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info
+dist/
+build/
+.next/
+.nuxt/
+tsbuildinfo
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+*.secret
+.vault_key
+
+# Virtual envs
+.venv/
+.eggs/
+.pytest_cache/
+.tox/
+htmlcov/
+.coverage
+*.egg
+
+# Logs
+logs/
+*.log
+
+# Reports
+reports/
+*.csv
+test-results.xml
+
+# Scratch files
+scratch*.py
+*.db
+pipeline_states.db
+
+# Binary/secret files
+*.pem
+*.key
+*.p12
+app.ini
+realm-export.json
+vault_key
+
+# Docker override
+docker-compose.override.yml
+
+# Test artifacts
+__tests__
+coverage/
+nyc_output/

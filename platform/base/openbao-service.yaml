@@ -1,0 +1,45 @@
+---
+# OpenBao Service — exposes port 8200 within the cluster
+apiVersion: v1
+kind: Service
+metadata:
+  name: openbao
+  namespace: iacgenie
+  labels:
+    app: openbao
+    component: secret-store
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8200"
+    prometheus.io/path: "/v1/sys/metrics"
+spec:
+  selector:
+    app: openbao
+  ports:
+    - name: http
+      port: 8200
+      targetPort: 8200
+      protocol: TCP
+  type: ClusterIP
+---
+# Headless service for StatefulSet pod discovery (Raft cluster)
+apiVersion: v1
+kind: Service
+metadata:
+  name: openbao-internal
+  namespace: iacgenie
+  labels:
+    app: openbao
+    component: secret-store
+spec:
+  selector:
+    app: openbao
+  clusterIP: None
+  ports:
+    - name: http
+      port: 8200
+      targetPort: 8200
+    - name: cluster
+      port: 8201
+      targetPort: 8201
+  publishNotReadyAddresses: true

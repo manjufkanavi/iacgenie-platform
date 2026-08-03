@@ -1,0 +1,14 @@
+{
+  "keycloak_url": "{{ jwt_middleware_keycloak_url }}",
+  "realm": "{{ jwt_middleware_realm }}",
+  "backend_port": {{ jwt_middleware_backend_port }},
+  "cache_ttl": {{ jwt_config.cache_ttl }},
+  "issuer": "{{ jwt_config.issuer }}",
+  "audience": "{{ jwt_config.audience }}",
+  "algorithm": "{{ jwt_config.algorithm }}",
+  "protected_paths": [
+{% for path in rbac_protected_paths %}
+    {"path_prefix": "{{ path.path }}", "required_role": "{{ path.required_role }}"}{% if not loop.last %},{% endif %}
+{% endfor %}
+  ]
+}

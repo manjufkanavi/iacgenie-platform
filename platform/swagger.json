@@ -1,0 +1,688 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "TerraGenius AI API",
+    "description": "API for generating and managing infrastructure-as-code.\n\n## Authentication Flow\n\n1. User signs up or logs in using Firebase Authentication (email/password, Google, etc.) via the frontend.\n2. Frontend obtains a Firebase ID token.\n3. Frontend POSTs the ID token to `/auth/token`.\n4. Backend verifies the Firebase token and returns a custom JWT (`accessToken`).\n5. All protected API calls require `Authorization: Bearer <accessToken>`.\n6. The backend validates the JWT and attaches user context.\n\n**Public endpoints:** `/auth/token`, `/status`, `/health`, `/signup`, `/login`, `/reset-password`\n**Protected endpoints:** All `/api/` routes, `/generate`, `/deployments`, `/billing`, `/audit-logs`, etc.\n\n**Future Ready:** To swap auth providers (e.g. Auth0, Cognito), only the `/auth/token` logic and token validation need to change. The rest of the API and security model remains the same.\n\n**Testing:** Use the provided `test_auth_flow.js` script to verify the full login → token exchange → protected API flow.\n\n**Security:** Never send Firebase tokens directly to protected endpoints. Always use the custom JWT returned from `/auth/token`.\n",
+    "version": "2.0.0"
+  },
+  "servers": [
+    {
+      "url": "/api",
+      "description": "Mock API Server"
+    }
+  ],
+  "paths": {
+    "/generate": {
+      "post": {
+        "summary": "Start Asynchronous Code Generation",
+        "description": "Accepts a generation request, queues it as a background job, and immediately returns a job_id for status polling.",
+        "operationId": "startGeneration",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Prompt and configuration for code generation.",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted. The generation task has been queued.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerationStartResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/generate/status/{job_id}": {
+      "get": {
+        "summary": "Get Generation Status",
+        "description": "Poll this endpoint with the job_id received from `/generate` to check the status and retrieve results.",
+        "operationId": "getGenerationStatus",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "description": "The ID of the generation job.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current status of the job.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerationStatusResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found."
+          }
+        }
+      }
+    },
+    "/generations/{projectId}": {
+      "get": {
+        "summary": "List generations for a project",
+        "description": "Retrieve all generation records for a specific project",
+        "tags": ["generations"],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Project identifier"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of generations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerationListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new generation record",
+        "description": "Create a new generation record in Firestore",
+        "tags": ["generations"],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Project identifier"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Generation record created successfully"
+          },
+          "400": {
+            "description": "Invalid request parameters"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/deployments/{projectId}": {
+      "get": {
+        "summary": "List deployments for a project",
+        "description": "Retrieve all deployment records for a specific project",
+        "tags": ["deployments"],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Project identifier"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of deployments",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeploymentListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new deployment record",
+        "description": "Create a new deployment record in Firestore",
+        "tags": ["deployments"],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Project identifier"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeploymentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Deployment record created successfully"
+          },
+          "400": {
+            "description": "Invalid request parameters"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/billing/{projectId}": {
+      "get": {
+        "summary": "Get billing information for a project",
+        "description": "Retrieve billing and usage information for a specific project",
+        "tags": ["billing"],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Project identifier"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Billing information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/audit-logs/{projectId}": {
+      "get": {
+        "summary": "List audit logs for a project",
+        "description": "Retrieve audit logs for a specific project",
+        "tags": ["audit-logs"],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Project identifier"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 100
+            },
+            "description": "Maximum number of logs to return"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of audit logs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditLogListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/auth/token": {
+      "post": {
+        "summary": "Exchange Firebase token for custom JWT",
+        "description": "Accepts a Firebase ID token and returns a custom JWT for use with protected API endpoints.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "firebaseToken": {
+                    "type": "string",
+                    "example": "eyJhbGciOi..."
+                  }
+                },
+                "required": ["firebaseToken"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JWT token returned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accessToken": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT token obtained from /auth/token endpoint"
+      }
+    },
+    "schemas": {
+      "GenerationRequest": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "example": "Create an AWS S3 bucket for static website hosting."
+          },
+          "model": {
+            "type": "string",
+            "example": "gemini-2.5-flash-preview-04-17"
+          },
+          "provider": {
+            "type": "string",
+            "enum": ["aws", "gcp", "azure"],
+            "example": "aws"
+          }
+        },
+        "required": ["prompt", "model", "provider"]
+      },
+      "GenerationStartResponse": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "example": "d1b2c3a4-e5f6-7890-1234-567890abcdef"
+          }
+        },
+        "required": ["job_id"]
+      },
+      "GeneratedFile": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "example": "main.tf" },
+          "language": { "type": "string", "example": "hcl" },
+          "content": { "type": "string", "example": "resource \"aws_s3_bucket\" \"b\" { ... }" }
+        },
+        "required": ["name", "language", "content"]
+      },
+      "ValidationStepLog": {
+        "type": "object",
+        "properties": {
+          "stage": {"type": "string", "example": "generate"},
+          "status": {"type": "string", "example": "success"},
+          "message": {"type": "string", "example": "AI response received."},
+          "timestamp": {"type": "string", "format": "date-time"}
+        },
+        "required": ["stage", "status", "message", "timestamp"]
+      },
+      "GenerationStatusResponse": {
+        "type": "object",
+        "properties": {
+          "job_id": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "running", "completed", "failed"]
+          },
+          "logs": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ValidationStepLog" }
+          },
+          "code": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/GeneratedFile" },
+            "nullable": true
+          }
+        },
+        "required": ["job_id", "status", "logs", "code"]
+      },
+      "GenerationListResponse": {
+        "type": "object",
+        "properties": {
+          "generations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GenerationResponse"
+            }
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": ["generations", "total"]
+      },
+      "GenerationResponse": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "userId": { "type": "string" },
+          "projectId": { "type": "string" },
+          "prompt": { "type": "string" },
+          "model": { "type": "string" },
+          "provider": { "type": "string" },
+          "status": { "type": "string" },
+          "jobId": { "type": "string" },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "language": { "type": "string" },
+                "content": { "type": "string" }
+              }
+            }
+          },
+          "logs": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ValidationStepLog" }
+          },
+          "createdAt": { "type": "string" },
+          "updatedAt": { "type": "string" }
+        },
+        "required": ["id", "userId", "projectId", "prompt", "model", "provider", "status", "jobId", "files", "logs", "createdAt", "updatedAt"]
+      },
+      "DeploymentRequest": {
+        "type": "object",
+        "properties": {
+          "projectId": { "type": "string" },
+          "generationId": { "type": "string" },
+          "provider": { "type": "string" },
+          "region": { "type": "string" },
+          "credentialsId": { "type": "string" }
+        },
+        "required": ["projectId", "generationId", "provider", "region", "credentialsId"]
+      },
+      "DeploymentListResponse": {
+        "type": "object",
+        "properties": {
+          "deployments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeploymentResponse"
+            }
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": ["deployments", "total"]
+      },
+      "DeploymentResponse": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "userId": { "type": "string" },
+          "projectId": { "type": "string" },
+          "generationId": { "type": "string" },
+          "provider": { "type": "string" },
+          "region": { "type": "string" },
+          "credentialsId": { "type": "string" },
+          "status": { "type": "string" },
+          "logs": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ValidationStepLog" }
+          },
+          "outputs": {
+            "type": "object"
+          },
+          "createdAt": { "type": "string" },
+          "updatedAt": { "type": "string" }
+        },
+        "required": ["id", "userId", "projectId", "generationId", "provider", "region", "credentialsId", "status", "logs", "outputs", "createdAt", "updatedAt"]
+      },
+      "BillingResponse": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "userId": { "type": "string" },
+          "projectId": { "type": "string" },
+          "plan": { "type": "string" },
+          "usage": {
+            "type": "object",
+            "properties": {
+              "generations": {
+                "type": "object",
+                "properties": {
+                  "current": { "type": "integer" },
+                  "limit": { "type": "integer" }
+                }
+              },
+              "deployments": {
+                "type": "object",
+                "properties": {
+                  "current": { "type": "integer" },
+                  "limit": { "type": "integer" }
+                }
+              },
+              "api_calls": {
+                "type": "object",
+                "properties": {
+                  "current": { "type": "integer" },
+                  "limit": { "type": "integer" }
+                }
+              }
+            }
+          },
+          "cost": { "type": "number" },
+          "invoiceHistory": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "date": { "type": "string" },
+                "amount": { "type": "number" },
+                "status": { "type": "string" },
+                "description": { "type": "string" }
+              }
+            }
+          },
+          "createdAt": { "type": "string" },
+          "updatedAt": { "type": "string" }
+        },
+        "required": ["id", "userId", "projectId", "plan", "usage", "cost", "invoiceHistory", "createdAt", "updatedAt"]
+      },
+      "UsageRequest": {
+        "type": "object",
+        "properties": {
+          "projectId": { "type": "string" },
+          "type": { "type": "string", "enum": ["generations", "deployments", "api_calls"] },
+          "count": { "type": "integer" },
+          "cost": { "type": "number" }
+        },
+        "required": ["projectId", "type", "count", "cost"]
+      },
+      "AuditLogListResponse": {
+        "type": "object",
+        "properties": {
+          "logs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditLogResponse"
+            }
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": ["logs", "total"]
+      },
+      "AuditLogResponse": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "userId": { "type": "string" },
+          "projectId": { "type": "string" },
+          "actor": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "email": { "type": "string" }
+            }
+          },
+          "action": { "type": "string" },
+          "resource": { "type": "string" },
+          "details": {
+            "type": "object"
+          },
+          "ipAddress": { "type": "string" },
+          "timestamp": { "type": "string" }
+        },
+        "required": ["id", "userId", "projectId", "actor", "action", "resource", "details", "ipAddress", "timestamp"]
+      },
+      "AuditLogRequest": {
+        "type": "object",
+        "properties": {
+          "projectId": { "type": "string" },
+          "action": { "type": "string" },
+          "resource": { "type": "string" },
+          "details": {
+            "type": "object"
+          }
+        },
+        "required": ["projectId", "action", "resource"]
+      }
+    }
+  }
+}

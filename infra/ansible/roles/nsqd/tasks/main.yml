@@ -1,0 +1,20 @@
+---
+# NSQD role - Main entry point
+- name: "NSQD | Deploy environment file"
+  ansible.builtin.template:
+    src: .env.j2
+    dest: /home/mkanavi/docker/iacgenie/.env.nsqd
+    owner: mkanavi
+    group: mkanavi
+    mode: "0600"
+  notify: Reload docker compose
+
+- name: "NSQD | Verify NSQD container is running"
+  ansible.builtin.command: docker ps -a --filter "name=iacgenie-nsqd" --format "{{ '{{.Names}}' }}"
+  register: nsqd_status
+  changed_when: false
+  failed_when: false
+
+- name: "NSQD | Show NSQD status"
+  ansible.builtin.debug:
+    var: nsqd_status.stdout_lines | default(['N/A - managed by docker-compose-generator'])

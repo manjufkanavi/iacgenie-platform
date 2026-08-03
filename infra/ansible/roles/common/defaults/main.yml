@@ -1,0 +1,8 @@
+timezone: UTC
+ssh_port: 22
+ssh_password_authentication: "no"
+ssh_permit_root_login: "no"
+ufw_enabled: true
+fail2ban_enabled: true
+fail2ban_maxretry: 5
+fail2ban_bantime: 3600

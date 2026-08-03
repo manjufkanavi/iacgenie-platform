@@ -1,0 +1,17 @@
+---
+# Cloudflare Tunnel role - Handlers
+- name: Restart cloudflared
+  ansible.builtin.systemd:
+    name: cloudflared
+    state: restarted
+    daemon_reload: yes
+
+- name: Verify cloudflared status
+  ansible.builtin.command: systemctl is-active cloudflared
+  register: cf_status
+  changed_when: false
+  failed_when: false
+
+- name: Show cloudflared status
+  ansible.builtin.debug:
+    var: cf_status.stdout

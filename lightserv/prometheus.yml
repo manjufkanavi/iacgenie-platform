@@ -1,0 +1,61 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'mcp-servers'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['mcp-server:3000']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        regex: '([^:]+):\d+'
+        replacement: '${1}:3000'
+
+  - job_name: 'searxng'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['searxng:8080']
+
+  - job_name: 'rota'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['rota:8080']
+
+  - job_name: 'a12n-server'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['a12n-server:8080']
+
+  - job_name: 'pogocache'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['pogocache:6379']
+
+  - job_name: 'logtide'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['logtide:8080']
+
+  - job_name: 'kono-gateway'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['kono-gateway:7805']
+
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['localhost:9100']
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['localhost:9093']
+
+rule_files:
+  - 'alert.rules'

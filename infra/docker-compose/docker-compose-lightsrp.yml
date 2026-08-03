@@ -1,0 +1,41 @@
+# =============================================================================
+# LightSerp Services — Security-Hardened
+# =============================================================================
+# Version: 2.0
+# Date: 2026-07-20
+#
+# Run alongside docker-compose-unified.yml:
+#   docker compose -f docker-compose-unified.yml -f docker-compose-lightsrp.yml up -d
+#
+# Security notes:
+#   - All secrets loaded via .env.lightserp env_file (no inline credentials)
+#   - Connected to both unified_network (application) and shared_internal
+#   - Read-only root filesystem where possible
+# =============================================================================
+
+services:
+  # LightSerp FastAPI backend
+  lightsrp-api:
+    image: "${LIGHTSrp_IMAGE:-ghcr.io/lightsrp/api:latest}"
+    restart: unless-stopped
+    networks:
+      - unified_network
+      - shared_internal
+    ports:
+      - "127.0.0.1:3070:3070"
+    env_file:
+      - .env.lightserp
+      - .env
+    depends_on:
+      - postgres
+      - redis
+      - minio
+      - openbao
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  unified_network:
+    external: true
+  shared_internal:
+    external: true

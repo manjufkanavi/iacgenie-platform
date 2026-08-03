@@ -1,0 +1,49 @@
+---
+# Phase 10.12: Project-based Gitea Organizations
+# Creates orgs, teams, and RBAC mapping via Gitea API
+
+- name: "10.12 | Gitea orgs | Check Gitea API connectivity"
+  ansible.builtin.uri:
+    url: "{{ gitea_api_url }}/api/v1/version"
+    method: GET
+    headers:
+      Authorization: "token {{ gitea_api_token }}"
+    status_code: [200]
+  register: gitea_version
+  changed_when: false
+  failed_when: false
+
+- name: "10.12 | Gitea orgs | Gitea version"
+  ansible.builtin.debug:
+    msg: "Gitea API reachable, version: {{ gitea_version.json.version | default('unknown') }}"
+  when: (gitea_version.status | default(0)) == 200
+
+- name: "10.12 | Gitea orgs | Create or get organizations"
+  ansible.builtin.include_tasks: create_org.yml
+  loop: "{{ gitea_project_orgs }}"
+  loop_control:
+    loop_var: target_org
+    label: "{{ target_org.org_name }}"
+
+- name: "10.12 | Gitea orgs | Create default teams per org"
+  ansible.builtin.include_tasks: create_teams.yml
+  loop: "{{ gitea_project_orgs }}"
+  loop_control:
+    loop_var: target_org
+    label: "{{ target_org.org_name }}"
+
+- name: "10.12 | Gitea orgs | Sync Keycloak → Gitea RBAC"
+  ansible.builtin.include_tasks: sync_rbac.yml
+  when: (gitea_version.status | default(0)) == 200
+
+- name: "10.12 | Gitea orgs | Create default repositories"
+  ansible.builtin.include_tasks: create_repos.yml
+  when: (gitea_version.status | default(0)) == 200
+
+- name: "10.12 | Gitea orgs | Summary"
+  ansible.builtin.debug:
+    msg: >
+      Project-based Gitea setup complete.
+      Organizations: {{ gitea_project_orgs | length }}
+      RBAC sync enabled via Keycloak → Gitea mapping
+  changed_when: false

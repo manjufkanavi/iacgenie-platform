@@ -1,0 +1,91 @@
+groups:
+- name: lightserp-alerts
+  interval: 30s
+  rules:
+  - alert: HighErrorRate
+    expr: (sum(rate(http_requests_total{job="mcp-servers", status=~"5.."}[5m])) by (instance) / sum(rate(http_requests_total{job="mcp-servers"}[5m])) by (instance)) > 0.1
+    for: 5m
+    labels:
+      severity: critical
+      service: lightserp
+      category: performance
+    annotations:
+      summary: "High error rate on {{ $labels.instance }}"
+      description: "Error rate is {{ $value | printf \"%.2f\" }}% (threshold: 10%)"
+
+  - alert: HighLatency
+    expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job="mcp-servers"}[5m])) by (le)) > 2
+    for: 5m
+    labels:
+      severity: warning
+      service: lightserp
+      category: performance
+    annotations:
+      summary: "High latency on {{ $labels.instance }}"
+      description: "95th percentile latency is {{ $value | printf \"%.2f\" }}s (threshold: 2s)"
+
+  - alert: ServiceDown
+    expr: up{job="mcp-servers"} == 0
+    for: 1m
+    labels:
+      severity: critical
+      service: lightserp
+      category: availability
+    annotations:
+      summary: "Service {{ $labels.instance }} is down"
+      description: "{{ $labels.instance }} has been down for more than 1 minute"
+
+  - alert: HighMemoryUsage
+    expr: (node_memory_Active_bytes / node_memory_MemTotal_bytes) * 100 > 85
+    for: 10m
+    labels:
+      severity: warning
+      service: lightserp
+      category: resources
+    annotations:
+      summary: "High memory usage on {{ $labels.instance }}"
+      description: "Memory usage is {{ $value | printf \"%.2f\" }}% (threshold: 85%)"
+
+  - alert: HighCPUUsage
+    expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 90
+    for: 10m
+    labels:
+      severity: warning
+      service: lightserp
+      category: resources
+    annotations:
+      summary: "High CPU usage on {{ $labels.instance }}"
+      description: "CPU usage is {{ $value | printf \"%.2f\" }}% (threshold: 90%)"
+
+  - alert: QueueBacklog
+    expr: nsq_queue_length{topic="scrape_jobs"} > 100
+    for: 5m
+    labels:
+      severity: warning
+      service: lightserp
+      category: processing
+    annotations:
+      summary: "Scrape job queue backlog"
+      description: "Queue length is {{ $value }} (threshold: 100)"
+
+  - alert: LowCacheHitRatio
+    expr: (sum(cache_hits_total{job="mcp-servers"}) / (sum(cache_hits_total{job="mcp-servers"}) + sum(cache_misses_total{job="mcp-servers"}))) < 0.4
+    for: 15m
+    labels:
+      severity: warning
+      service: lightserp
+      category: performance
+    annotations:
+      summary: "Low cache hit ratio"
+      description: "Cache hit ratio is {{ $value | printf \"%.2f\" }} (threshold: 40%)"
+
+  - alert: HealthCheckFailure
+    expr: probe_success{job="health-checks"} == 0
+    for: 2m
+    labels:
+      severity: critical
+      service: lightserp
+      category: availability
+    annotations:
+      summary: "Health check failure for {{ $labels.instance }}"
+      description: "Health check has been failing for {{ $labels.instance }} for more than 2 minutes"

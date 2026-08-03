@@ -1,0 +1,215 @@
+name: Destroy Services (Keep Nginx + Tunnel)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "yes" to confirm destruction'
+        required: true
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  destroy-services:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Destroy services and verify proxy layer preserved
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST || '192.168.0.118' }}
+          SSH_USER: ${{ secrets.SSH_USER || 'mkanavi' }}
+        run: |
+          set -euo pipefail
+
+          START_TIME=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          echo "DEPLOY_START=$START_TIME" >> $GITHUB_ENV
+          echo "=== IacGenie Destroy Pipeline ==="
+          echo "Target: $SSH_HOST"
+          echo "Branch: $GITHUB_REF_NAME"
+          echo "Commit: $GITHUB_SHA"
+
+          # Configure SSH key
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          # Add known hosts
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+          # Function to run SSH commands
+          run_remote() {
+            ssh -o StrictHostKeyChecking=no \
+                -o ConnectTimeout=30 \
+                -i ~/.ssh/deploy_key \
+                -q \
+                "${SSH_USER}@${SSH_HOST}" "$1"
+          }
+
+          # ===== STEP 1: Pre-destroy snapshot =====
+          echo "[1/7] Capturing pre-destroy state..."
+          PRE_SNAPSHOT=$(run_remote 'docker ps --format "{{.Names}}\t{{.Status}}" 2>/dev/null || echo "no containers"')
+          echo "$PRE_SNAPSHOT"
+          echo "$PRE_SNAPSHOT" > /tmp/pre-destroy-snapshot.txt
+
+          # ===== STEP 2: Backup .env file =====
+          echo "[2/7] Backing up .env file..."
+          run_remote 'cp ~/docker/iacgenie/.env ~/docker/iacgenie/.env.bak.pre-destroy 2>/dev/null; echo "env backed up"'
+          echo "  ✅ .env backup saved"
+
+          # ===== STEP 3: Stop all Docker services =====
+          echo "[3/7] Stopping Docker services..."
+          run_remote 'cd ~/docker/iacgenie && docker compose down --remove-orphans 2>&1'
+          echo "  ✅ Docker services stopped"
+
+          # ===== STEP 4: Remove containers and network =====
+          echo "[4/7] Removing containers and Docker network..."
+          run_remote 'cd ~/docker/iacgenie && docker rm -f $(docker ps -aq -f "name=iacgenie") 2>/dev/null || true'
+          run_remote 'docker network rm iacgenie-network 2>/dev/null || true'
+          echo "  ✅ Containers and network removed"
+
+          # ===== STEP 5: Verify Nginx is STILL running =====
+          echo "[5/7] Verifying Nginx preserved..."
+          NGINX_STATUS=$(run_remote 'systemctl is-active nginx')
+          if [ "$NGINX_STATUS" = "active" ]; then
+            echo "  ✅ Nginx is RUNNING (preserved)"
+            NGINX_STATUS_DISPLAY="active"
+          else
+            echo "  ❌ Nginx is NOT running — manual intervention needed!"
+            NGINX_STATUS_DISPLAY="inactive"
+          fi
+
+          # ===== STEP 6: Verify Cloudflare Tunnel is STILL running =====
+          echo "[6/7] Verifying Cloudflare Tunnel preserved..."
+          TUNNEL_STATUS=$(run_remote 'systemctl is-active cloudflared-iacgenie')
+          if [ "$TUNNEL_STATUS" = "active" ]; then
+            echo "  ✅ Cloudflare Tunnel is RUNNING (preserved)"
+            TUNNEL_STATUS_DISPLAY="active"
+          else
+            echo "  ❌ Cloudflare Tunnel is NOT running — manual intervention needed!"
+            TUNNEL_STATUS_DISPLAY="inactive"
+          fi
+
+          # ===== STEP 7: Clean up unused Docker resources =====
+          echo "[7/7] Pruning unused Docker resources..."
+          run_remote 'docker system prune -af --volumes 2>&1 || echo "prune had issues"'
+          echo "  ✅ Docker pruning complete"
+
+          # Capture post-destroy state
+          POST_SNAPSHOT=$(run_remote 'docker ps -a --format "{{.Names}}\t{{.Status}}" 2>/dev/null || echo "no containers"')
+          echo "$POST_SNAPSHOT" > /tmp/post-destroy-snapshot.txt
+
+          # Determine status
+          DEPLOY_STATUS="partial"
+          if [ "$NGINX_STATUS" = "active" ] && [ "$TUNNEL_STATUS" = "active" ]; then
+            DEPLOY_STATUS="success"
+            echo ""
+            echo "  🎉 Destroy complete. Nginx + Tunnel preserved."
+          elif [ "$NGINX_STATUS" = "active" ] || [ "$TUNNEL_STATUS" = "active" ]; then
+            DEPLOY_STATUS="partial"
+            echo ""
+            echo "  ⚠️  Destroy complete. 1/2 proxy services need attention."
+          else
+            DEPLOY_STATUS="failure"
+            echo ""
+            echo "  ❌ Both proxy services down! Manual recovery required."
+          fi
+
+          DEPLOY_END=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          DEPLOY_DURATION="$(( $(date +%s) - $(date -d "$START_TIME" +%s) ))s"
+          echo "DEPLOY_STATUS=$DEPLOY_STATUS" >> $GITHUB_ENV
+          echo "DEPLOY_END=$DEPLOY_END" >> $GITHUB_ENV
+          echo "DEPLOY_DURATION=$DEPLOY_DURATION" >> $GITHUB_ENV
+
+          # Build services JSON for report
+          SERVICES_JSON="["
+          # Add pre-destroy services
+          FIRST=true
+          while IFS=$'\t' read -r name status; do
+            [ -z "$name" ] && continue
+            [ "$name" = "NAME" ] && continue
+            if [ "$FIRST" = true ]; then FIRST=false; else SERVICES_JSON="${SERVICES_JSON},"; fi
+            SERVICES_JSON="${SERVICES_JSON}{\"name\":\"$name\",\"status\":\"$status\",\"health\":\"destroyed\",\"ports\":\"n/a\",\"uptime\":\"n/a\"}"
+          done < <(echo "$PRE_SNAPSHOT")
+
+          # Add proxy layer services
+          for svc_name in "nginx" "cloudflared"; do
+            if [ "$svc_name" = "nginx" ]; then
+              svc_status="$NGINX_STATUS_DISPLAY"
+            else
+              svc_status="$TUNNEL_STATUS_DISPLAY"
+            fi
+            if [ "$FIRST" = true ]; then FIRST=false; else SERVICES_JSON="${SERVICES_JSON},"; fi
+            SERVICES_JSON="${SERVICES_JSON}{\"name\":\"$svc_name\",\"status\":\"$svc_status\",\"health\":\"proxy-layer\",\"ports\":\"host-level\",\"uptime\":\"systemd\"}"
+          done
+          SERVICES_JSON="${SERVICES_JSON}]"
+          echo "SERVICES_DATA=$SERVICES_JSON" >> $GITHUB_ENV
+
+          # Build log data
+          {
+            echo "=== Pre-Destroy Snapshot ==="
+            cat /tmp/pre-destroy-snapshot.txt
+            echo ""
+            echo "=== Post-Destroy Snapshot ==="
+            cat /tmp/post-destroy-snapshot.txt
+            echo ""
+            echo "=== Nginx Status: $NGINX_STATUS ==="
+            echo "=== Tunnel Status: $TUNNEL_STATUS ==="
+          } > /tmp/destroy-log.txt
+          LOG_DATA=$(cat /tmp/destroy-log.txt)
+          echo "DEPLOY_LOG<<EOF" >> $GITHUB_ENV
+          echo "$LOG_DATA" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: Generate HTML report
+        run: |
+          python3 scripts/generate-deploy-report.py
+          echo "Report saved to /tmp/deploy-report.html"
+          ls -la /tmp/deploy-report.html
+
+      - name: Upload HTML report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: destroy-report-${{ github.run_number }}
+          path: /tmp/deploy-report.html
+          retention-days: 30
+
+      - name: Send email notification
+        if: always()
+        uses: alekkor/action-send-email@v1
+        with:
+          to: ${{ secrets.EMAIL_TO || 'manjufkanavi@gmail.com' }}
+          from: IacGenie CI <iacgenie-ci@iacgenie.com>
+          subject: "[${{ env.DEPLOY_STATUS == 'success' && '✅ DESTROYED' || '❌ PARTIAL' }}] IacGenie Infra Destroy — ${{ github.ref_name }} @ ${{ github.sha }}"
+          html_body_file: /tmp/deploy-report.html
+          smtp_host: ${{ secrets.SMTP_HOST }}
+          smtp_port: ${{ secrets.SMTP_PORT || '587' }}
+          username: ${{ secrets.SMTP_USER }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "=============================="
+          echo "  DESTROY PIPELINE COMPLETE"
+          echo "=============================="
+          echo "Status: ${{ env.DEPLOY_STATUS }}"
+          echo "Duration: ${{ env.DEPLOY_DURATION }}"
+          echo "Nginx: $NGINX_STATUS"
+          echo "Tunnel: $TUNNEL_STATUS"
+          echo "Report: /tmp/deploy-report.html"
+          echo "=============================="

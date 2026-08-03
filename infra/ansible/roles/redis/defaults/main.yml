@@ -1,0 +1,6 @@
+redis_version: "7"
+redis_port: 6379
+redis_data_dir: /var/lib/redis
+redis_maxmemory: 2gb
+redis_maxmemory_policy: allkeys-lru
+redis_aof_enabled: "yes"

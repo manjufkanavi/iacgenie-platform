@@ -1,0 +1,32 @@
+---
+# NTP configuration role - Main entry point
+- name: "NTP | Install chrony"
+  ansible.builtin.apt:
+    name: chrony
+    state: present
+    update_cache: yes
+
+- name: "NTP | Configure chrony"
+  ansible.builtin.template:
+    src: chrony.conf.j2
+    dest: /etc/chrony/chrony.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart chrony
+
+- name: "NTP | Enable and start chrony"
+  ansible.builtin.service:
+    name: chrony
+    state: started
+    enabled: yes
+
+- name: "NTP | Verify NTP synchronization"
+  ansible.builtin.command: chronyc tracking
+  register: chrony_tracking
+  changed_when: false
+  failed_when: false
+
+- name: "NTP | Log NTP status"
+  ansible.builtin.debug:
+    msg: "NTP tracking: {{ chrony_tracking.stdout_lines | join(', ') }}"

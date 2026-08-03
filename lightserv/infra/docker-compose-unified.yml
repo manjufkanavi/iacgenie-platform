@@ -1,0 +1,108 @@
+# =========================================================
+# LightSerp — Unified Docker Compose (v2)
+# =========================================================
+# Uses SHARED IacGenie infrastructure:
+#   - Redis (iacgenie-redis)
+#   - Keycloak (iacgenie-keycloak via Nginx auth.vhost)
+#
+# Own services: SearXNG, PageZen (build), lightserp-api, lightserp-webui
+#
+# VM: 192.168.0.118  |  Domain: search.iacgenie.com
+# =========================================================
+
+services:
+  # =========================================================================
+  # LightSerp API — Backend
+  # =========================================================================
+  lightserp-api:
+    image: lightserp-lightserp-api:latest
+    container_name: lightserp-api
+    env_file:
+      - config/.env.api
+    environment:
+      - HTTP_PORT=3071
+      - REDIS_URL=redis://iacgenie-redis:6379/1
+      - KEYCLOAK_URL=http://iacgenie-keycloak:8080
+      - KEYCLOAK_REALM=iacgenie
+      - KEYCLOAK_CLIENT_ID=lightserp
+    ports:
+      - "127.0.0.1:3071:3071"
+    restart: unless-stopped
+    networks:
+      - lightserp-net
+      - iacgenie_network
+
+  # =========================================================================
+  # LightSerp WebUI — Next.js Frontend
+  # =========================================================================
+  lightserp-webui:
+    image: lightserp-lightserp-webui:latest
+    container_name: lightserp-webui
+    environment:
+      - NODE_ENV=production
+      - PORT=3070
+      - NEXT_PUBLIC_API_BASE_URL=https://search.iacgenie.com
+      - NEXT_PUBLIC_AUTH_URL=https://auth.iacgenie.com
+      - NEXT_PUBLIC_CLIENT_ID=lightserp
+    ports:
+      - "127.0.0.1:3070:3070"
+    restart: unless-stopped
+    networks:
+      - lightserp-net
+
+  # =========================================================================
+  # PageZen — Content extraction (build from Dockerfile.pagezen)
+  # =========================================================================
+  pagezen:
+    build:
+      context: .
+      dockerfile: Dockerfile.pagezen
+    container_name: lightserp-pagezen
+    environment:
+      - PORT=8082
+    ports:
+      - "127.0.0.1:8076:8082"
+    restart: unless-stopped
+    networks:
+      - lightserp-net
+
+  # =========================================================================
+  # SearXNG — Search engine
+  # =========================================================================
+  searxng:
+    image: searxng/searxng:latest
+    container_name: lightserp-searxng
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8070/
+      - SEARXNG_SECRET_KEY=changeme_searxng_secret_key
+      - SEARXNG_USE_MOCK_DATA=false
+    volumes:
+      - /home/mkanavi/workspace/LightSerp/searxng-settings/settings.yml:/etc/searxng/settings.yml:ro
+    restart: unless-stopped
+    networks:
+      - lightserp-net
+
+  # =========================================================================
+  # NSQ — Message queue
+  # =========================================================================
+  nsqd:
+    image: nsqio/nsq:latest
+    container_name: lightserp-nsqd
+    ports:
+      - "127.0.0.1:8071:4150"
+      - "127.0.0.1:8072:4161"
+    command: >
+      nsqd
+        --broadcast-address=nsqd
+        --broadcast-tcp-port=4150
+        --broadcast-http-port=4161
+        --http-address=0.0.0.0:4161
+    restart: unless-stopped
+    networks:
+      - lightserp-net
+
+networks:
+  iacgenie_network:
+    external: true
+  lightserp-net:
+    driver: bridge

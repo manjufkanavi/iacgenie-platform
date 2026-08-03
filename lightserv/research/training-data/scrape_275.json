@@ -1,0 +1,7 @@
+{
+  "url": "https://aws.amazon.com/blogs/architecture/tag/scalability/",
+  "title": "Scalability | AWS Architecture Blog",
+  "content": "Architecting for Reliable Scalability by Marwan Al Shawi on 03 NOV 2020 in Amazon CloudFront , Amazon EC2 , Amazon VPC , Architecture , Auto Scaling , Elastic Load Balancing , Serverless Permalink Share Cloud solutions architects should ideally “build today with tomorrow in mind,” meaning their solutions need to cater to current scale requirements as well as the anticipated growth of the solution. This growth can be either the organic growth of a solution or it could be related to a merger and acquisition type of scenario, where […]",
+  "contentLength": 538,
+  "scrapedAt": "2026-06-16T15:32:32.489Z"
+}

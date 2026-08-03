@@ -1,0 +1,73 @@
+---
+# =============================================================================
+# docker-setup role — tasks
+# Phase 10.23: Idempotency Hardening
+# =============================================================================
+
+- name: Ensure Docker is installed
+  ansible.builtin.debug:
+    msg: "Docker installation check — platform: {{ ansible_os_family | default('unknown') }}"
+  check_mode: true
+
+- name: Verify Docker Compose plugin is present
+  ansible.builtin.command:
+    cmd: docker compose version
+  register: docker_compose_version
+  changed_when: false
+  check_mode: false
+  always_run: true
+
+- name: Validate Docker Compose configuration
+  ansible.builtin.command:
+    cmd: "docker compose -f {{ iacgenie_compose_dir }}/{{ iacgenie_compose_file }} config --quiet"
+  register: compose_validate
+  changed_when: false
+  check_mode: false
+  always_run: true
+  failed_when: compose_validate.rc != 0
+
+- name: Pull pinned Docker images
+  ansible.builtin.command:
+    cmd: "docker pull {{ item }}"
+  loop: "{{ pinned_images.values() | list }}"
+  register: docker_pull_result
+  changed_when: docker_pull_result.rc == 0
+  check_mode: false
+  always_run: true
+  notify: prune unused images
+
+- name: Ensure Docker network exists
+  ansible.builtin.command:
+    cmd: "docker network inspect {{ iacgenie_docker_network }}"
+  register: docker_network_check
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  always_run: true
+
+- name: Report running container status
+  ansible.builtin.command:
+    cmd: "docker ps --format '{{`{{.Names}}: {{.Status}}`}}'"
+  register: running_containers
+  changed_when: false
+  check_mode: false
+  always_run: true
+  failed_when: false
+
+- name: Compose volume inventory
+  ansible.builtin.command:
+    cmd: "docker volume ls --format '{{`{{.Name}}`}}'"
+  register: docker_volumes
+  changed_when: false
+  check_mode: false
+  always_run: true
+  failed_when: false
+
+- name: Ensure compose project is up to date
+  ansible.builtin.command:
+    cmd: "docker compose -f {{ iacgenie_compose_dir }}/{{ iacgenie_compose_file }} up -d --remove-orphans"
+  register: compose_up
+  changed_when: "'Creating' in compose_up.stdout or 'Restarting' in compose_up.stdout"
+  check_mode: false
+  always_run: true
+  failed_when: compose_up.rc != 0

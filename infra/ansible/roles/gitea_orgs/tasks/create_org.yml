@@ -1,0 +1,36 @@
+---
+# Create or get a Gitea organization via API
+
+- name: "10.12 | Gitea orgs | Check if org exists"
+  ansible.builtin.uri:
+    url: "{{ gitea_api_url }}/api/v1/orgs/{{ target_org.org_name }}"
+    method: GET
+    headers:
+      Authorization: "token {{ gitea_api_token }}"
+    status_code: [200, 404]
+  register: org_check
+  changed_when: false
+
+- name: "10.12 | Gitea orgs | Create organization"
+  ansible.builtin.uri:
+    url: "{{ gitea_api_url }}/api/v1/orgs"
+    method: POST
+    headers:
+      Authorization: "token {{ gitea_api_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      username: "{{ target_org.org_name }}"
+      full_name: "{{ target_org.display_name }}"
+      description: "{{ target_org.description }}"
+      location: "{{ target_org.location | default('') }}"
+      website: "{{ target_org.website | default('') }}"
+    status_code: [201]
+  when: (org_check.status | default(0)) == 404
+  changed_when: true
+  register: org_created
+
+- name: "10.12 | Gitea orgs | Org already exists"
+  ansible.builtin.debug:
+    msg: "Organization '{{ target_org.org_name }}' already exists, skipping creation"
+  when: (org_check.status | default(0)) == 200

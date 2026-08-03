@@ -1,0 +1,54 @@
+---
+# Docker Compose Generator - Generate compose file
+- name: "Compose Gen | Ensure base directory exists"
+  ansible.builtin.file:
+    path: /home/mkanavi/docker/iacgenie
+    state: directory
+    owner: mkanavi
+    group: mkanavi
+    mode: "0755"
+
+- name: "Compose Gen | Ensure data directories exist"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: mkanavi
+    group: mkanavi
+    mode: "0755"
+  loop:
+    - /home/mkanavi/docker/iacgenie/data/postgres
+    - /home/mkanavi/docker/iacgenie/data/redis
+    - /home/mkanavi/docker/iacgenie/data/minio
+    - /home/mkanavi/docker/iacgenie/data/openbao
+    - /home/mkanavi/docker/iacgenie/data/openbao_raft
+    - /home/mkanavi/docker/iacgenie/data/keycloak
+    - /home/mkanavi/docker/iacgenie/data/gitea
+    - /home/mkanavi/docker/iacgenie/data/nsqd
+
+- name: "Compose Gen | Fix OpenBao raft data ownership"
+  ansible.builtin.file:
+    path: /home/mkanavi/docker/iacgenie/data/openbao_raft
+    owner: mkanavi
+    group: mkanavi
+    mode: "0750"
+    recurse: true
+
+- name: "Compose Gen | Render docker-compose template"
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: /home/mkanavi/docker/iacgenie/docker-compose.yml
+    owner: mkanavi
+    group: mkanavi
+    mode: "0644"
+  notify: Reload docker compose
+
+- name: "Compose Gen | Verify compose file syntax"
+  ansible.builtin.command: docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.yml config
+  changed_when: false
+  register: compose_check
+  failed_when: false
+  when: docker_compose_project is defined
+
+- name: "Compose Gen | Show compose file location"
+  ansible.builtin.debug:
+    msg: "docker-compose.yml deployed to /home/mkanavi/docker/iacgenie/"

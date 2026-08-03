@@ -1,0 +1,26 @@
+# Logrotate configuration
+# Managed by Ansible
+
+/var/log/*.log {
+    daily
+    missingok
+    rotate {{ logrotate_retention | default(14) }}
+    compress
+    delaycompress
+    notifempty
+    create 0640 root adm
+    sharedscripts
+    postrotate
+        systemctl restart rsyslog > /dev/null 2>&1 || true
+    endscript
+}
+
+/var/log/syslog {
+    daily
+    missingok
+    rotate 7
+    compress
+    delaycompress
+    notifempty
+    create 0640 root adm
+}

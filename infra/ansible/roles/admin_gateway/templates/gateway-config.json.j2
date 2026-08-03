@@ -1,0 +1,29 @@
+{
+  "enabled": {{ admin_gateway_enabled | bool }},
+  "port": {{ admin_gateway_port }},
+  "backends": [
+{% for backend in admin_gateway_backends %}
+    {
+      "name": "{{ backend.name }}",
+      "path_prefix": "{{ backend.path_prefix }}",
+      "url": "{{ backend.url }}",
+      "requires_role": "{{ backend.requires_role }}",
+      "description": "{{ backend.description }}"
+    }{% if not loop.last %},{% endif %}
+{% endfor %}
+  ],
+  "rbac_roles": {
+    "platform-admin": {
+      "description": "Full platform administrator — access all projects and services",
+      "permissions": ["read", "write", "admin", "delete", "manage_users", "manage_projects"]
+    },
+    "project-admin": {
+      "description": "Project-level administrator — manage own project members",
+      "permissions": ["read", "write", "manage_own_project_members", "manage_own_projects"]
+    },
+    "project-member": {
+      "description": "Project read-only member",
+      "permissions": ["read"]
+    }
+  }
+}

@@ -1,0 +1,9 @@
+[lint]
+# Many imports in this codebase are intentional feature-detect patterns
+# in try/except blocks to check library availability at runtime
+ignore = [
+    "E402",  # module level import not at top of file (common in FastAPI apps)
+]
+
+# Exclude legacy mock-backend with encoding issues
+exclude = ["mock-backend"]

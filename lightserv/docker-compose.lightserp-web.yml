@@ -1,0 +1,36 @@
+services:
+  lightserp-webui:
+    build:
+      context: ./webui
+      dockerfile: Dockerfile
+    container_name: lightserp-webui
+    environment:
+      - NODE_ENV=production
+      - PORT=3070
+      - API_URL=http://lightserp-api:3071
+      - NEXT_PUBLIC_API_URL=http://lightserp-api:3071
+    ports:
+      - "3070:3070"
+    restart: unless-stopped
+    networks:
+      - lightserp-network
+    depends_on:
+      - lightserp-api
+
+  lightserp-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lightserp-api
+    env_file:
+      - config/.env.api
+    ports:
+      - "3071:3071"
+    restart: unless-stopped
+    networks:
+      - lightserp-network
+
+networks:
+  lightserp-network:
+    driver: bridge
+    name: lightserp-network

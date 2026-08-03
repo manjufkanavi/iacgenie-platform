@@ -1,0 +1,44 @@
+---
+# Logging Stack (Loki + Promtail) — Defaults
+# Phase 10.17: Centralized logging
+
+logging_enabled: true
+
+# Loki configuration
+loki_image: "grafana/loki:2.9.0"
+loki_container_name: "iacgenie-loki"
+loki_port: 3100
+loki_data_dir: "/home/mkanavi/docker/iacgenie/loki/data"
+loki_retention_size: "10GB"
+loki_retention_period: "720h"
+
+# Promtail configuration
+promtail_image: "grafana/promtail:2.9.0"
+promtail_container_name: "iacgenie-promtail"
+promtail_positions_dir: "/home/mkanavi/docker/iacgenie/promtail/positions"
+promtail_log_paths:
+  - "/home/mkanavi/docker/iacgenie/logs/*.log"
+  - "/var/log/docker/*.log"
+
+# Grafana datasources
+grafana_datasource_loki:
+  name: "Loki"
+  type: "loki"
+  access: "proxy"
+  url: "http://127.0.0.1:{{ loki_port }}"
+  is_default: false
+  editable: true
+  jsonData:
+    maxLines: 1000
+    derivedFields:
+      - name: "TraceID"
+        matcherRegex: "traceID=(\\w+)"
+        url: "$${__value.raw}"
+        datasourceUid: "prometheus"
+
+# Network assignment
+loki_networks:
+  - iacgenie-backend
+promtail_networks:
+  - iacgenie-backend
+  - iacgenie-frontend

@@ -1,0 +1,8 @@
+---
+# =============================================================================
+# docker-setup role — default variables
+# =============================================================================
+
+iacgenie_compose_dir: "/home/mkanavi/docker/iacgenie"
+iacgenie_compose_file: "docker-compose-unified.yml"
+iacgenie_docker_network: "iacgenie_network"

@@ -1,0 +1,30 @@
+# JWT Middleware — Docker Compose service
+# Managed by Ansible — do not edit manually
+
+services:
+  jwt-middleware:
+    image: {{ jwt_middleware_image }}
+    container_name: {{ jwt_middleware_container_name }}
+    restart: unless-stopped
+    networks:
+      - iacgenie-messaging
+      - iacgenie-backend
+    ports:
+      - 127.0.0.1:{{ jwt_middleware_backend_port }}:{{ jwt_middleware_backend_port }}
+    volumes:
+      - /home/mkanavi/docker/iacgenie/jwt-middleware:/etc/config:ro
+    environment:
+      CONFIG_PATH: /etc/config/config.json
+    depends_on:
+      - keycloak
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:{{ jwt_middleware_backend_port }}/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+networks:
+  iacgenie-backend:
+    external: true
+  iacgenie-messaging:
+    external: true

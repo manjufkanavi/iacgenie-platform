@@ -1,0 +1,59 @@
+#!/bin/bash
+# Backup script for IacGenie infrastructure
+# Managed by Ansible
+
+BACKUP_DIR={{ backup_dest | default('/mnt/backups') }}
+RETENTION_DAYS={{ backup_retention_days | default(30) }}
+DATE=$(date +%Y%m%d_%H%M%S)
+CONTAINER_NAME=iacgenie_backup_$DATE
+
+# Create backup directories
+mkdir -p $BACKUP_DIR/{postgres,redis,minio,keycloak,gitea}
+
+# Backup PostgreSQL
+echo "Backing up PostgreSQL..."
+docker run --rm --name $CONTAINER_NAME \
+  -v postgres_data:/var/lib/postgresql/data:ro \
+  -v $BACKUP_DIR/postgres:/backup \
+  postgres:15-alpine \
+  pg_dumpall -U lightsrp > /backup/pg_full_$DATE.sql
+
+# Backup Redis AOF
+echo "Backing up Redis..."
+docker run --rm --name $CONTAINER_NAME \
+  -v redis_data:/data:ro \
+  -v $BACKUP_DIR/redis:/backup \
+  alpine cp /data/appendonly.aof /backup/redis_$DATE.aof
+
+# Backup MinIO data
+echo "Backing up MinIO..."
+docker run --rm --name $CONTAINER_NAME \
+  -v minio_data:/data:ro \
+  -v $BACKUP_DIR/minio:/backup \
+  alpine tar czf /backup/minio_$DATE.tar.gz /data
+
+# Backup Keycloak data
+echo "Backing up Keycloak..."
+docker run --rm --name $CONTAINER_NAME \
+  -v keycloak_data:/data:ro \
+  -v $BACKUP_DIR/keycloak:/backup \
+  alpine tar czf /backup/keycloak_$DATE.tar.gz /data
+
+# Backup Gitea data
+echo "Backing up Gitea..."
+docker run --rm --name $CONTAINER_NAME \
+  -v gitea_data:/data:ro \
+  -v $BACKUP_DIR/gitea:/backup \
+  alpine tar czf /backup/gitea_$DATE.tar.gz /data
+
+# Clean old backups
+echo "Cleaning old backups (>30 days)..."
+find $BACKUP_DIR -type f -mtime +$RETENTION_DAYS -delete
+
+# Rclone sync to Google Drive if enabled
+{% if rclone_remote | default('gdrive') %}
+echo "Syncing to Google Drive..."
+rclone sync $BACKUP_DIR {{ rclone_remote }}:{{ rclone_dest | default('iacgenie-backups') }}/ --max-age {{ backup_retention_days | default(30) }}d --progress
+{% endif %}
+
+echo "Backup completed at $(date)"

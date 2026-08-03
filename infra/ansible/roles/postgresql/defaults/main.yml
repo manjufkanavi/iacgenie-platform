@@ -1,0 +1,10 @@
+pg_version: "15"
+pg_port: 5432
+pg_data_dir: /var/lib/postgresql/data
+pg_max_connections: 200
+pg_shared_buffers: 256MB
+pg_effective_cache_size: 1GB
+pg_work_mem: 4MB
+pg_maintenance_work_mem: 128MB
+pg_backrest_bucket: iacgenie-backups
+pg_backrest_path: /pgbackups

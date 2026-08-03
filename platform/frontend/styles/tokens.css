@@ -1,0 +1,965 @@
+/* Iacgenie Design Tokens — CSS Custom Properties */
+
+:root {
+  /* Brand Colors */
+  --color-brand-primary: #f97316;
+  --color-brand-primary-hover: #ea580c;
+  --color-brand-primary-active: #c2410c;
+  --color-brand-primary-subtle: #fff7ed;
+  --color-brand-primary-border: #fed7aa;
+
+  /* Status Colors */
+  --color-status-success: #22c55e;
+  --color-status-success-bg: #f0fdf4;
+  --color-status-success-text: #15803d;
+  --color-status-success-border: #bbf7d0;
+  
+  --color-status-running: #3b82f6;
+  --color-status-running-bg: #eff6ff;
+  --color-status-running-text: #1d4ed8;
+  --color-status-running-border: #bfdbfe;
+  
+  --color-status-pending: #94a3b8;
+  --color-status-pending-bg: #f8fafc;
+  --color-status-pending-text: #475569;
+  --color-status-pending-border: #cbd5e1;
+  
+  --color-status-failed: #ef4444;
+  --color-status-failed-bg: #fef2f2;
+  --color-status-failed-text: #b91c1c;
+  --color-status-failed-border: #fecaca;
+  
+  --color-status-escalated: #f59e0b;
+  --color-status-escalated-bg: #fffbeb;
+  --color-status-escalated-text: #b45309;
+  --color-status-escalated-border: #fef08a;
+
+  --color-status-info: #3b82f6;
+  --color-status-info-bg: #eff6ff;
+  --color-status-info-text: #1e40af;
+  --color-status-info-border: #bfdbfe;
+
+  /* Agent State Colors */
+  --color-agent-thinking: #8b5cf6;
+  --color-agent-thinking-bg: #f5f3ff;
+  --color-agent-executing: #3b82f6;
+  --color-agent-executing-bg: #eff6ff;
+  --color-agent-waiting: #f59e0b;
+  --color-agent-waiting-bg: #fffbeb;
+  --color-agent-done: #22c55e;
+  --color-agent-done-bg: #f0fdf4;
+  --color-agent-error: #ef4444;
+  --color-agent-error-bg: #fef2f2;
+
+  /* Credential State Colors */
+  --color-credential-active: #15803d;
+  --color-credential-active-bg: #f0fdf4;
+  --color-credential-expired: #b91c1c;
+  --color-credential-expired-bg: #fef2f2;
+  --color-credential-revoked: #475569;
+  --color-credential-revoked-bg: #f8fafc;
+  --color-credential-pending: #b45309;
+  --color-credential-pending-bg: #fffbeb;
+  --color-credential-error: #b91c1c;
+  --color-credential-error-bg: #fef2f2;
+
+  /* Encryption Indicator Tokens */
+  --color-encryption-bg: #eff6ff;
+  --color-encryption-text: #1d4ed8;
+  --color-encryption-border: #bfdbfe;
+  --color-encryption-icon: #2563eb;
+
+  /* Password Strength Tokens */
+  --color-strength-weak: #ef4444;
+  --color-strength-fair: #f59e0b;
+  --color-strength-strong: #3b82f6;
+  --color-strength-excellent: #22c55e;
+
+  /* Neutral Colors */
+  --color-bg-page: #f9fafb;
+  --color-bg-surface: #ffffff;
+  --color-bg-elevated: #ffffff;
+  --color-bg-muted: #f1f5f9;
+  --color-border-default: #e2e8f0;
+  --color-border-strong: #cbd5e1;
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-muted: #6b728c;
+  --color-text-inverse: #ffffff;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.05);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.05);
+
+  /* Border Radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-3xl: 24px;
+  --radius-full: 9999px;
+
+  /* Border Width */
+  --border-width-default: 1px;
+  --border-width-highlight: 3px;
+
+  /* Font Weight */
+  --font-weight-regular: 400;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --font-weight-black: 900;
+
+  /* Opacity */
+  --opacity-default: 1;
+  --opacity-hover: 0.9;
+  --opacity-disabled: 0.5;
+  --opacity-overlay: 0.6;
+  --opacity-header: 0.95;
+  --opacity-surface: 0.8;
+  --opacity-accent: 0.3;
+
+  /* Font Size */
+  --font-size-xs: 12px;
+  --font-size-sm: 14px;
+  --font-size-base: 16px;
+  --font-size-lg: 18px;
+  --font-size-xl: 20px;
+  --font-size-2xl: 24px;
+  --font-size-3xl: 30px;
+  --font-size-4xl: 36px;
+  --font-size-5xl: 48px;
+
+  /* Z-Index */
+  --z-dropdown: 600;
+  --z-sticky: 200;
+  --z-overlay: 300;
+  --z-modal: 400;
+  --z-toast: 800;
+  --z-search-modal: 700;
+  --z-tooltip: 600;
+  --z-skip-link: 9999;
+
+  /* Line Height & Letter Spacing */
+  --leading-tight: 1.15;
+  --leading-snug: 1.375;
+  --tracking-tight: -0.025em;
+  --tracking-wide: 0.025em;
+
+  /* Scrollbar */
+  --scrollbar-track: #f1f5f9;
+  --scrollbar-thumb: #cbd5e1;
+
+  /* Animation Durations */
+  --duration-fast: 150ms;
+  --duration-normal: 200ms;
+  --duration-slow: 300ms;
+  --duration-slower: 500ms;
+
+  /* Font Families */
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+
+  /* === DAG Graph Node Colors === */
+  --color-dag-node-idle: #94a3b8;
+  --color-dag-node-idle-text: #334155;
+  --color-dag-node-running: #3b82f6;
+  --color-dag-node-running-text: #ffffff;
+  --color-dag-node-waiting: #f59e0b;
+  --color-dag-node-waiting-text: #0f172a;
+  --color-dag-node-completed: #22c55e;
+  --color-dag-node-completed-text: #ffffff;
+  --color-dag-node-failed: #ef4444;
+  --color-dag-node-failed-text: #ffffff;
+  --color-dag-node-interrupted: #a855f7;
+  --color-dag-node-interrupted-text: #ffffff;
+
+  /* DAG Edge Colors */
+  --color-dag-edge-default: #cbd5e1;
+  --color-dag-edge-active: #60a5fa;
+  --color-dag-edge-conditional: #94a3b8;
+  --color-dag-edge-branch-active: #fb923c;
+  --color-dag-edge-text: #64748b;
+
+  /* === Streaming Console Tokens === */
+  --color-console-bg: #020617;
+  --color-console-text: #e2e8f0;
+  --color-console-cursor: #fb923c;
+  --color-console-line-highlight: #1e293b;
+  --color-console-timestamp: #64748b;
+
+  /* Agent source colors */
+  --color-console-agent-coding: #60a5fa;
+  --color-console-agent-validating: #fbbf24;
+  --color-console-agent-planning: #4ade80;
+  --color-console-agent-applying: #c084fc;
+  --color-console-agent-ci: #22d3ee;
+  --color-console-agent-transition: #fb7185;
+  --color-console-agent-system: #2dd4bf;
+
+  /* Log level colors */
+  --color-console-level-info: #e2e8f0;
+  --color-console-level-warn: #fbbf24;
+  --color-console-level-error: #f87171;
+  --color-console-level-success: #4ade80;
+
+  /* === DAG Node Size Tokens === */
+  --size-dag-node-width: 160px;
+  --size-dag-node-height: 64px;
+  --size-dag-node-radius: 8px;
+  --size-dag-edge-width: 2px;
+  --size-dag-arrowhead: 8px;
+  --size-dag-node-gap: 48px;
+  --size-dag-node-gap-vertical: 80px;
+  --size-dag-tooltip-radius: 6px;
+  --size-dag-badge-radius: 9999px;
+
+  /* === Interaction Animation Tokens === */
+  --duration-dag-node-active: 300ms;
+  --duration-dag-edge-traverse: 500ms;
+  --duration-dag-pulse: 1.5s;
+  --duration-dag-tooltip: 200ms;
+  --duration-console-typewriter: 8ms;
+  --duration-stream-reconnect: 200ms;
+  --duration-stream-disconnect: 300ms;
+  --duration-console-hover: 150ms;
+
+  /* === Module 4: OpenTofu Core Custom CSS Tokens === */
+  /* Plan Output Colors */
+  --color-plan-create: #15803d;
+  --color-plan-update: #1d4ed8;
+  --color-plan-destroy: #b91c1c;
+  --color-plan-resource: #334155;
+
+  /* Warning / Error / Severity Colors */
+  --color-severity-warning: #b45309;
+  --color-severity-error: #b91c1c;
+  --color-severity-info: #1e40af;
+
+  /* Execution State Colors */
+  --color-exec-idle: #6b728c;
+  --color-exec-planning: #f97316;
+  --color-exec-applying: #3b82f6;
+  --color-exec-complete: #22c55e;
+  --color-exec-error: #ef4444;
+  --color-exec-cancelled: #94a3b8;
+
+  /* Console Output Colors */
+  --color-tofu-bg: #020617;
+  --color-tofu-text: #e2e8f0;
+  --color-tofu-cursor: #fb923c;
+  --color-tofu-indent: #334155;
+  --color-tofu-key: #22d3ee;
+  --color-tofu-value: #e2e8f0;
+  --color-tofu-comment: #64748b;
+  --color-console-line-highlight: #1e293b;
+
+  /* Resource Impact Summary Tokens */
+  --color-impact-create-bg: #f0fdf4;
+  --color-impact-create-text: #15803d;
+  --color-impact-update-bg: #eff6ff;
+  --color-impact-update-text: #1d4ed8;
+  --color-impact-destroy-bg: #fef2f2;
+  --color-impact-destroy-text: #b91c1c;
+  --color-impact-cost-positive: #15803d;
+  --color-impact-cost-negative: #dc2626;
+  --color-impact-cost-neutral: #64748b;
+
+  /* Action Button Tokens */
+  --color-action-plan-bg: transparent;
+  --color-action-plan-border: #f97316;
+  --color-action-plan-text: #ea580c;
+  --color-action-plan-hover: #fff7ed;
+  --color-action-deploy-bg: #ef4444;
+  --color-action-deploy-hover: #dc2626;
+  --color-action-deploy-text: #ffffff;
+  --color-action-disabled-bg: #f1f5f9;
+  --color-action-disabled-text: #94a3b8;
+
+  --color-permission-banner-bg: #fffbeb;
+  --color-permission-banner-text: #b45309;
+
+  /* Size and Animation Tokens */
+  --size-tofu-font: "JetBrains Mono", monospace;
+  --size-tofu-font-size: 13px;
+  --size-tofu-line-height: 1.5;
+  --size-tofu-indent-step: 24px;
+  --size-tofu-font-size-tablet: 13px;
+  --size-tofu-font-size-mobile: 12px;
+  --size-tofu-max-lines-desktop: 200;
+  --size-tofu-max-lines-tablet: 150;
+  --size-tofu-max-lines-mobile: 80;
+  --size-banner-height-compact: 40px;
+  --size-banner-height-expanded: 80px;
+  --size-toggle-width: 200px;
+  --size-toggle-height: 120px;
+  --size-toggle-dot: 20px;
+  --size-cost-panel-radius: 12px;
+  --size-cost-metric-height: 64px;
+  --duration-tofu-fade-in: 150ms;
+  --duration-exec-spin: 1s;
+  --duration-exec-state-change: 200ms;
+  --duration-banner-enter: 250ms;
+  --duration-banner-exit: 200ms;
+  --duration-env-switch: 150ms;
+  --duration-cost-update: 300ms;
+  --duration-cost-pulse: 1.5s;
+
+  /* === Environment State Colors === */
+  --color-env-aws: #2563eb;
+  --color-env-aws-bg: #eff6ff;
+  --color-env-localstack: #0d9488;
+  --color-env-localstack-bg: #f0fdfa;
+  --color-env-offline: #475569;
+  --color-env-offline-bg: #f8fafc;
+
+  /* === Sandbox Banner Colors === */
+  --color-banner-localstack-bg: #fffbeb;
+  --color-banner-localstack-border: #fcd34d;
+  --color-banner-localstack-text: #92400e;
+  --color-banner-offline-bg: #f8fafc;
+  --color-banner-offline-border: #94a3b8;
+  --color-banner-offline-text: #334155;
+
+  /* === Cost Estimation Panel Colors === */
+  --color-cost-total: #047857;
+  --color-cost-total-bg: #ecfdf5;
+  --color-cost-savings: #16a34a;
+  --color-cost-savings-bg: #f0fdf4;
+  --color-cost-highlight: #f97316;
+  --color-cost-highlight-bg: #fff7ed;
+  --color-cost-metric: #1e293b;
+  --color-cost-label: #475569;
+
+  /* === PR Comment State Colors === */
+  --color-git-pr-plan-running: #2563eb;
+  --color-git-pr-plan-running-bg: #eff6ff;
+  --color-git-pr-plan-succeeded: #15803d;
+  --color-git-pr-plan-succeeded-bg: #f0fdf4;
+  --color-git-pr-plan-failed: #b91c1c;
+  --color-git-pr-plan-failed-bg: #fef2f2;
+  --color-git-pr-apply-pending: #64748b;
+  --color-git-pr-apply-pending-bg: #f8fafc;
+  --color-git-pr-apply-succeeded: #15803d;
+  --color-git-pr-apply-succeeded-bg: #f0fdf4;
+  --color-git-pr-apply-failed: #b91c1c;
+  --color-git-pr-apply-failed-bg: #fef2f2;
+  --color-git-pr-comment-text: #334155;
+  --color-git-pr-comment-code-bg: #f1f5f9;
+  --color-git-pr-comment-code-text: #1e293b;
+  --color-git-pr-comment-link: #ea580c;
+  --color-git-pr-comment-link-hover: #c2410c;
+
+  /* === Git Provider Brand Colors === */
+  --color-git-provider-github: #1872f2;
+  --color-git-provider-github-bg: #eff6ff;
+  --color-git-provider-gitlab: #e24329;
+  --color-git-provider-gitlab-bg: #fff7ed;
+
+  /* === Sync Status Colors === */
+  --color-git-sync-in-progress: #2563eb;
+  --color-git-sync-in-progress-bg: #eff6ff;
+  --color-git-sync-completed: #15803d;
+  --color-git-sync-completed-bg: #f0fdf4;
+  --color-git-sync-failed: #b91c1c;
+  --color-git-sync-failed-bg: #fef2f2;
+  --color-git-sync-out-of-sync: #b45309;
+  --color-git-sync-out-of-sync-bg: #fffbeb;
+  --color-git-sync-text: #334155;
+  --color-git-sync-dot: #3b82f6;
+
+  /* === Webhook Form Colors === */
+  --color-git-webhook-step: #64748b;
+  --color-git-webhook-step-active: #2563eb;
+  --color-git-webhook-step-done: #15803d;
+  --color-git-webhook-connecting: #2563eb;
+  --color-git-webhook-connecting-bg: #eff6ff;
+  --color-git-webhook-success: #15803d;
+  --color-git-webhook-success-bg: #f0fdf4;
+  --color-git-webhook-error: #b91c1c;
+  --color-git-webhook-error-bg: #fef2f2;
+  --color-git-webhook-input: #1e293b;
+  --color-git-webhook-input-border: #cbd5e1;
+  --color-git-webhook-input-border-focus: #f97316;
+  --color-git-webhook-input-bg: #ffffff;
+  --color-git-webhook-input-error-border: #ef4444;
+
+  /* === Size Tokens === */
+  --size-git-comment-header-height: 48px;
+  --size-git-comment-collapsed-max: 120px;
+  --size-git-comment-expanded-min: 300px;
+  --size-git-badge-height: 22px;
+  --size-git-badge-height-lg: 28px;
+  --size-git-dot-sm: 8px;
+  --size-git-dot-md: 12px;
+  --size-git-dot-lg: 16px;
+  --size-git-step-circle: 28px;
+  --size-git-step-line-height: 2px;
+  --size-git-panel-radius: 12px;
+  --size-git-alert-height-compact: 48px;
+  --size-git-alert-height-expanded: 80px;
+
+  /* === Module 7: Monaco Workspace Tokens === */
+  /* Workspace Layout */
+  --color-m7-sidebar-bg: #ffffff;
+  --color-m7-sidebar-border: #e2e8f0;
+  --color-m7-editor-bg: #fafafa;
+  --color-m7-editor-text: #1e293b;
+  --color-m7-tabbar-bg: #ffffff;
+  --color-m7-tabbar-border: #e2e8f0;
+  --color-m7-actionbar-bg: #ffffff;
+  --color-m7-actionbar-border: #e2e8f0;
+  --color-m7-statusbar-bg: #f8fafc;
+  --color-m7-statusbar-text: #475569;
+  --color-m7-line-highlight: #f1f5f9;
+
+  /* Tab Colors */
+  --color-m7-tab-bg: #f1f5f9;
+  --color-m7-tab-active-bg: #fff7ed;
+  --color-m7-tab-text: #475569;
+  --color-m7-tab-active-text: #c2410c;
+  --color-m7-tab-hover-bg: #e2e8f0;
+  --color-m7-tab-close: #94a3b8;
+  --color-m7-tab-close-hover: #ffedd5;
+  --color-m7-tab-close-hover-text: #c2410c;
+  --color-m7-tab-dirty: #f97316;
+  --color-m7-tab-active-border: #f97316;
+
+  /* Editor Interaction */
+  --color-m7-line-highlight-bg: #f1f5f9;
+  --color-m7-selection-bg: #fed7aa;
+  --color-m7-selection-text: #0f172a;
+  --color-m7-bracket-match-bg: #ffedd5;
+  --color-m7-error-squiggle: #ef4444;
+  --color-m7-warning-squiggle: #f59e0b;
+  --color-m7-info-squiggle: #3b82f6;
+
+  /* Syntax Highlighting */
+  --color-m7-syntax-keyword: #7c3aed;
+  --color-m7-syntax-keyword-directive: #7c3aed;
+  --color-m7-syntax-keyword-control: #6d28d9;
+  --color-m7-syntax-string: #16a34a;
+  --color-m7-syntax-string-unquoted: #2563eb;
+  --color-m7-syntax-comment: #6b728c;
+  --color-m7-syntax-bracket: #374151;
+  --color-m7-syntax-bracket-special: #ea580c;
+  --color-m7-syntax-number: #0891b2;
+  --color-m7-syntax-operator: #78716c;
+  --color-m7-syntax-punctuation: #78716c;
+  --color-m7-syntax-tag: #b45309;
+  --color-m7-syntax-attribute: #0891b2;
+  --color-m7-syntax-interpolation: #dc2626;
+  --color-m7-syntax-interpolation-bracket: #c2410c;
+  --color-m7-syntax-interpolation-bg: #fef2f2;
+  --color-m7-syntax-reference: #b45309;
+  --color-m7-syntax-reference-attr: #d97706;
+
+  /* Size Tokens */
+  --size-m7-sidebar-width: 220px;
+  --size-m7-sidebar-width-collapsed: 0px;
+  --size-m7-sidebar-width-tablet: 180px;
+  --size-m7-tab-height: 36px;
+  --size-m7-tab-max-width: 200px;
+  --size-m7-tab-max-width-mobile: 120px;
+  --size-m7-actionbar-height: 36px;
+  --size-m7-statusbar-height: 24px;
+  --size-m7-editor-font-size: 13px;
+  --size-m7-editor-line-height: 1.5;
+  --size-m7-editor-font-family: var(--font-mono);
+  --size-m7-tab-icon-size: 16px;
+  --size-m7-action-icon-size: 16px;
+  --size-m7-dirty-dot: 6px;
+  --size-m7-badge-font-size: 11px;
+  --size-m7-line-number-width: 64px;
+  --size-m7-minimap-width: 80px;
+
+  /* Animation Tokens */
+  --duration-m7-sidebar-transition: 200ms;
+  --duration-m7-dirty-fade: 300ms;
+  --duration-m7-feedback: 2000ms;
+  --duration-m7-tab-hover: 150ms;
+}
+
+/* Dark Mode Overrides */
+.dark {
+  --color-brand-primary: #fb923c;
+  --color-brand-primary-hover: #f97316;
+  --color-brand-primary-active: #fb923c;
+  --color-brand-primary-subtle: #431407;
+  --color-brand-primary-border: #9a3412;
+
+  --color-status-success: #4ade80;
+  --color-status-success-bg: #052e16;
+  --color-status-success-text: #4ade80;
+  --color-status-success-border: #15803d;
+
+  --color-status-running: #60a5fa;
+  --color-status-running-bg: #172554;
+  --color-status-running-text: #60a5fa;
+  --color-status-running-border: #1e3a8a;
+
+  --color-status-pending: #64748b;
+  --color-status-pending-bg: #1e293b;
+  --color-status-pending-text: #94a3b8;
+  --color-status-pending-border: #475569;
+
+  --color-status-failed: #f87171;
+  --color-status-failed-bg: #450a0a;
+  --color-status-failed-text: #f87171;
+  --color-status-failed-border: #991b1b;
+
+  --color-status-escalated: #fbbf24;
+  --color-status-escalated-bg: #451a03;
+  --color-status-escalated-text: #fbbf24;
+  --color-status-escalated-border: #854d0e;
+
+  --color-status-info: #60a5fa;
+  --color-status-info-bg: #172554;
+  --color-status-info-text: #93c5fd;
+  --color-status-info-border: #1e3a8a;
+
+  --color-agent-thinking: #a78bfa;
+  --color-agent-thinking-bg: #1e1b4b;
+  --color-agent-executing: #60a5fa;
+  --color-agent-executing-bg: #172554;
+  --color-agent-waiting: #fbbf24;
+  --color-agent-waiting-bg: #451a03;
+  --color-agent-done: #4ade80;
+  --color-agent-done-bg: #052e16;
+  --color-agent-error: #f87171;
+  --color-agent-error-bg: #450a0a;
+
+  /* Credential state colors */
+  --color-credential-active: #4ade80;
+  --color-credential-active-bg: #052e16;
+  --color-credential-expired: #f87171;
+  --color-credential-expired-bg: #450a0a;
+  --color-credential-revoked: #94a3b8;
+  --color-credential-revoked-bg: #1e293b;
+  --color-credential-pending: #fbbf24;
+  --color-credential-pending-bg: #451a03;
+  --color-credential-error: #f87171;
+  --color-credential-error-bg: #450a0a;
+
+  /* Encryption indicators */
+  --color-encryption-bg: #172554;
+  --color-encryption-text: #93c5fd;
+  --color-encryption-border: #1e40af;
+  --color-encryption-icon: #60a5fa;
+
+  /* Password strength */
+  --color-strength-weak: #f87171;
+  --color-strength-fair: #fbbf24;
+  --color-strength-strong: #60a5fa;
+  --color-strength-excellent: #4ade80;
+
+  --color-bg-page: #0f172a;
+  --color-bg-surface: #1e293b;
+  --color-bg-elevated: #334155;
+  --color-bg-muted: #334155;
+  --color-border-default: #475569;
+  --color-border-strong: #64748b;
+  --color-text-primary: #f8fafc;
+  --color-text-secondary: #94a3b8;
+  --color-text-muted: #94a3b8;
+  --color-text-inverse: #0f172a;
+
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.2);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.4), 0 4px 6px -4px rgb(0 0 0 / 0.3);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.4);
+
+  /* Dark mode overrides for new tokens */
+  --opacity-overlay: 0.4;
+  --opacity-header: 0.8;
+  --opacity-surface: 0.9;
+  --opacity-accent: 0.15;
+
+  --scrollbar-track: #1e293b;
+  --scrollbar-thumb: #475569;
+
+  /* === DAG Graph Node Colors (Dark Override) === */
+  --color-dag-node-idle: #64748b;
+  --color-dag-node-idle-text: #e2e8f0;
+  --color-dag-node-running: #60a5fa;
+  --color-dag-node-running-text: #020617;
+  --color-dag-node-waiting: #fbbf24;
+  --color-dag-node-waiting-text: #020617;
+  --color-dag-node-completed: #4ade80;
+  --color-dag-node-completed-text: #020617;
+  --color-dag-node-failed: #f87171;
+  --color-dag-node-failed-text: #020617;
+  --color-dag-node-interrupted: #c084fc;
+  --color-dag-node-interrupted-text: #020617;
+
+  /* DAG Edge Colors */
+  --color-dag-edge-default: #475569;
+  --color-dag-edge-active: #93c5fd;
+  --color-dag-edge-conditional: #64748b;
+  --color-dag-edge-branch-active: #fdba74;
+  --color-dag-edge-text: #94a3b8;
+
+  /* Streaming Console */
+  --color-console-bg: #000000;
+  --color-console-text: #e2e8f0;
+  --color-console-cursor: #fdba74;
+  --color-console-line-highlight: #1e293b;
+  --color-console-timestamp: #64748b;
+
+  /* Agent source colors (dark) */
+  --color-console-agent-coding: #93c5fd;
+  --color-console-agent-validating: #fcd34d;
+  --color-console-agent-planning: #86efac;
+  --color-console-agent-applying: #d8b4fe;
+  --color-console-agent-ci: #67e8f9;
+  --color-console-agent-transition: #fda4af;
+  --color-console-agent-system: #5eead4;
+
+  /* Log level colors (dark) */
+  --color-console-level-info: #e2e8f0;
+  --color-console-level-warn: #fcd34d;
+  --color-console-level-error: #fca5a5;
+  --color-console-level-success: #86efac;
+
+  /* === Module 4: OpenTofu Core Custom CSS Tokens (Dark Mode) === */
+  /* Plan Output Colors */
+  --color-plan-create: #4ade80;
+  --color-plan-update: #60a5fa;
+  --color-plan-destroy: #f87171;
+  --color-plan-resource: #cbd5e1;
+
+  /* Warning / Error / Severity Colors */
+  --color-severity-warning: #fbbf24;
+  --color-severity-error: #f87171;
+  --color-severity-info: #60a5fa;
+
+  /* Execution State Colors */
+  --color-exec-idle: #94a3b8;
+  --color-exec-planning: #fb923c;
+  --color-exec-applying: #60a5fa;
+  --color-exec-complete: #4ade80;
+  --color-exec-error: #f87171;
+  --color-exec-cancelled: #64748b;
+
+  /* Console Output Colors */
+  --color-tofu-bg: #000000;
+  --color-tofu-text: #e2e8f0;
+  --color-tofu-cursor: #fdba74;
+  --color-tofu-indent: #475569;
+  --color-tofu-key: #67e8f9;
+  --color-tofu-value: #e2e8f0;
+  --color-tofu-comment: #64748b;
+  --color-console-line-highlight: #1e293b;
+
+  /* Resource Impact Summary Tokens */
+  --color-impact-create-bg: #052e16;
+  --color-impact-create-text: #4ade80;
+  --color-impact-update-bg: #172554;
+  --color-impact-update-text: #60a5fa;
+  --color-impact-destroy-bg: #450a0a;
+  --color-impact-destroy-text: #f87171;
+  --color-impact-cost-positive: #4ade80;
+  --color-impact-cost-negative: #f87171;
+  --color-impact-cost-neutral: #94a3b8;
+
+  /* Action Button Tokens */
+  --color-action-plan-bg: transparent;
+  --color-action-plan-border: #fb923c;
+  --color-action-plan-text: #fb923c;
+  --color-action-plan-hover: #431407;
+  --color-action-deploy-bg: #ef4444;
+  --color-action-deploy-hover: #dc2626;
+  --color-action-deploy-text: #ffffff;
+  --color-action-disabled-bg: #334155;
+  --color-action-disabled-text: #64748b;
+
+  --color-permission-banner-bg: #451a03;
+  --color-permission-banner-text: #fbbf24;
+
+  /* === Environment State Colors (Dark Override) === */
+  --color-env-aws: #60a5fa;
+  --color-env-aws-bg: #172554;
+  --color-env-localstack: #2dd4bf;
+  --color-env-localstack-bg: #134e4a;
+  --color-env-offline: #94a3b8;
+  --color-env-offline-bg: #1e293b;
+
+  /* === Sandbox Banner Colors (Dark Override) === */
+  --color-banner-localstack-bg: #451a03;
+  --color-banner-localstack-border: #d97706;
+  --color-banner-localstack-text: #fde68a;
+  --color-banner-offline-bg: #1e293b;
+  --color-banner-offline-border: #94a3b8;
+  --color-banner-offline-text: #e2e8f0;
+
+  /* === Cost Estimation Panel Colors (Dark Override) === */
+  --color-cost-total: #34d399;
+  --color-cost-total-bg: #022c22;
+  --color-cost-savings: #4ade80;
+  --color-cost-savings-bg: #052e16;
+  --color-cost-highlight: #fb923c;
+  --color-cost-highlight-bg: #431407;
+  --color-cost-metric: #e2e8f0;
+  --color-cost-label: #94a3b8;
+
+  /* PR Comment State Colors */
+  --color-git-pr-plan-running: #60a5fa;
+  --color-git-pr-plan-running-bg: #172554;
+  --color-git-pr-plan-succeeded: #4ade80;
+  --color-git-pr-plan-succeeded-bg: #052e16;
+  --color-git-pr-plan-failed: #f87171;
+  --color-git-pr-plan-failed-bg: #450a0a;
+  --color-git-pr-apply-pending: #94a3b8;
+  --color-git-pr-apply-pending-bg: #1e293b;
+  --color-git-pr-apply-succeeded: #4ade80;
+  --color-git-pr-apply-succeeded-bg: #052e16;
+  --color-git-pr-apply-failed: #f87171;
+  --color-git-pr-apply-failed-bg: #450a0a;
+  --color-git-pr-comment-text: #e2e8f0;
+  --color-git-pr-comment-code-bg: #1e293b;
+  --color-git-pr-comment-code-text: #e2e8f0;
+  --color-git-pr-comment-link: #fb923c;
+  --color-git-pr-comment-link-hover: #f97316;
+
+  /* Git Provider Brand Colors */
+  --color-git-provider-github: #60a5fa;
+  --color-git-provider-github-bg: #172554;
+  --color-git-provider-gitlab: #fb923c;
+  --color-git-provider-gitlab-bg: #431407;
+
+  /* Sync Status Colors */
+  --color-git-sync-in-progress: #60a5fa;
+  --color-git-sync-in-progress-bg: #172554;
+  --color-git-sync-completed: #4ade80;
+  --color-git-sync-completed-bg: #052e16;
+  --color-git-sync-failed: #f87171;
+  --color-git-sync-failed-bg: #450a0a;
+  --color-git-sync-out-of-sync: #fbbf24;
+  --color-git-sync-out-of-sync-bg: #451a03;
+  --color-git-sync-text: #e2e8f0;
+  --color-git-sync-dot: #60a5fa;
+
+  /* Webhook Form Colors */
+  --color-git-webhook-step: #94a3b8;
+  --color-git-webhook-step-active: #60a5fa;
+  --color-git-webhook-step-done: #4ade80;
+  --color-git-webhook-connecting: #60a5fa;
+  --color-git-webhook-connecting-bg: #172554;
+  --color-git-webhook-success: #4ade80;
+  --color-git-webhook-success-bg: #052e16;
+  --color-git-webhook-error: #f87171;
+  --color-git-webhook-error-bg: #450a0a;
+  --color-git-webhook-input: #e2e8f0;
+  --color-git-webhook-input-border: #64748b;
+  --color-git-webhook-input-border-focus: #fb923c;
+  --color-git-webhook-input-bg: #1e293b;
+  --color-git-webhook-input-error-border: #f87171;
+
+  /* === Module 7: Monaco Workspace Tokens (Dark Mode) === */
+  /* Workspace Layout */
+  --color-m7-sidebar-bg: #1e293b;
+  --color-m7-sidebar-border: #475569;
+  --color-m7-editor-bg: #1e293b;
+  --color-m7-editor-text: #e2e8f0;
+  --color-m7-tabbar-bg: #1e293b;
+  --color-m7-tabbar-border: #475569;
+  --color-m7-actionbar-bg: #1e293b;
+  --color-m7-actionbar-border: #475569;
+  --color-m7-statusbar-bg: #0f172a;
+  --color-m7-statusbar-text: #94a3b8;
+  --color-m7-line-highlight: #334155;
+
+  /* Tab Colors */
+  --color-m7-tab-bg: #334155;
+  --color-m7-tab-active-bg: #431407;
+  --color-m7-tab-text: #94a3b8;
+  --color-m7-tab-active-text: #fb923c;
+  --color-m7-tab-hover-bg: #475569;
+  --color-m7-tab-close: #64748b;
+  --color-m7-tab-close-hover: #7c2d12;
+  --color-m7-tab-close-hover-text: #fb923c;
+  --color-m7-tab-dirty: #fb923c;
+  --color-m7-tab-active-border: #fb923c;
+
+  /* Editor Interaction */
+  --color-m7-line-highlight-bg: #334155;
+  --color-m7-selection-bg: #9a3412;
+  --color-m7-selection-text: #f8fafc;
+  --color-m7-bracket-match-bg: #7c2d12;
+  --color-m7-error-squiggle: #f87171;
+  --color-m7-warning-squiggle: #fbbf24;
+  --color-m7-info-squiggle: #60a5fa;
+
+  /* Syntax Highlighting */
+  --color-m7-syntax-keyword: #c084fc;
+  --color-m7-syntax-keyword-directive: #c084fc;
+  --color-m7-syntax-keyword-control: #a78bfa;
+  --color-m7-syntax-string: #4ade80;
+  --color-m7-syntax-string-unquoted: #60a5fa;
+  --color-m7-syntax-comment: #64748b;
+  --color-m7-syntax-bracket: #cbd5e1;
+  --color-m7-syntax-bracket-special: #fb923c;
+  --color-m7-syntax-number: #22d3ee;
+  --color-m7-syntax-operator: #94a3b8;
+  --color-m7-syntax-punctuation: #94a3b8;
+  --color-m7-syntax-tag: #fbbf24;
+  --color-m7-syntax-attribute: #22d3ee;
+  --color-m7-syntax-interpolation: #f87171;
+  --color-m7-syntax-interpolation-bracket: #fb923c;
+  --color-m7-syntax-interpolation-bg: #450a0a;
+  --color-m7-syntax-reference: #fbbf24;
+  --color-m7-syntax-reference-attr: #fcd34d;
+}
+
+/* === Animation Keyframes === */
+
+/* Sandbox Banner Transitions */
+@keyframes banner-enter {
+  from { transform: translateY(-100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes banner-exit {
+  from { transform: translateY(0); opacity: 1; }
+  to { transform: translateY(-100%); opacity: 0; }
+}
+
+/* Environment mode card scale on selection */
+@keyframes env-switch {
+  from { transform: scale(0.98); }
+  to { transform: scale(1); }
+}
+
+/* Cost metric value transition */
+@keyframes cost-update {
+  from { opacity: 0.5; transform: translateY(2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Savings badge pulse (single burst) */
+@keyframes cost-pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+/* DAG node pulse glow */
+@keyframes dag-node-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(168, 85, 247, 0); }
+}
+
+@keyframes dag-node-running {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+  50% { box-shadow: 0 0 0 4px rgba(59, 130, 246, 0); }
+}
+
+/* Stream indicator pulse */
+@keyframes indicator-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* Console cursor blink */
+@keyframes console-cursor-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+/* Log line fade-in */
+@keyframes console-log-enter {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Sync dot pulse (continuous, in-progress state) */
+@keyframes git-sync-pulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.4); opacity: 0.5; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Step indicator advance (step-by-step form) */
+@keyframes git-step-advance {
+  from { transform: scale(0.85); opacity: 0.5; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* PR comment expand/collapse */
+@keyframes git-comment-expand {
+  from { max-height: var(--size-git-comment-collapsed-max); opacity: 0; }
+  to { max-height: var(--size-git-comment-expanded-min); opacity: 1; }
+}
+
+/* Out-of-sync alert slide-in */
+@keyframes git-alert-enter {
+  from { transform: translateY(-100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* Reduced Motion Safety */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0ms !important;
+  }
+
+  @keyframes banner-enter {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes banner-exit {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+
+  @keyframes cost-pulse {
+    0% { transform: scale(1); }
+    100% { transform: scale(1); }
+  }
+
+  @keyframes indicator-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+
+  @keyframes console-cursor-blink {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0.7; }
+  }
+
+  /* Disable sync pulse animation */
+  @keyframes git-sync-pulse {
+    0% { transform: scale(1); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  /* Replace expand animation with instant opacity change */
+  @keyframes git-comment-expand {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  /* Replace alert slide with instant opacity */
+  @keyframes git-alert-enter {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+}
+

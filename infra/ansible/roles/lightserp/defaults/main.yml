@@ -1,0 +1,5 @@
+lightserp_api_port: 8000
+lightserp_webui_port: 3001
+lightserp_searxng_url: http://searxng:8080
+lightserp_nsqd_url: http://nsqd:4150
+lightserp_minio_url: http://minio:9000

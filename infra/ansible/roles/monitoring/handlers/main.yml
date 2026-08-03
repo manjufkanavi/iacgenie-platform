@@ -1,0 +1,17 @@
+---
+# Monitoring — Handler
+
+- name: Restart prometheus
+  ansible.builtin.command:
+    cmd: docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.monitoring.yml restart prometheus
+  changed_when: true
+
+- name: Restart grafana
+  ansible.builtin.command:
+    cmd: docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.monitoring.yml restart grafana
+  changed_when: true
+
+- name: Start monitoring stack
+  ansible.builtin.command:
+    cmd: docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.monitoring.yml up -d
+  changed_when: true

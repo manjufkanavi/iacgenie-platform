@@ -1,0 +1,45 @@
+{
+    "tunnel": "iacgenie-tunnel-2",
+    "credentials-file": "/etc/cloudflared/creds/tunnel2.json",
+    "ingress": [
+        {
+            "hostname": "iacgenie.local",
+            "service": "https://127.0.0.1:443",
+            "originRequest": {
+                "noTLSVerify": true,
+                "connectTimeout": "30s",
+                "httpHostHeader": "iacgenie.local"
+            }
+        },
+        {
+            "hostname": "lightsrp.local",
+            "service": "https://127.0.0.1:443",
+            "originRequest": {
+                "noTLSVerify": true,
+                "connectTimeout": "30s",
+                "httpHostHeader": "lightsrp.local"
+            }
+        },
+        {
+            "hostname": "infra.local",
+            "service": "https://127.0.0.1:443",
+            "originRequest": {
+                "noTLSVerify": true,
+                "connectTimeout": "30s",
+                "httpHostHeader": "infra.local"
+            }
+        },
+        {
+            "hostname": "auth.local",
+            "service": "https://127.0.0.1:443",
+            "originRequest": {
+                "noTLSVerify": true,
+                "connectTimeout": "30s",
+                "httpHostHeader": "auth.local"
+            }
+        },
+        {
+            "service": "http_status:404"
+        }
+    ]
+}

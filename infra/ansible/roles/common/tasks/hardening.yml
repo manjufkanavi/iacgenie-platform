@@ -1,0 +1,108 @@
+---
+# Common role - System hardening
+- name: "Common | Set timezone"
+  community.general.timezone:
+    name: "{{ timezone | default('UTC') }}"
+
+- name: "Common | Configure SSH hardening"
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    owner: root
+    group: root
+    mode: "0600"
+    state: present
+  loop:
+    - { regexp: "^#?Port .+", line: "Port {{ ssh_port | default(22) }}" }
+    - { regexp: "^#?PermitRootLogin .+", line: "PermitRootLogin {{ ssh_permit_root_login | default('no') }}" }
+    - { regexp: "^#?PasswordAuthentication .+", line: "PasswordAuthentication {{ ssh_password_authentication | default('no') }}" }
+    - { regexp: "^#?X11Forwarding .+", line: "X11Forwarding no" }
+    - { regexp: "^#?MaxAuthTries .+", line: "MaxAuthTries 3" }
+    - { regexp: "^#?LoginGraceTime .+", line: "LoginGraceTime 60" }
+  notify: Restart sshd
+
+- name: "Common | Configure UFW"
+  when: ufw_enabled | default(true) | bool
+  block:
+    - name: "Common | Enable UFW"
+      community.general.ufw:
+        state: enabled
+        policy: deny
+      tags:
+        - ufw
+
+    - name: "Common | Set UFW default policies"
+      community.general.ufw:
+        direction: "{{ item.direction }}"
+        policy: "{{ item.policy }}"
+      loop:
+        - { direction: incoming, policy: deny }
+        - { direction: outgoing, policy: allow }
+
+    - name: "Common | Add UFW rules for allowed ports"
+      community.general.ufw:
+        rule: allow
+        port: "{{ item.split('/')[0] }}"
+        proto: "{{ item.split('/')[1] }}"
+      loop: "{{ ufw_allowed_ports | default(['22/tcp', '80/tcp', '443/tcp']) }}"
+
+    - name: "Common | Log UFW status"
+      ansible.builtin.command: ufw status verbose
+      register: ufw_status
+      changed_when: false
+      notify: Log ufw_status
+
+- name: "Common | Configure fail2ban"
+  when: fail2ban_enabled | default(true) | bool
+  block:
+    - name: "Common | Configure fail2ban for SSH"
+      ansible.builtin.template:
+        src: jail.local.j2
+        dest: /etc/fail2ban/jail.local
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Restart fail2ban
+
+    - name: "Common | Enable and start fail2ban"
+      ansible.builtin.service:
+        name: fail2ban
+        enabled: yes
+        state: started
+
+- name: "Common | Configure unattended-upgrades"
+  ansible.builtin.template:
+    src: 50unattended-upgrades.j2
+    dest: /etc/apt/apt.conf.d/50unattended-upgrades
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: "Common | Configure logrotate"
+  ansible.builtin.template:
+    src: logrotate.conf.j2
+    dest: /etc/logrotate.conf
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: "Common | Configure sysctl settings"
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    sysctl_set: yes
+    state: present
+    reload: yes
+  loop: "{{ sysctl_settings }}"
+  when: sysctl_settings is defined
+
+- name: "Common | Set sysctl settings defaults"
+  ansible.builtin.set_fact:
+    sysctl_settings:
+      - { key: "net.ipv4.tcp_syncookies", value: "1" }
+      - { key: "net.ipv4.icmp_echo_ignore_broadcasts", value: "1" }
+      - { key: "net.ipv4.conf.all.accept_redirects", value: "0" }
+      - { key: "net.ipv4.conf.all.send_redirects", value: "0" }
+      - { key: "net.ipv4.conf.default.accept_redirects", value: "0" }
+      - { key: "net.ipv4.conf.default.send_redirects", value: "0" }

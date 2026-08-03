@@ -1,0 +1,15 @@
+// Unattended-upgrades configuration
+// Managed by Ansible
+
+Unattended-Upgrade::Origins-Pattern {
+    "o=Ubuntu,a=noble-security";
+    "o=Ubuntu,a=noble-updates";
+};
+
+Unattended-Upgrade::Package-Blacklist {
+    // Add packages to blacklist here
+};
+
+Unattended-Upgrade::Automatic-Reboot {
+    "When-reboot";
+};

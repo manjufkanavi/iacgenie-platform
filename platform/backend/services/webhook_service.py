@@ -1,0 +1,577 @@
+"""
+
+Comprehensive Webhook Service
+
+Handles both outgoing and incoming webhooks with retry logic, security, and proper error handling
+
+"""
+
+import asyncio
+
+import httpx
+
+import json
+
+import hmac
+
+import hashlib
+
+import logging
+
+from typing import Dict, List, Optional, Any, Callable
+
+from datetime import datetime, timedelta
+
+from dataclasses import dataclass
+
+from enum import Enum
+
+logger = logging.getLogger(__name__)
+
+
+class WebhookEventType(Enum):
+    """Supported webhook event types"""
+
+    PROJECT_CREATED = "project.created"
+    PROJECT_UPDATED = "project.updated"
+    PROJECT_DELETED = "project.deleted"
+    GENERATION_STARTED = "generation.started"
+    GENERATION_COMPLETED = "generation.completed"
+    GENERATION_FAILED = "generation.failed"
+    DEPLOYMENT_STARTED = "deployment.started"
+    DEPLOYMENT_COMPLETED = "deployment.completed"
+    DEPLOYMENT_FAILED = "deployment.failed"
+    MODEL_CONFIG_CREATED = "model_config.created"
+    MODEL_CONFIG_UPDATED = "model_config.updated"
+    API_KEY_CREATED = "api_key.created"
+    API_KEY_REVOKED = "api_key.revoked"
+    TEAM_MEMBER_INVITED = "team_member.invited"
+    TEAM_MEMBER_JOINED = "team_member.joined"
+    INTEGRATION_CREATED = "integration.created"
+    INTEGRATION_UPDATED = "integration.updated"
+    BILLING_UPDATED = "billing.updated"
+    AUDIT_LOG_CREATED = "audit_log.created"
+
+
+@dataclass
+class WebhookDeliveryResult:
+    """Result of webhook delivery attempt"""
+
+    webhook_id: str
+    url: str
+    success: bool
+    status_code: int
+    response_time: float
+    error_message: Optional[str] = None
+    retry_count: int = 0
+    timestamp: Optional[datetime] = None
+
+    def __post_init__(self):
+        if self.timestamp is None:
+            self.timestamp = datetime.utcnow()
+
+
+@dataclass
+class WebhookPayload:
+    """Standardized webhook payload"""
+
+    event: str
+    timestamp: str
+    data: Dict[str, Any]
+    webhook_id: str
+    user_id: str
+    project_id: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+
+class WebhookService:
+    """Comprehensive webhook service with retry logic and security"""
+
+    def __init__(
+        self, db_adapter: Any, max_retries: int = 3, retry_delay: float = 1.0
+    ) -> None:
+        self.db = db_adapter
+        self.max_retries = max_retries
+        self.retry_delay = retry_delay
+        self.event_handlers: Dict[str, List[Callable]] = {}
+
+    async def register_webhook(
+        self, user_id: str, webhook_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Register a new webhook with validation"""
+        try:
+            # Validate required fields
+            if not webhook_data.get("url"):
+                raise ValueError("Webhook URL is required")
+            if not webhook_data.get("events"):
+                raise ValueError("At least one event type is required")
+            # Validate URL format
+            if not webhook_data["url"].startswith(("http://", "https://")):
+                raise ValueError("Webhook URL must be HTTP or HTTPS")
+            # Validate events
+            valid_events = [event.value for event in WebhookEventType]
+            for event in webhook_data["events"]:
+                if event not in valid_events:
+                    raise ValueError(f"Invalid event type: {event}")
+            # Add metadata
+            webhook_data.update(
+                {
+                    "user_id": user_id,
+                    "created_at": datetime.utcnow().isoformat(),
+                    "updated_at": datetime.utcnow().isoformat(),
+                    "is_active": webhook_data.get("is_active", True),
+                    "delivery_count": 0,
+                    "success_count": 0,
+                    "failure_count": 0,
+                    "last_delivery": None,
+                    "last_success": None,
+                    "last_failure": None,
+                }
+            )
+            # Create webhook in database
+            result = await self.db.create_webhook(user_id, webhook_data)
+            # Test webhook if requested
+            if webhook_data.get("test_on_create", False):
+                await self.test_webhook(user_id, result["id"])
+            return result
+        except Exception as e:
+            logger.error(f"Failed to register webhook: {str(e)}")
+            raise
+
+    async def send_webhook(
+        self,
+        event_type: str,
+        data: Dict[str, Any],
+        user_id: str,
+        project_id: Optional[str] = None,
+    ) -> List[WebhookDeliveryResult]:
+        """Send webhook to all registered endpoints for the event type"""
+        try:
+            # Get all webhooks for the user that listen to this event
+            webhooks = await self.db.list_webhooks(user_id)
+            matching_webhooks = [
+                w
+                for w in webhooks
+                if w.get("is_active", True) and event_type in w.get("events", [])
+            ]
+            if not matching_webhooks:
+                logger.info(f"No active webhooks found for event: {event_type}")
+                return []
+            # Create standardized payload
+            payload = WebhookPayload(
+                event=event_type,
+                timestamp=datetime.utcnow().isoformat(),
+                data=data,
+                webhook_id="",  # Will be set per webhook
+                user_id=user_id,
+                project_id=project_id,
+                metadata={"source": "iacgenie", "version": "2.0.0"},
+            )
+            # Send to all matching webhooks
+            results = []
+            for webhook in matching_webhooks:
+                payload.webhook_id = webhook["id"]
+                result = await self._deliver_webhook(webhook, payload)
+                results.append(result)
+                # Update webhook statistics
+                await self._update_webhook_stats(webhook["id"], result)
+            return results
+        except Exception as e:
+            logger.error(f"Failed to send webhook for event {event_type}: {str(e)}")
+            raise
+
+    async def _deliver_webhook(
+        self, webhook: Dict[str, Any], payload: WebhookPayload
+    ) -> WebhookDeliveryResult:
+        """Deliver webhook with retry logic"""
+        url = webhook["url"]
+        secret = webhook.get("secret")
+        headers = webhook.get("headers", {})
+        # Prepare headers
+        delivery_headers = {
+            "Content-Type": "application/json",
+            "User-Agent": "IaCGenie-Webhook/2.0.0",
+            "X-Webhook-Event": payload.event,
+            "X-Webhook-Timestamp": payload.timestamp,
+            "X-Webhook-ID": payload.webhook_id,
+            **headers,
+        }
+        # Add signature if secret is provided
+        if secret:
+            signature = self._generate_signature(payload, secret)
+            delivery_headers["X-Webhook-Signature"] = signature
+        # Prepare payload
+        payload_dict = {
+            "event": payload.event,
+            "timestamp": payload.timestamp,
+            "data": payload.data,
+            "webhook_id": payload.webhook_id,
+            "user_id": payload.user_id,
+            "project_id": payload.project_id,
+            "metadata": payload.metadata,
+        }
+        # Attempt delivery with retries
+        for attempt in range(self.max_retries + 1):
+            try:
+                start_time = datetime.utcnow()
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    response = await client.post(
+                        url, json=payload_dict, headers=delivery_headers
+                    )
+                response_time = (datetime.utcnow() - start_time).total_seconds()
+                if 200 <= response.status_code < 300:
+                    return WebhookDeliveryResult(
+                        webhook_id=payload.webhook_id,
+                        url=url,
+                        success=True,
+                        status_code=response.status_code,
+                        response_time=response_time,
+                        retry_count=attempt,
+                    )
+                else:
+                    error_msg = f"HTTP {response.status_code}: {response.text[:200]}"
+                    if attempt == self.max_retries:
+                        return WebhookDeliveryResult(
+                            webhook_id=payload.webhook_id,
+                            url=url,
+                            success=False,
+                            status_code=response.status_code,
+                            response_time=response_time,
+                            error_message=error_msg,
+                            retry_count=attempt,
+                        )
+            except Exception as e:
+                error_msg = str(e)
+                if attempt == self.max_retries:
+                    return WebhookDeliveryResult(
+                        webhook_id=payload.webhook_id,
+                        url=url,
+                        success=False,
+                        status_code=0,
+                        response_time=0,
+                        error_message=error_msg,
+                        retry_count=attempt,
+                    )
+            # Wait before retry (exponential backoff)
+            if attempt < self.max_retries:
+                delay = self.retry_delay * (2**attempt)
+                await asyncio.sleep(delay)
+        # Should never reach here
+        return WebhookDeliveryResult(
+            webhook_id=payload.webhook_id,
+            url=url,
+            success=False,
+            status_code=0,
+            response_time=0,
+            error_message="Max retries exceeded",
+            retry_count=self.max_retries,
+        )
+
+    def _generate_signature(self, payload: WebhookPayload, secret: str) -> str:
+        """Generate HMAC signature for webhook payload"""
+        payload_str = json.dumps(
+            {
+                "event": payload.event,
+                "timestamp": payload.timestamp,
+                "data": payload.data,
+            },
+            sort_keys=True,
+        )
+        signature = hmac.new(
+            secret.encode("utf-8"), payload_str.encode("utf-8"), hashlib.sha256
+        ).hexdigest()
+        return f"sha256={signature}"
+
+    async def _update_webhook_stats(
+        self, webhook_id: str, result: WebhookDeliveryResult
+    ) -> None:
+        """Update webhook delivery statistics"""
+        try:
+            webhook = await self.db.get_webhook_by_id(webhook_id)
+            if not webhook:
+                return
+            updates = {
+                "delivery_count": webhook.get("delivery_count", 0) + 1,
+                "last_delivery": result.timestamp.isoformat(),  # type: ignore[union-attr]
+            }
+            if result.success:
+                updates.update(
+                    {
+                        "success_count": webhook.get("success_count", 0) + 1,
+                        "last_success": result.timestamp.isoformat(),  # type: ignore[union-attr]
+                    }
+                )
+            else:
+                updates.update(
+                    {
+                        "failure_count": webhook.get("failure_count", 0) + 1,
+                        "last_failure": result.timestamp.isoformat(),  # type: ignore[union-attr]
+                    }
+                )
+            await self.db.update_webhook(webhook["user_id"], webhook_id, updates)
+        except Exception as e:
+            logger.error(f"Failed to update webhook stats: {str(e)}")
+
+    async def test_webhook(
+        self, user_id: str, webhook_id: str
+    ) -> WebhookDeliveryResult:
+        """Test a webhook by sending a test payload"""
+        try:
+            webhook = await self.db.get_webhook(user_id, webhook_id)
+            if not webhook:
+                raise ValueError("Webhook not found")
+            # Create test payload
+            test_payload = WebhookPayload(
+                event="test",
+                timestamp=datetime.utcnow().isoformat(),
+                data={
+                    "message": "This is a test webhook from IaCGenie",
+                    "webhook_id": webhook_id,
+                    "user_id": user_id,
+                    "test_timestamp": datetime.utcnow().isoformat(),
+                },
+                webhook_id=webhook_id,
+                user_id=user_id,
+                metadata={"source": "iacgenie", "version": "2.0.0", "test": True},
+            )
+            # Deliver test webhook
+            result = await self._deliver_webhook(webhook, test_payload)
+            # Log test result
+            await self.db.create_webhook_log(
+                user_id,
+                webhook_id,
+                {
+                    "type": "test",
+                    "success": result.success,
+                    "status_code": result.status_code,
+                    "response_time": result.response_time,
+                    "error_message": result.error_message,
+                    "timestamp": result.timestamp.isoformat(),  # type: ignore[union-attr]
+                },
+            )
+            return result
+        except Exception as e:
+            logger.error(f"Failed to test webhook: {str(e)}")
+            raise
+
+    async def verify_incoming_signature(
+        self, payload: str, signature: str, secret: str
+    ) -> bool:
+        """Verify incoming webhook signature"""
+        try:
+            expected_signature = self._generate_signature_raw(payload, secret)
+            return hmac.compare_digest(signature, expected_signature)
+        except Exception as e:
+            logger.error(f"Failed to verify signature: {str(e)}")
+            return False
+
+    def _generate_signature_raw(self, payload: str, secret: str) -> str:
+        """Generate signature for raw payload string"""
+        signature = hmac.new(
+            secret.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256
+        ).hexdigest()
+        return f"sha256={signature}"
+
+    async def process_incoming_webhook(
+        self,
+        webhook_id: str,
+        payload: Dict[str, Any],
+        headers: Dict[str, str],
+        ip_address: str,
+    ) -> Dict[str, Any]:
+        """Process incoming webhook with validation and routing"""
+        try:
+            # Get webhook configuration
+            webhook = await self.db.get_webhook_by_id(webhook_id)
+            if not webhook:
+                raise ValueError("Webhook not found")
+            if not webhook.get("is_active", True):
+                raise ValueError("Webhook is inactive")
+            # Verify signature if secret is configured
+            if webhook.get("secret"):
+                signature = headers.get("X-Webhook-Signature") or headers.get(
+                    "X-Hub-Signature-256"
+                )
+                if not signature:
+                    raise ValueError("Missing webhook signature")
+                payload_str = json.dumps(payload, sort_keys=True)
+                if not await self.verify_incoming_signature(
+                    payload_str, signature, webhook["secret"]
+                ):
+                    raise ValueError("Invalid webhook signature")
+            # Create webhook event record
+            event_data = {
+                "webhook_id": webhook_id,
+                "user_id": webhook.get("user_id"),
+                "event_type": "webhook.received",
+                "payload": payload,
+                "headers": headers,
+                "ip_address": ip_address,
+                "user_agent": headers.get("User-Agent", ""),
+                "content_type": headers.get("Content-Type", ""),
+                "timestamp": datetime.utcnow().isoformat(),
+                "status": "received",
+                "processed": False,
+            }
+            # Store event
+            event_record = await self.db.create_webhook_event(event_data)
+            # Process based on webhook type
+            webhook_type = webhook.get("type", "generic")
+            if webhook_type == "github":
+                result = await self._process_github_webhook(
+                    webhook_id, payload, event_record
+                )
+            elif webhook_type == "slack":
+                result = await self._process_slack_webhook(
+                    webhook_id, payload, event_record
+                )
+            else:
+                result = await self._process_generic_webhook(
+                    webhook_id, payload, event_record
+                )
+            # Update event status
+            await self.db.update_webhook_event(
+                webhook.get("user_id"),
+                event_record["id"],
+                {"status": "processed", "processed": True, "result": result},
+            )
+            return result
+        except Exception as e:
+            logger.error(f"Failed to process incoming webhook: {str(e)}")
+            raise
+
+    async def _process_github_webhook(
+        self, webhook_id: str, payload: Dict[str, Any], event_record: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Process GitHub webhook"""
+        try:
+            event_type = payload.get("ref_type", "unknown")
+            if event_type == "branch":
+                # Handle branch creation/deletion
+                return {
+                    "action": "github_branch_event",
+                    "branch": payload.get("ref"),
+                    "repository": payload.get("repository", {}).get("name"),
+                    "sender": payload.get("sender", {}).get("login"),
+                }
+            elif event_type == "tag":
+                # Handle tag creation
+                return {
+                    "action": "github_tag_event",
+                    "tag": payload.get("ref"),
+                    "repository": payload.get("repository", {}).get("name"),
+                }
+            else:
+                # Handle other GitHub events
+                return {
+                    "action": "github_event",
+                    "event_type": event_type,
+                    "repository": payload.get("repository", {}).get("name"),
+                }
+        except Exception as e:
+            logger.error(f"Failed to process GitHub webhook: {str(e)}")
+            return {"error": str(e)}
+
+    async def _process_slack_webhook(
+        self, webhook_id: str, payload: Dict[str, Any], event_record: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Process Slack webhook"""
+        try:
+            # Handle Slack slash commands or interactive messages
+            if payload.get("type") == "url_verification":
+                return {"challenge": payload.get("challenge")}
+            return {
+                "action": "slack_event",
+                "event_type": payload.get("type"),
+                "user": payload.get("user", {}).get("name"),
+                "channel": payload.get("channel", {}).get("name"),
+            }
+        except Exception as e:
+            logger.error(f"Failed to process Slack webhook: {str(e)}")
+            return {"error": str(e)}
+
+    async def _process_generic_webhook(
+        self, webhook_id: str, payload: Dict[str, Any], event_record: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Process generic webhook"""
+        try:
+            # Extract common fields
+            event_type = payload.get("event", "unknown")
+            action = payload.get("action", "unknown")
+            return {
+                "action": "generic_event",
+                "event_type": event_type,
+                "action_type": action,
+                "data": payload.get("data", {}),
+            }
+        except Exception as e:
+            logger.error(f"Failed to process generic webhook: {str(e)}")
+            return {"error": str(e)}
+
+    async def get_webhook_stats(self, user_id: str) -> Dict[str, Any]:
+        """Get comprehensive webhook statistics"""
+        try:
+            webhooks = await self.db.list_webhooks(user_id)
+            total_webhooks = len(webhooks)
+            active_webhooks = len([w for w in webhooks if w.get("is_active", True)])
+            total_deliveries = sum(w.get("delivery_count", 0) for w in webhooks)
+            total_successes = sum(w.get("success_count", 0) for w in webhooks)
+            total_failures = sum(w.get("failure_count", 0) for w in webhooks)
+            success_rate = (
+                (total_successes / total_deliveries * 100)
+                if total_deliveries > 0
+                else 0
+            )
+            # Calculate last 24 hours statistics
+            last_24h = datetime.utcnow() - timedelta(hours=24)
+            last_24h_deliveries = 0
+            last_24h_successes = 0
+            last_24h_failures = 0
+            for webhook in webhooks:
+                # Get webhook events from last 24 hours
+                events = await self.db.get_webhook_events_since(webhook["id"], last_24h)
+                last_24h_deliveries += len(events)
+                last_24h_successes += len(
+                    [
+                        e
+                        for e in events
+                        if e.get("status") == "processed"
+                        and e.get("result", {}).get("success")
+                    ]
+                )
+                last_24h_failures += len(
+                    [
+                        e
+                        for e in events
+                        if e.get("status") == "processed"
+                        and not e.get("result", {}).get("success")
+                    ]
+                )
+            return {
+                "total_webhooks": total_webhooks,
+                "active_webhooks": active_webhooks,
+                "total_deliveries": total_deliveries,
+                "total_successes": total_successes,
+                "total_failures": total_failures,
+                "success_rate": round(success_rate, 2),
+                "last_24h_deliveries": last_24h_deliveries,
+                "last_24h_successes": last_24h_successes,
+                "last_24h_failures": last_24h_failures,
+            }
+        except Exception as e:
+            logger.error(f"Failed to get webhook stats: {str(e)}")
+            raise
+
+
+# Global webhook service instance
+
+
+webhook_service = None
+
+
+async def get_webhook_service(db_adapter: Any) -> WebhookService:
+    """Get or create webhook service instance"""
+    global webhook_service
+    if webhook_service is None:
+        webhook_service = WebhookService(db_adapter)
+    return webhook_service

@@ -1,0 +1,38 @@
+---
+# PostgreSQL Role Vars
+# Phase 10.11: Keycloak DB credentials
+
+postgres_version: "15"
+postgres_port: 5432
+postgres_data_dir: "/home/mkanavi/docker/iacgenie/data/postgres"
+postgres_conf_file: "/home/mkanavi/docker/iacgenie/data/postgres/postgresql.conf"
+postgres_hba_file: "/home/mkanavi/docker/iacgenie/data/postgres/pg_hba.conf"
+
+# Phase 10.11: Keycloak DB
+keycloak_db_user: keycloak
+keycloak_db_name: keycloak
+keycloak_db_password: CHANGE_ME_IN_VAULT
+
+# Multi-tenant databases (Phase 10.3)
+postgres_databases:
+  - name: iacgenie
+    owner: iacgenie
+  - name: keycloak
+    owner: keycloak
+  - name: gitea
+    owner: gitea
+  - name: lightsrp
+    owner: lightsrp
+
+postgres_users:
+  - name: postgres
+    password: CHANGE_ME_IN_VAULT
+    superuser: true
+  - name: iacgenie
+    password: CHANGE_ME_IN_VAULT
+  - name: keycloak
+    password: "{{ keycloak_db_password }}"
+  - name: gitea
+    password: CHANGE_ME_IN_VAULT
+  - name: lightsrp
+    password: CHANGE_ME_IN_VAULT

@@ -1,0 +1,15 @@
+[Unit]
+Description=Cloudflare Tunnel
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mkanavi
+ExecStart=/usr/local/bin/cloudflared tunnel --config /home/mkanavi/docker/iacgenie/cloudflared/config.yml --protocol http2 run iacgenie-pi
+Restart=always
+RestartSec=5
+Environment=NO_AUTOUPDATE=true
+
+[Install]
+WantedBy=multi-user.target

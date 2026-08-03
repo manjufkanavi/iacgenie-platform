@@ -1,0 +1,97 @@
+# LightSerp — Docker Compose (Unified Infrastructure)
+#
+# Services: LightSerp MCP Server, Page Zen
+#
+# Shared infrastructure provided by docker-compose-unified.yml:
+#   - PostgreSQL 15 (lightsrp schema, port 5432)
+#   - Redis 7 (db 1, port 6379)
+#   - SearXNG (port 8080)
+#   - NSQ (port 4150)
+#   - MinIO (port 9000)
+#   - Keycloak (port 8080)
+#   - OpenBao (port 8200)
+#
+# Run alongside unified stack:
+#   docker compose -f docker-compose-unified.yml -f docker-compose.yml up -d
+#
+# MCP server is exposed on stdio (for Claude Desktop, Cursor, etc.)
+# HTTP health endpoint: http://localhost:3001/health
+
+name: lightserp-unified
+
+services:
+  # ── Page Zen (Content Extraction) ───────────────────────────────
+  # Port mapping: 127.0.0.1:8076:8082
+  pagezen:
+    build:
+      context: .
+      dockerfile: Dockerfile.pagezen
+    container_name: lightserp-pagezen
+    ports:
+      - "127.0.0.1:8076:8082"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    depends_on:
+      - lightserp
+    networks:
+      - lightserp-net
+      - unified_network
+
+  # ── LightSerp MCP Server ────────────────────────────────────────
+  # MCP on stdio, HTTP health on 127.0.0.1:3001
+  lightserp:
+    build: .
+    container_name: lightserp-mcp
+    ports:
+      - "127.0.0.1:3001:3001"
+    env_file:
+      - config/.env.api
+    environment:
+      - NODE_ENV=production
+      - HTTP_PORT=3001
+      # Unified infrastructure service endpoints (Docker network)
+      - SEARXNG_URL=http://searxng:8080/search?format=json
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/1
+      - DATABASE_URL=postgresql://lightsrp:${POSTGRES_LIGHTSERP_PASSWORD}@postgres:5432/lightsrp
+      - NSQD_URL=nsqd:4150
+      - NSQ_LOOKUPD_URL=nsqlookupd:4160
+      - KEYCLOAK_URL=http://keycloak:8080/realms/unified
+      - KEYCLOAK_CLIENT_ID=lightsrp
+      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD}
+      - OPENBAO_ADDR=http://openbao:8200
+      - OPENBAO_TOKEN=${OPENBAO_TOKEN}
+      - PAGEZEN_URL=http://pagezen:8082
+      - PROXY_URLS=disabled
+      - JWT_SECRET=${JWT_SECRET}
+      - SCRAPING_CACHE_TTL=3600
+      - PAGEZEN_TIMEOUT=30000
+      - PAGEZEN_HEALTH_INTERVAL=60000
+    depends_on:
+      searxng:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nsqd:
+        condition: service_healthy
+      pagezen:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - lightserp-net
+      - unified_network
+
+# ── Networks ─────────────────────────────────────────────────────────
+networks:
+  lightserp-net:
+    driver: bridge
+  unified_network:
+    external: true

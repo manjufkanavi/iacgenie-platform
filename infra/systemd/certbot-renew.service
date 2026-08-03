@@ -1,0 +1,16 @@
+[Unit]
+Description=Certbot Automatic Certificate Renewal
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/scripts/certbot-auto.sh
+Nice=10
+IOSchedulingClass=idle
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=certbot-renew
+
+[Install]
+WantedBy=multi-user.target

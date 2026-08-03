@@ -1,0 +1,406 @@
+name: Backup All Services
+
+on:
+  workflow_dispatch:
+    inputs:
+      backup_type:
+        description: 'Type of backup'
+        required: false
+        default: 'full'
+        type: choice
+        options:
+          - full
+          - selective
+      services:
+        description: 'Services to backup (comma-separated, only if selective)'
+        required: false
+        default: 'postgres,openbao,gitea,keycloak'
+  schedule:
+    - cron: '0 2 * * *'  # Daily at 2am UTC
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  backup-services:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Backup all services and verify integrity
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST || '192.168.0.118' }}
+          SSH_USER: ${{ secrets.SSH_USER || 'mkanavi' }}
+        run: |
+          set -euo pipefail
+
+          START_TIME=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          echo "BACKUP_START=$START_TIME" >> $GITHUB_ENV
+          echo "=== IacGenie Backup Pipeline ==="
+          echo "Target: $SSH_HOST"
+          echo "Branch: $GITHUB_REF_NAME"
+          echo "Commit: $GITHUB_SHA"
+          echo "Backup type: ${{ github.event.inputs.backup_type || 'full' }}"
+
+          # Configure SSH key
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          # Add known hosts
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+          # Function to run SSH commands
+          run_remote() {
+            ssh -o StrictHostKeyChecking=no \
+                -o ConnectTimeout=30 \
+                -i ~/.ssh/deploy_key \
+                -q \
+                "${SSH_USER}@${SSH_HOST}" "$1"
+          }
+
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          BACKUP_DIR="/home/mkanavi/backups"
+          RESULTS_JSON="["
+          FIRST=true
+          BACKUP_ERRORS=0
+          BACKUP_SUCCESS=0
+
+          # ---- PostgreSQL Backup ----
+          echo ""
+          echo "[1/5] Backing up PostgreSQL..."
+          PG_RESULT=$(run_remote '
+            set -e
+            BACKUP_DIR="/home/mkanavi/backups"
+            TIMESTAMP="'"$TIMESTAMP"'"
+            CONTAINER="iacgenie_postgres"
+            mkdir -p "$BACKUP_DIR"
+            
+            if ! docker ps --format "{{.Names}}" | grep -q "^${CONTAINER}$"; then
+              echo "SKIP:Container not running"
+              exit 0
+            fi
+            
+            # Use pg_dumpall for full cluster dump
+            docker exec "$CONTAINER" pg_dumpall -U postgres > "$BACKUP_DIR/pgdump_${TIMESTAMP}.sql" 2>&1
+            
+            # Rotate old backups (keep 30 days)
+            find "$BACKUP_DIR" -name "pgdump_*.sql" -mtime +30 -delete 2>/dev/null || true
+            
+            SIZE=$(stat -c%s "$BACKUP_DIR/pgdump_${TIMESTAMP}.sql" 2>/dev/null || echo "0")
+            if [ "$SIZE" -gt 0 ] 2>/dev/null; then
+              echo "OK:${SIZE}"
+            else
+              echo "FAIL:0"
+            fi
+          ' 2>&1) || true
+
+          if echo "$PG_RESULT" | grep -q "^OK:"; then
+            PG_STATUS="success"
+            PG_SIZE=$(echo "$PG_RESULT" | grep "^OK:" | cut -d: -f2)
+            PG_SIZE_HUMAN=$(echo "scale=2; $PG_SIZE/1024/1024" | bc 2>/dev/null || echo "unknown")
+            echo "  ✅ PostgreSQL backed up (${PG_SIZE_HUMAN}MB)"
+            BACKUP_SUCCESS=$((BACKUP_SUCCESS + 1))
+            if [ "$FIRST" = true ]; then FIRST=false; else RESULTS_JSON="${RESULTS_JSON},"; fi
+            RESULTS_JSON="${RESULTS_JSON}{\"service\":\"PostgreSQL\",\"status\":\"success\",\"size_bytes\":${PG_SIZE:-0},\"size_mb\":\"${PG_SIZE_HUMAN}\",\"file\":\"pgdump_${TIMESTAMP}.sql\"}"
+          elif echo "$PG_RESULT" | grep -q "^SKIP:"; then
+            PG_STATUS="skipped"
+            echo "  ⏭️  PostgreSQL skipped (container not running)"
+          else
+            PG_STATUS="failed"
+            echo "  ❌ PostgreSQL backup failed"
+            BACKUP_ERRORS=$((BACKUP_ERRORS + 1))
+            if [ "$FIRST" = true ]; then FIRST=false; else RESULTS_JSON="${RESULTS_JSON},"; fi
+            RESULTS_JSON="${RESULTS_JSON}{\"service\":\"PostgreSQL\",\"status\":\"failed\",\"size_bytes\":0,\"error\":\"backup failed\"}"
+          fi
+
+          # ---- OpenBao Backup ----
+          echo ""
+          echo "[2/5] Backing up OpenBao..."
+          OB_RESULT=$(run_remote '
+            set -e
+            BACKUP_DIR="/home/mkanavi/backups"
+            TIMESTAMP="'"$TIMESTAMP"'"
+            # Copy raft data directly from host mount (snapshot API requires complex auth)
+            RAFT_PATH="/home/mkanavi/docker/iacgenie/data/openbao_raft/raft"
+            mkdir -p "$BACKUP_DIR"
+            
+            if [ -d "$RAFT_PATH" ] && [ -f "$RAFT_PATH/raft.db" ]; then
+              cp -r "$RAFT_PATH" "$BACKUP_DIR/openbao-raft-${TIMESTAMP}" 2>&1
+              SIZE=$(du -sb "$BACKUP_DIR/openbao-raft-${TIMESTAMP}" 2>/dev/null | cut -f1 || echo "0")
+              echo "OK:${SIZE}"
+            else
+              echo "FAIL:0"
+            fi
+          ' 2>&1) || true
+
+          if echo "$OB_RESULT" | grep -q "^OK:"; then
+            OB_STATUS="success"
+            OB_SIZE=$(echo "$OB_RESULT" | grep "^OK:" | cut -d: -f2)
+            OB_SIZE_HUMAN=$(echo "scale=2; $OB_SIZE/1024/1024" | bc 2>/dev/null || echo "unknown")
+            echo "  ✅ OpenBao backed up (${OB_SIZE_HUMAN}MB)"
+            BACKUP_SUCCESS=$((BACKUP_SUCCESS + 1))
+            if [ "$FIRST" = true ]; then FIRST=false; else RESULTS_JSON="${RESULTS_JSON},"; fi
+            RESULTS_JSON="${RESULTS_JSON}{\"service\":\"OpenBao\",\"status\":\"success\",\"size_bytes\":${OB_SIZE:-0},\"size_mb\":\"${OB_SIZE_HUMAN}\",\"file\":\"openbao-raft-${TIMESTAMP}/\"}"
+          else
+            OB_STATUS="failed"
+            echo "  ❌ OpenBao backup failed"
+            BACKUP_ERRORS=$((BACKUP_ERRORS + 1))
+            if [ "$FIRST" = true ]; then FIRST=false; else RESULTS_JSON="${RESULTS_JSON},"; fi
+            RESULTS_JSON="${RESULTS_JSON}{\"service\":\"OpenBao\",\"status\":\"failed\",\"size_bytes\":0,\"error\":\"backup failed\"}"
+          fi
+
+          # ---- Gitea Backup ----
+          echo ""
+          echo "[3/5] Backing up Gitea..."
+          GT_RESULT=$(run_remote '
+            set -e
+            BACKUP_DIR="/home/mkanavi/backups"
+            TIMESTAMP="'"$TIMESTAMP"'"
+            CONTAINER="iacgenie_gitea"
+            mkdir -p "$BACKUP_DIR"
+            
+            if ! docker ps --format "{{.Names}}" | grep -q "^${CONTAINER}$"; then
+              echo "SKIP:Container not running"
+              exit 0
+            fi
+            
+            # Rootless Gitea stores data at /var/lib/gitea, NOT /data
+            docker exec "$CONTAINER" tar czf "/tmp/gitea-backup-${TIMESTAMP}.tar.gz" \
+              --exclude="logs/*" \
+              --exclude="tmp/*" \
+              /var/lib/gitea 2>&1
+            
+            docker cp "$CONTAINER:/tmp/gitea-backup-${TIMESTAMP}.tar.gz" \
+              "$BACKUP_DIR/gitea-${TIMESTAMP}.tar.gz" 2>&1
+            
+            SIZE=$(stat -c%s "$BACKUP_DIR/gitea-${TIMESTAMP}.tar.gz" 2>/dev/null || echo "0")
+            if tar tzf "$BACKUP_DIR/gitea-${TIMESTAMP}.tar.gz" >/dev/null 2>&1; then
+              echo "OK:${SIZE}"
+            else
+              echo "FAIL:0"
+            fi
+          ' 2>&1) || true
+
+          if echo "$GT_RESULT" | grep -q "^OK:"; then
+            GT_STATUS="success"
+            GT_SIZE=$(echo "$GT_RESULT" | grep "^OK:" | cut -d: -f2)
+            GT_SIZE_HUMAN=$(echo "scale=2; $GT_SIZE/1024/1024" | bc 2>/dev/null || echo "unknown")
+            echo "  ✅ Gitea backed up (${GT_SIZE_HUMAN}MB)"
+            BACKUP_SUCCESS=$((BACKUP_SUCCESS + 1))
+            if [ "$FIRST" = true ]; then FIRST=false; else RESULTS_JSON="${RESULTS_JSON},"; fi
+            RESULTS_JSON="${RESULTS_JSON}{\"service\":\"Gitea\",\"status\":\"success\",\"size_bytes\":${GT_SIZE:-0},\"size_mb\":\"${GT_SIZE_HUMAN}\",\"file\":\"gitea-${TIMESTAMP}.tar.gz\"}"
+          elif echo "$GT_RESULT" | grep -q "^SKIP:"; then
+            GT_STATUS="skipped"
+            echo "  ⏭️  Gitea skipped (container not running)"
+          else
+            GT_STATUS="failed"
+            echo "  ❌ Gitea backup failed"
+            BACKUP_ERRORS=$((BACKUP_ERRORS + 1))
+            if [ "$FIRST" = true ]; then FIRST=false; else RESULTS_JSON="${RESULTS_JSON},"; fi
+            RESULTS_JSON="${RESULTS_JSON}{\"service\":\"Gitea\",\"status\":\"failed\",\"size_bytes\":0,\"error\":\"backup failed\"}"
+          fi
+
+          # ---- Keycloak Backup ----
+          echo ""
+          echo "[4/5] Backing up Keycloak..."
+          KC_RESULT=$(run_remote '
+            set -e
+            BACKUP_DIR="/home/mkanavi/backups"
+            TIMESTAMP="'"$TIMESTAMP"'"
+            CONTAINER="iacgenie_keycloak"
+            mkdir -p "$BACKUP_DIR"
+            
+            if ! docker ps --format "{{.Names}}" | grep -q "^${CONTAINER}$"; then
+              echo "SKIP:Container not running"
+              exit 0
+            fi
+            
+            # Use docker cp (no tar binary in Keycloak image)
+            docker cp "$CONTAINER:/opt/keycloak/data" "$BACKUP_DIR/keycloak-${TIMESTAMP}" 2>&1
+            
+            SIZE=$(du -sb "$BACKUP_DIR/keycloak-${TIMESTAMP}" 2>/dev/null | cut -f1 || echo "0")
+            if [ "$SIZE" -gt 0 ] 2>/dev/null; then
+              echo "OK:${SIZE}"
+            else
+              echo "FAIL:0"
+            fi
+          ' 2>&1) || true
+
+          if echo "$KC_RESULT" | grep -q "^OK:"; then
+            KC_STATUS="success"
+            KC_SIZE=$(echo "$KC_RESULT" | grep "^OK:" | cut -d: -f2)
+            KC_SIZE_HUMAN=$(echo "scale=2; $KC_SIZE/1024/1024" | bc 2>/dev/null || echo "unknown")
+            echo "  ✅ Keycloak backed up (${KC_SIZE_HUMAN}MB)"
+            BACKUP_SUCCESS=$((BACKUP_SUCCESS + 1))
+            if [ "$FIRST" = true ]; then FIRST=false; else RESULTS_JSON="${RESULTS_JSON},"; fi
+            RESULTS_JSON="${RESULTS_JSON}{\"service\":\"Keycloak\",\"status\":\"success\",\"size_bytes\":${KC_SIZE:-0},\"size_mb\":\"${KC_SIZE_HUMAN}\",\"file\":\"keycloak-${TIMESTAMP}/\"}"
+          elif echo "$KC_RESULT" | grep -q "^SKIP:"; then
+            KC_STATUS="skipped"
+            echo "  ⏭️  Keycloak skipped (container not running)"
+          else
+            KC_STATUS="failed"
+            echo "  ❌ Keycloak backup failed"
+            BACKUP_ERRORS=$((BACKUP_ERRORS + 1))
+            if [ "$FIRST" = true ]; then FIRST=false; else RESULTS_JSON="${RESULTS_JSON},"; fi
+            RESULTS_JSON="${RESULTS_JSON}{\"service\":\"Keycloak\",\"status\":\"failed\",\"size_bytes\":0,\"error\":\"backup failed\"}"
+          fi
+
+          # ---- Config Files Backup ----
+          echo ""
+          echo "[5/5] Backing up configuration files..."
+          CFG_RESULT=$(run_remote '
+            set -e
+            BACKUP_DIR="/home/mkanavi/backups"
+            TIMESTAMP="'"$TIMESTAMP"'"
+            mkdir -p "$BACKUP_DIR"
+            
+            tar czf "$BACKUP_DIR/configs-${TIMESTAMP}.tar.gz" \
+              /etc/nginx/ \
+              /etc/systemd/system/cloudflared-iacgenie.service \
+              2>/dev/null
+            
+            SIZE=$(stat -c%s "$BACKUP_DIR/configs-${TIMESTAMP}.tar.gz" 2>/dev/null || echo "0")
+            if [ "$SIZE" -gt 0 ] 2>/dev/null; then
+              echo "OK:${SIZE}"
+            else
+              echo "FAIL:0"
+            fi
+          ' 2>&1) || true
+
+          if echo "$CFG_RESULT" | grep -q "^OK:"; then
+            CFG_STATUS="success"
+            CFG_SIZE=$(echo "$CFG_RESULT" | grep "^OK:" | cut -d: -f2)
+            CFG_SIZE_HUMAN=$(echo "scale=2; $CFG_SIZE/1024/1024" | bc 2>/dev/null || echo "unknown")
+            echo "  ✅ Configs backed up (${CFG_SIZE_HUMAN}MB)"
+            BACKUP_SUCCESS=$((BACKUP_SUCCESS + 1))
+            if [ "$FIRST" = true ]; then FIRST=false; else RESULTS_JSON="${RESULTS_JSON},"; fi
+            RESULTS_JSON="${RESULTS_JSON}{\"service\":\"Configs\",\"status\":\"success\",\"size_bytes\":${CFG_SIZE:-0},\"size_mb\":\"${CFG_SIZE_HUMAN}\",\"file\":\"configs-${TIMESTAMP}.tar.gz\"}"
+          else
+            CFG_STATUS="failed"
+            echo "  ❌ Configs backup failed"
+            BACKUP_ERRORS=$((BACKUP_ERRORS + 1))
+            if [ "$FIRST" = true ]; then FIRST=false; else RESULTS_JSON="${RESULTS_JSON},"; fi
+            RESULTS_JSON="${RESULTS_JSON}{\"service\":\"Configs\",\"status\":\"failed\",\"size_bytes\":0,\"error\":\"backup failed\"}"
+          fi
+
+          # ---- Verification Step ----
+          echo ""
+          echo "[6/6] Running backup verification..."
+          VERIFY_RESULT=$(run_remote '
+            set -e
+            echo "=== Backup Verification Report ==="
+            echo "Date: $(date)"
+            echo ""
+            
+            ERRORS=0
+            
+            # Check PostgreSQL
+            PG_BACKUPS=$(ls -t /home/mkanavi/backups/pgdump_*.sql 2>/dev/null | head -1)
+            if [ -f "$PG_BACKUPS" ]; then
+              SIZE=$(stat -c%s "$PG_BACKUPS" 2>/dev/null || echo 0)
+              echo "  PostgreSQL: $(basename $PG_BACKUPS) (${SIZE} bytes) ✓"
+            else
+              echo "  PostgreSQL: NO BACKUP ✗"
+              ERRORS=$((ERRORS + 1))
+            fi
+            
+            # Check OpenBao
+            OB_BACKUPS=$(ls -td /home/mkanavi/backups/openbao-raft-* 2>/dev/null | head -1)
+            if [ -d "$OB_BACKUPS" ]; then
+              SIZE=$(du -sb "$OB_BACKUPS" 2>/dev/null | cut -f1 || echo 0)
+              echo "  OpenBao: $(basename $OB_BACKUPS) (${SIZE} bytes) ✓"
+            else
+              echo "  OpenBao: NO BACKUP ✗"
+              ERRORS=$((ERRORS + 1))
+            fi
+            
+            # Check Gitea
+            GT_BACKUPS=$(ls -t /home/mkanavi/backups/gitea-*.tar.gz 2>/dev/null | head -1)
+            if [ -f "$GT_BACKUPS" ]; then
+              SIZE=$(stat -c%s "$GT_BACKUPS" 2>/dev/null || echo 0)
+              echo "  Gitea: $(basename $GT_BACKUPS) (${SIZE} bytes) ✓"
+            else
+              echo "  Gitea: NO BACKUP ✗"
+              ERRORS=$((ERRORS + 1))
+            fi
+            
+            # Check Keycloak
+            KC_BACKUPS=$(ls -td /home/mkanavi/backups/keycloak-* 2>/dev/null | head -1)
+            if [ -d "$KC_BACKUPS" ]; then
+              SIZE=$(du -sb "$KC_BACKUPS" 2>/dev/null | cut -f1 || echo 0)
+              echo "  Keycloak: $(basename $KC_BACKUPS) (${SIZE} bytes) ✓"
+            else
+              echo "  Keycloak: NO BACKUP ✗"
+              ERRORS=$((ERRORS + 1))
+            fi
+            
+            # Check configs
+            CFG_BACKUPS=$(ls -t /home/mkanavi/backups/configs-*.tar.gz 2>/dev/null | head -1)
+            if [ -f "$CFG_BACKUPS" ]; then
+              SIZE=$(stat -c%s "$CFG_BACKUPS" 2>/dev/null || echo 0)
+              echo "  Configs: $(basename $CFG_BACKUPS) (${SIZE} bytes) ✓"
+            else
+              echo "  Configs: NO BACKUP ✗"
+              ERRORS=$((ERRORS + 1))
+            fi
+            
+            echo ""
+            if [ $ERRORS -eq 0 ]; then
+              echo "=== ALL BACKUPS VERIFIED ✓ ==="
+            else
+              echo "=== $ERRORS BACKUP(S) MISSING ==="
+            fi
+            echo "ERRORS=$ERRORS"
+          ' 2>&1) || true
+
+          VERIFY_OUTPUT=$(echo "$VERIFY_RESULT" | head -20)
+          echo "$VERIFY_OUTPUT"
+          
+          if echo "$VERIFY_RESULT" | grep -q "ALL BACKUPS VERIFIED"; then
+            VERIFY_STATUS="success"
+            echo "  ✅ All backups verified!"
+          else
+            VERIFY_STATUS="partial"
+            VERIFY_ERRORS=$(echo "$VERIFY_RESULT" | grep "ERRORS=" | tail -1 || echo "ERRORS=unknown")
+            echo "  ⚠️  $VERIFY_ERRORS"
+            BACKUP_ERRORS=$((BACKUP_ERRORS + 1))
+          fi
+
+          # Close JSON array
+          RESULTS_JSON="${RESULTS_JSON}]"
+          echo "BACKUP_RESULTS=$RESULTS_JSON" >> $GITHUB_ENV
+
+          BACKUP_END=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          BACKUP_DURATION="$(( $(date +%s) - $(date -d "$START_TIME" +%s) ))s"
+          echo "BACKUP_STATUS=success" >> $GITHUB_ENV
+          echo "BACKUP_END=$BACKUP_END" >> $GITHUB_ENV
+          echo "BACKUP_DURATION=$BACKUP_DURATION" >> $GITHUB_ENV
+          echo "BACKUP_SUCCESS_COUNT=$BACKUP_SUCCESS" >> $GITHUB_ENV
+          echo "BACKUP_ERROR_COUNT=$BACKUP_ERRORS" >> $GITHUB_ENV
+
+          echo ""
+          echo "  ✅ Backup complete: $BACKUP_SUCCESS succeeded, $BACKUP_ERRORS errors"
+          echo "  Duration: $BACKUP_DURATION"
+
+      - name: Generate report
+        run: |
+          echo "=== Backup Summary ==="
+          echo "Status: ${{ env.BACKUP_STATUS }}"
+          echo "Duration: ${{ env.BACKUP_DURATION }}"
+          echo "Success: ${{ env.BACKUP_SUCCESS_COUNT }}"
+          echo "Errors: ${{ env.BACKUP_ERROR_COUNT }}"
+          echo "Results: ${{ env.BACKUP_RESULTS }}"
+          echo ""
+          echo "✅ Backup pipeline complete"

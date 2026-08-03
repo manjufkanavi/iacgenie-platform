@@ -1,0 +1,42 @@
+---
+# JWT Middleware — Tasks
+# Validates Keycloak JWT tokens and enforces RBAC
+
+- name: "10.13 | JWT middleware | Deploy middleware container"
+  ansible.builtin.include_tasks: deploy_container.yml
+  when: jwt_middleware_enabled | bool
+
+- name: "10.13 | JWT middleware | Generate JWT config"
+  ansible.builtin.template:
+    src: jwt-config.json.j2
+    dest: /home/mkanavi/docker/iacgenie/jwt-middleware-config.json
+    owner: mkanavi
+    group: mkanavi
+    mode: "0644"
+  notify: Reload docker compose
+
+- name: "10.13 | JWT middleware | Generate Nginx RBAC proxy config"
+  ansible.builtin.template:
+    src: jwt-rbac-proxy.conf.j2
+    dest: /etc/nginx/conf.d/jwt-rbac-proxy.conf
+    owner: root
+    group: root
+    mode: "0644"
+    validate: "nginx -t -c %s"
+  notify: Restart nginx
+  when: jwt_middleware_enabled | bool
+
+- name: "10.13 | JWT middleware | Verify middleware health"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ jwt_middleware_backend_port }}/health"
+    method: GET
+    status_code: [200]
+  register: jwt_health
+  retries: 10
+  delay: 3
+  changed_when: false
+  failed_when: false
+
+- name: "10.13 | JWT middleware | Health status"
+  ansible.builtin.debug:
+    msg: "JWT middleware health: {{ jwt_health is changed | ternary('FAILED', 'OK') }}"

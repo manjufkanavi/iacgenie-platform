@@ -1,0 +1,48 @@
+---
+# Admin Gateway — Defaults
+# Unified RBAC gateway for all admin interfaces
+
+admin_gateway_enabled: true
+admin_gateway_image: "lightserp/admin-gateway:latest"
+admin_gateway_port: 9090
+admin_gateway_container_name: iacgenie-admin-gateway
+admin_gateway_backend_url: "http://127.0.0.1:9091"
+admin_gateway_backend_port: 9091
+
+# Admin gateway backends with RBAC requirements
+admin_gateway_backends:
+  - name: iacgenie-dashboard
+    path_prefix: "/iacgenie/"
+    url: "https://iacgenie.local"
+    requires_role: platform-admin
+    description: "IacGenie admin dashboard"
+
+  - name: gitea-admin
+    path_prefix: "/gitea-admin/"
+    url: "https://git.iacgenie.com"
+    requires_role: platform-admin
+    description: "Gitea admin panel"
+
+  - name: keycloak-admin
+    path_prefix: "/keycloak-admin/"
+    url: "https://auth.iacgenie.com"
+    requires_role: platform-admin
+    description: "Keycloak admin console"
+
+  - name: grafana
+    path_prefix: "/grafana/"
+    url: "https://infra.local/grafana/"
+    requires_role: project-admin
+    description: "Grafana dashboards"
+
+  - name: minio-console
+    path_prefix: "/minio/"
+    url: "https://infra.local/minio/"
+    requires_role: project-admin
+    description: "MinIO console"
+
+  - name: openbao
+    path_prefix: "/openbao/"
+    url: "https://vault.iacgenie.com"
+    requires_role: platform-admin
+    description: "OpenBao admin"

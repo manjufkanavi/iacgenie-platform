@@ -1,0 +1,19 @@
+---
+dependencies: []
+
+galaxy_info:
+  author: IacGenie Team
+  description: Keycloak multi-tenant realm provisioning
+  company: IacGenie
+  license: MIT
+  min_ansible_version: "2.14"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+  galaxy_tags:
+    - keycloak
+    - security
+    - authentication
+    - realm
+    - oauth2

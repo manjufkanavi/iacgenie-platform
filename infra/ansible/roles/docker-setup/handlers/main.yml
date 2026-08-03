@@ -1,0 +1,21 @@
+---
+# =============================================================================
+# docker-setup role — handlers
+# =============================================================================
+
+- name: prune unused images
+  ansible.builtin.command:
+    cmd: docker image prune -f --filter "until=168h"
+  changed_when: false
+  check_mode: false
+  listen: "post compose prune"
+
+- name: validate services health
+  ansible.builtin.command:
+    cmd: "docker compose -f {{ iacgenie_compose_dir }}/{{ iacgenie_compose_file }} ps"
+  register: compose_ps
+  changed_when: false
+  check_mode: false
+  always_run: true
+  failed_when: false
+  listen: "post compose health check"

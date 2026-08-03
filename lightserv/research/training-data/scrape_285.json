@@ -1,0 +1,7 @@
+{
+  "url": "https://aws.amazon.com/blogs/architecture/category/compute/auto-scaling/",
+  "title": "Auto Scaling | AWS Architecture Blog",
+  "content": "Building highly available Oracle databases with Amazon FSx for NetApp ONTAP by Vignyanand Penumatcha and Sharath Lingareddy on 03 JUN 2026 in Advanced (300) , Amazon EC2 , Amazon EventBridge , Amazon FSx for NetApp ONTAP , Application Integration , Auto Scaling , AWS Backup , AWS Lambda , AWS Systems Manager , Compute , Customer Solutions , Database , Experience-Based Acceleration , Learning Levels , Storage , Technical How-to Permalink Comments Share This post shows how to build a highly available Oracle database architecture using FSxN shared storage, Auto Scaling groups with dynamic AMI updates, and serverless orchestration to help reduce recovery times with current configurations.",
+  "contentLength": 693,
+  "scrapedAt": "2026-06-16T15:32:36.778Z"
+}

@@ -1,0 +1,20 @@
+---
+# Docker role - Add Docker repository
+- name: "Docker | Create keyrings directory"
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+
+- name: "Docker | Add Docker GPG key"
+  ansible.builtin.apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    keyring: /etc/apt/keyrings/docker.gpg
+    state: present
+
+- name: "Docker | Add Docker repository"
+  ansible.builtin.apt_repository:
+    repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu {{ ubuntu_codename | default(ansible_distribution_release) }} stable"
+    filename: docker
+    state: present
+    update_cache: yes

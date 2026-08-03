@@ -1,0 +1,6 @@
+---
+# =============================================================================
+# service-validation role — vars (internal)
+# =============================================================================
+
+_validation_status_cmd: "docker compose -f {{ iacgenie_compose_dir }}/{{ iacgenie_compose_file }} ps --format 'json'"

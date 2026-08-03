@@ -1,0 +1,138 @@
+---
+# OpenBao StatefulSet for production Kubernetes deployment
+# Provides HA-capable secret storage with persistent volumes
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: openbao
+  namespace: iacgenie
+  labels:
+    app: openbao
+    component: secret-store
+    version: "latest"
+spec:
+  serviceName: openbao-internal
+  replicas: 1  # Increase to 3 for HA with Raft integrated storage
+  selector:
+    matchLabels:
+      app: openbao
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: openbao
+        component: secret-store
+    spec:
+      serviceAccountName: openbao
+      terminationGracePeriodSeconds: 10
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 100
+        fsGroup: 1000
+      containers:
+        - name: openbao
+          image: quay.io/openbao/openbao:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - "bao"
+            - "server"
+            - "-config=/openbao/config/openbao.hcl"
+          env:
+            - name: BAO_ADDR
+              value: "http://0.0.0.0:8200"
+            - name: BAO_CLUSTER_ADDR
+              value: "http://$(POD_IP):8201"
+            - name: BAO_API_ADDR
+              value: "http://$(POD_IP):8200"
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: SKIP_SETCAP
+              value: "true"
+          ports:
+            - name: http
+              containerPort: 8200
+              protocol: TCP
+            - name: cluster
+              containerPort: 8201
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /v1/sys/health?standbyok=true&sealedcode=204&uninitcode=204
+              port: 8200
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /v1/sys/health?standbyok=true
+              port: 8200
+              scheme: HTTP
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            failureThreshold: 3
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              add:
+                - IPC_LOCK
+          volumeMounts:
+            - name: config
+              mountPath: /openbao/config
+              readOnly: true
+            - name: data
+              mountPath: /openbao/data
+      volumes:
+        - name: config
+          configMap:
+            name: openbao-config
+  # Persistent volume for Raft storage
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          app: openbao
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi
+        # storageClassName: standard  # Override with your cluster's storage class
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openbao-config
+  namespace: iacgenie
+  labels:
+    app: openbao
+data:
+  openbao.hcl: |
+    ui            = false
+    disable_mlock = true
+    log_level     = "info"
+
+    storage "raft" {
+      path    = "/openbao/data"
+      node_id = "openbao-0"
+    }
+
+    listener "tcp" {
+      address         = "0.0.0.0:8200"
+      cluster_address = "0.0.0.0:8201"
+      tls_disable     = "true"
+      # In production: provide tls_cert_file and tls_key_file via Secret volume
+    }
+
+    api_addr     = "http://0.0.0.0:8200"
+    cluster_addr = "http://0.0.0.0:8201"

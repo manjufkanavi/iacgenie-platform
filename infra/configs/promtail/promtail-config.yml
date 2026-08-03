@@ -1,0 +1,61 @@
+# Promtail Configuration — Log Shipper for Loki
+# Phase 10.17: Centralized Logging (Loki + Promtail)
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+client:
+  url: http://loki:3100/loki/api/v1/push
+  batchsize: 100
+  batchwait: 1s
+  fill_size: 1572864
+  retry_period: 15s
+  timeout: 10s
+
+scrape_configs:
+  # Scrape Docker container logs
+  - job_name: containers
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: containerlogs
+          host: iacgenie-host
+          __path__: /var/log/containers/*.log
+
+    pipeline_stages:
+      - json:
+          expressions:
+            output: log
+            stream: stream
+            attrs: attrs
+            tag: tag
+      - labels:
+          stream:
+      - drop:
+          source: output
+          expression: '^$'
+
+  # Scrape host system logs
+  - job_name: system
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: systemlogs
+          host: iacgenie-host
+          __path__: /var/log/*.log
+
+  # Scrape Docker daemon logs
+  - job_name: docker
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: dockerlogs
+          host: iacgenie-host
+          __path__: /var/log/docker.log

@@ -1,0 +1,62 @@
+---
+# Admin Gateway — Tasks
+# Task 10.14: Admin gateway with RBAC
+# Task 10.15: RBAC permission matrix
+
+- name: "10.14 | Admin gateway | Deploy gateway container"
+  ansible.builtin.include_tasks: deploy_container.yml
+  when: admin_gateway_enabled | bool
+
+- name: "10.14 | Admin gateway | Generate gateway configuration"
+  ansible.builtin.template:
+    src: gateway-config.json.j2
+    dest: /home/mkanavi/docker/iacgenie/admin-gateway/config.json
+    owner: mkanavi
+    group: mkanavi
+    mode: "0644"
+  notify: Restart admin gateway
+
+- name: "10.14 | Admin gateway | Deploy Nginx admin proxy"
+  ansible.builtin.template:
+    src: admin-gateway-nginx.conf.j2
+    dest: /etc/nginx/conf.d/admin-gateway.conf
+    owner: root
+    group: root
+    mode: "0644"
+    validate: "nginx -t -c %s"
+  notify: Restart nginx
+  when: admin_gateway_enabled | bool
+
+- name: "10.15 | RBAC permission matrix | Generate permission matrix"
+  ansible.builtin.template:
+    src: rbac-permission-matrix.md.j2
+    dest: /home/mkanavi/docker/iacgenie/RBAC-PERMISSION-MATRIX.md
+    owner: mkanavi
+    group: mkanavi
+    mode: "0644"
+  changed_when: true
+
+- name: "10.15 | RBAC permission matrix | Deploy to documentation"
+  ansible.builtin.copy:
+    src: rbac-permission-matrix.md
+    dest: /home/mkanavi/docker/iacgenie/RBAC-PERMISSION-MATRIX.md
+    owner: mkanavi
+    group: mkanavi
+    mode: "0644"
+  delegate_to: localhost
+  changed_when: true
+
+- name: "10.14 | Admin gateway | Verify gateway health"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ admin_gateway_backend_port }}/health"
+    method: GET
+    status_code: [200]
+  register: gw_health
+  retries: 10
+  delay: 3
+  changed_when: false
+  failed_when: false
+
+- name: "10.14 | Admin gateway | Health status"
+  ansible.builtin.debug:
+    msg: "Admin gateway health: {{ gw_health is changed | ternary('FAILED', 'OK') }}"

@@ -1,0 +1,82 @@
+docker_network_name: iacgenie-network
+docker_network_subnet: "172.29.0.0/16"
+docker_compose_project: iacgenie
+generate_compose_files: true
+
+# Phase 10.22: Resource quotas — Service resource limits
+service_memory_defaults:
+  postgres: "2g"
+  redis: "512m"
+  minio: "4g"
+  openbao: "1g"
+  keycloak: "2g"
+  gitea: "1g"
+  nginx: "512m"
+  cloudflared: "256m"
+  lightserp: "512m"
+  pagezen: "512m"
+  loki: "1g"
+  prometheus: "1g"
+  grafana: "512m"
+
+service_cpu_defaults:
+  postgres: "0.75"
+  redis: "0.25"
+  minio: "0.5"
+  openbao: "0.5"
+  keycloak: "1.0"
+  gitea: "0.5"
+  nginx: "0.25"
+  cloudflared: "0.25"
+  lightserp: "1.0"
+  pagezen: "0.25"
+  loki: "0.5"
+  prometheus: "0.5"
+  grafana: "0.25"
+
+# Service network assignments (Phase 10.7)
+service_networks:
+  postgres:
+    - iacgenie-backend
+  redis:
+    - iacgenie-backend
+  minio:
+    - iacgenie-backend
+  openbao:
+    - iacgenie-backend
+  keycloak:
+    - iacgenie-backend
+  gitea:
+    - iacgenie-backend
+  lightserp-api:
+    - iacgenie-frontend
+    - iacgenie-backend
+    - iacgenie-messaging
+  lightserp-webui:
+    - iacgenie-frontend
+  searxng:
+    - iacgenie-frontend
+  nsqd:
+    - iacgenie-messaging
+  pagezen:
+    - iacgenie-frontend
+  nginx:
+    - iacgenie-frontend
+  cloudflared:
+    - iacgenie-frontend
+
+# Phase 10.20: TLS/SSL config
+tls_enabled: true
+tls_cert_dir: /etc/letsencrypt/live/iacgenie.com
+tls_cert_file: fullchain.pem
+tls_key_file: privkey.pem
+
+# Phase 10.20: Certbot auto-renewal
+certbot_enabled: true
+certbot_email: admin@iacgenie.com
+certbot_domains:
+  - iacgenie.com
+  - "*.iacgenie.com"
+certbot_challenge: dns
+certbot_auto_renew_hour: "3"
+certbot_auto_renew_minute: "30"

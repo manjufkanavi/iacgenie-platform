@@ -1,0 +1,24 @@
+---
+# =============================================================================
+# IacGenie Unified Infrastructure — Ansible Site Playbook
+# Phase 10.23: Idempotency Hardening
+# =============================================================================
+# This playbook orchestrates all infrastructure roles with idempotency guards.
+# All tasks are check-mode compatible where possible.
+# =============================================================================
+
+- name: Apply Infrastructure Configuration
+  hosts: all
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/main.yml
+  roles:
+    - role: docker-setup
+      tags: ["docker", "setup"]
+    - role: service-validation
+      tags: ["validate", "health"]
+    - role: nginx-config
+      tags: ["nginx", "proxy"]
+    - role: certbot-setup
+      tags: ["certbot", "tls", "ssl"]

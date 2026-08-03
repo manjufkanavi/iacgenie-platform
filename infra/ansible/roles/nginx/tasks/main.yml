@@ -1,0 +1,45 @@
+---
+# Nginx role - Main entry point
+- name: "Nginx | Ensure Nginx is installed"
+  ansible.builtin.apt:
+    name: nginx
+    state: present
+
+- name: "Nginx | Deploy Nginx main configuration"
+  ansible.builtin.template:
+    src: nginx.conf.j2
+    dest: /etc/nginx/nginx.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart nginx
+
+- name: "Nginx | Deploy reverse proxy configuration (unified)"
+  ansible.builtin.template:
+    src: reverse-proxy.conf.j2
+    dest: /etc/nginx/conf.d/iacgenie.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart nginx
+
+- name: "Nginx | Remove stale unified config files"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/nginx/conf.d/iacgenie-unified.conf
+    - /etc/nginx/conf.d/iacgenie-unified.conf.bak
+    - /etc/nginx/conf.d/iacgenie-unified.conf.bak.*
+  notify: Restart nginx
+
+- name: "Nginx | Test configuration"
+  ansible.builtin.command: nginx -t
+  changed_when: false
+  failed_when: false
+
+- name: "Nginx | Ensure Nginx is running"
+  ansible.builtin.service:
+    name: nginx
+    state: started
+    enabled: yes

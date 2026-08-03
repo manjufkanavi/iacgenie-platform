@@ -1,0 +1,414 @@
+# =============================================================================
+# IacGenie New VM Deployment — Docker Compose (Infrastructure Services)
+# =============================================================================
+# Purpose: VM acts as infrastructure provider (headless).
+#          Development runs on local Mac — VM hosts only platform services.
+#
+# VM: elementary OS 8 (Ubuntu 24.04), Intel x86_64 (AMD64)
+# IP: 192.168.0.118
+#
+# Services: postgres, redis, minio, openbao, keycloak, gitea,
+#           prometheus, grafana, cloudflared, coolify
+# Storage: local disk (/home/mkanavi/docker/iacgenie/)
+#
+# Usage:
+#   docker compose -f docker-compose-newvm.yml up -d
+#   docker compose -f docker-compose-newvm.yml ps
+#   docker compose -f docker-compose-newvm.yml logs -f
+# =============================================================================
+
+x-common-settings: &common-settings
+  restart: unless-stopped
+  networks:
+    - iacgenie_network
+  # No volume mounts needed unless specified per service
+
+services:
+  # =========================================================================
+  # 1. PostgreSQL — single instance with multiple databases
+  # =========================================================================
+  postgres:
+    image: postgres:15-alpine
+    <<: *common-settings
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_SUPER_PASSWORD}
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD}
+      POSTGRES_KC_PASSWORD: ${POSTGRES_KC_PASSWORD}
+      POSTGRES_IACGENIE_PASSWORD: ${POSTGRES_APP_PASSWORD}
+    volumes:
+      - /home/mkanavi/docker/iacgenie/postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sh:/docker-entrypoint-initdb.d/99-init-users.sql
+    ports:
+      - "127.0.0.1:5432:5432"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    user: "postgres:postgres"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "0.5"
+
+  # =========================================================================
+  # 2. Redis — caching & session store
+  # =========================================================================
+  redis:
+    image: redis:7-alpine
+    <<: *common-settings
+    command: redis-server --save --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - /home/mkanavi/docker/iacgenie/redis_data:/data/redis
+    ports:
+      - "127.0.0.1:6379:6379"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.25"
+
+  # =========================================================================
+  # 3. MinIO — S3-compatible object storage
+  # =========================================================================
+  minio:
+    image: minio/minio:latest
+    <<: *common-settings
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_SERVER_URL: https://minio.iacgenie.com
+      MINIO_BROWSER_REDIRECT_URL: https://console.minio.iacgenie.com
+    volumes:
+      - /home/mkanavi/docker/iacgenie/minio_data:/data/minio
+    command: server /data/minio --console-address ":9001"
+    ports:
+      - "127.0.0.1:9000:9000"  # API (only via tunnel)
+      - "127.0.0.1:9001:9001"  # Console (only via tunnel)
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+
+  # =========================================================================
+  # 4. OpenBao — secrets management (Vault fork)
+  # =========================================================================
+  openbao:
+    image: quay.io/openbao/openbao:latest
+    <<: *common-settings
+    container_name: iacgenie-openbao
+    environment:
+      BAO_ADDR: http://127.0.0.1:8200
+      BAO_API_ADDR: http://openbao:8200
+      BAO_DEV_ROOT_TOKEN_ID: ${OPENBAO_ROOT_TOKEN}
+      BAO_DEV_LISTEN_ADDRESS: 127.0.0.1:8200
+      OPENBAO_ADDR: http://openbao:8200
+      OPENBAO_TOKEN: ${OPENBAO_TOKEN}
+    volumes:
+      - /home/mkanavi/docker/iacgenie/openbao_data:/openbao/data
+    ports:
+      - "127.0.0.1:8200:8200"
+    command: server -dev -dev-listen-address=127.0.0.1:8200
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8200/v1/sys/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+
+  # =========================================================================
+  # 5. OpenBao Init — configures KV-v2 engine + policies
+  # =========================================================================
+  openbao-init:
+    image: curlimages/curl:8.6.0
+    <<: *common-settings
+    container_name: iacgenie-openbao-init
+    depends_on:
+      openbao:
+        condition: service_healthy
+    environment:
+      OPENBAO_ADDR: http://openbao:8200
+      OPENBAO_TOKEN: ${OPENBAO_TOKEN}
+      OPENBAO_ROOT_TOKEN: ${OPENBAO_ROOT_TOKEN}
+    volumes:
+      - ./docker/openbao/bootstrap.sh:/bootstrap.sh:ro
+    entrypoint: ["/bin/sh", "/bootstrap.sh"]
+    networks:
+      - iacgenie_network
+    restart: "no"
+
+  # =========================================================================
+  # 6. Keycloak — OAuth / OIDC provider
+  # =========================================================================
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    <<: *common-settings
+    command: start-dev --import-realm
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${POSTGRES_KC_PASSWORD}
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      SMTP2GO_USERNAME: ${SMTP2GO_USERNAME:-}
+      SMTP2GO_PASSWORD: ${SMTP2GO_API_KEY:-}
+      KC_HTTP_PORT: 8080
+      KC_HOST_NAME: auth.iacgenie.com
+      KC_HOST_URL_STRICT_HTTPS: "false"
+      KC_METRICS_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+      - ./docker/keycloak/import-realm.sh:/setup/import-realm.sh:ro
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "exec 3<>/dev/tcp/localhost/8080; echo -e 'GET /health/ready HTTP/1.1\r\nhost: localhost\r\nConnection: close\r\n\r\n' >&3; head -n 1 <&3",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "0.5"
+
+  # =========================================================================
+  # 7. MinIO Init — creates buckets after MinIO starts
+  # =========================================================================
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    environment:
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+    command: >
+      sh -c "
+        until mc alias set iacgenie http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD}; do
+          echo 'Waiting for MinIO...' && sleep 2;
+        done &&
+        mc mb iacgenie/artifacts --ignore-existing &&
+        mc mb iacgenie/logs --ignore-existing &&
+        mc mb iacgenie/plans --ignore-existing &&
+        mc mb iacgenie/outputs --ignore-existing &&
+        echo 'MinIO buckets initialized'
+      "
+    networks:
+      - iacgenie_network
+    restart: "no"
+
+  # =========================================================================
+  # 8. Gitea — Git service (production-ready, rootless)
+  # =========================================================================
+  # Key: Rootless Gitea stores config at /etc/gitea/app.ini and data at
+  # /var/lib/gitea. We bind-mount both for full persistence.
+  #
+  # Production checklist:
+  #   1. ✅ Data persistence via bind mounts ( Goals #1 )
+  #   2. ✅ Automated daily backups via cron ( Goal #2 )
+  #   3. ✅ Security hardened — admin-only login ( Goal #3 )
+  #   4. ✅ GitHub push mirroring via deploy key ( Goal #4 )
+  #   5. ✅ Gitea Actions disabled — self-hosted runners used ( Goal #5 )
+  # =========================================================================
+  gitea:
+    image: gitea/gitea:1.23.4-rootless   # pinned for reproducibility
+    <<: *common-settings
+    container_name: iacgenie-gitea
+    environment:
+      GITEA__security__INSTALL_LOCK: "true"
+      GITEA__service__DISABLE_REGISTRATION: "true"
+      GITEA__service__ENABLE_REGISTRATION: "false"
+      GITEA__service__REQUIRE_SIGNIN_VIEW: "true"
+      GITEA__service__REGISTER_EMAIL_CONFIRM: "false"
+      GITEA__service__DISABLE_GRAVATAR: "true"   # self-hosted avatar source
+      # SSH
+      GITEA__ssh__DISABLE_PACKED_COMMANDEORS: "true"
+      GITEA__ssh__START_SSH_SERVER: "true"
+      GITEA__ssh__SSH_PORT: 22
+    volumes:
+      # Data mount — /var/lib/gitea holds repos, DB, uploads, SSH keys, etc.
+      - /home/mkanavi/docker/iacgenie/gitea_data/data:/var/lib/gitea
+      # Config dir — bind-mount entire /etc/gitea so rootless entrypoint can
+      # write app.ini (merge ENV vars) and create overrides on first boot.
+      # After first boot, app.ini is authoritative and preserved across restarts.
+      - /home/mkanavi/docker/iacgenie/gitea_data/config:/etc/gitea
+    ports:
+      - "127.0.0.1:3000:3000"   # Web UI (only via tunnel)
+      - "127.0.0.1:2222:22"      # SSH for git clone/push
+    security_opt:
+      - no-new-privileges:true
+    user: "1000:1000"            # rootless container
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/ || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.25"
+
+  # =========================================================================
+  # 9. Prometheus — metrics collection
+  # =========================================================================
+  prometheus:
+    image: prom/prometheus:latest
+    <<: *common-settings
+    user: "0"
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - /home/mkanavi/docker/iacgenie/prometheus_data:/data/prometheus
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/data/prometheus"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+
+  # =========================================================================
+  # 10. Grafana — metrics dashboards
+  # =========================================================================
+  grafana:
+    image: grafana/grafana:latest
+    <<: *common-settings
+    ports:
+      - "127.0.0.1:3001:3000"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    volumes:
+      - /home/mkanavi/docker/iacgenie/grafana_data:/data/grafana
+      - ./docker/grafana/provisioning/datasources/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+    environment:
+      GF_SECURITY_ADMIN_USER: "${GRAFANA_ADMIN_USER:-admin}"
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_SERVER_ROOT_URL: https://dashboards.iacgenie.com
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_POSTGRES_PASSWORD: ${POSTGRES_APP_PASSWORD}
+    depends_on:
+      - prometheus
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+
+  # =========================================================================
+  # 11. Coolify — PaaS deployment platform
+  # =========================================================================
+  coolify:
+    image: ghcr.io/coollabsio/coolify:latest
+    container_name: iacgenie-coolify
+    <<: *common-settings
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    volumes:
+      - coolify_data:/var/lib/coolify
+    ports:
+      - "127.0.0.1:8089:80"   # Coolify web UI (only via tunnel)
+      - "127.0.0.1:8090:8080" # Coolify Swoole (only via tunnel)
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  # =========================================================================
+  # Note: Cloudflare tunnel runs as a systemd service (cloudflared-tunnel.service)
+  # on the host, NOT in Docker. The systemd service reads config from
+  # ~/docker/iacgenie/cloudflared/config.yml and exposes all services via the
+  # iacgenie-pi tunnel. Docker-compose services are not touched.
+  # =========================================================================
+
+# =========================================================================
+# Volumes
+# =========================================================================
+volumes:
+  # Core data volumes — stored on local disk
+  postgres_data:
+    name: iacgenie_postgres_data
+  redis_data:
+    name: iacgenie_redis_data
+  minio_data:
+    name: iacgenie_minio_data
+  openbao_data:
+    name: iacgenie_openbao_data
+  prometheus_data:
+    name: iacgenie_prometheus_data
+  grafana_data:
+    name: iacgenie_grafana_data
+  coolify_data:
+    name: iacgenie_coolify_data
+
+# =========================================================================
+# Network
+# =========================================================================
+networks:
+  iacgenie_network:
+    name: iacgenie_network
+    driver: bridge

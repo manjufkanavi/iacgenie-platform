@@ -1,0 +1,25 @@
+---
+# =============================================================================
+# service-validation role — default variables
+# =============================================================================
+
+iacgenie_compose_dir: "/home/mkanavi/docker/iacgenie"
+iacgenie_compose_file: "docker-compose-unified.yml"
+
+# Health check services to validate
+health_check_services:
+  - container: iacgenie-grafana
+    health_url: "http://127.0.0.1:3000/api/health"
+  - container: iacgenie-prometheus
+    health_url: "http://127.0.0.1:9090/-/healthy"
+  - container: iacgenie-loki
+    health_url: "http://127.0.0.1:3100/ready"
+  - container: iacgenie-minio
+    health_url: "http://127.0.0.1:9000/minio/health/live"
+  - container: iacgenie-postgres
+    health_url: "http://127.0.0.1:5432"
+
+# Volume paths to check
+check_volumes:
+  - /home/mkanavi/docker/iacgenie
+  - /home/mkanavi/docker/iacgenie/gitea_data

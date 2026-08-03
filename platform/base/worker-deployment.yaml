@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: iacgenie-worker
+  namespace: iacgenie
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: iacgenie-worker
+  template:
+    metadata:
+      labels:
+        app: iacgenie-worker
+        version: v1
+    spec:
+      containers:
+        - name: celery-worker
+          image: ${REGISTRY:-ghcr.io/iacgenie}/backend:${IMAGE_TAG:-latest}
+          command:
+            - celery
+            - -A
+            - celery_worker
+            - worker
+            - --loglevel=info
+            - --concurrency=4
+            - --queues=pipeline_phases
+          envFrom:
+            - configMapRef:
+                name: iacgenie-config
+            - secretRef:
+                name: iacgenie-secrets
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 4Gi
+          readinessProbe:
+            exec:
+              command:
+                - celery
+                - -A
+                - celery_worker
+                - inspect
+                - ping
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command:
+                - celery
+                - -A
+                - celery_worker
+                - inspect
+                - ping
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+          volumeMounts:
+            - name: workspace-volume
+              mountPath: /workspace/sandboxes
+      volumes:
+        - name: workspace-volume
+          emptyDir: {}

@@ -1,0 +1,32 @@
+# pgBackRest configuration
+# Managed by Ansible
+
+[{{ pg_backup_repository | default('repo1') }}]
+repo1-type={{ pgbackrest_repo_type | default('s3') }}
+repo1-s3-bucket={{ pgbackrest_repo_bucket | default('iacgenie-backups') }}
+repo1-s3-endpoint={{ pgbackrest_repo_endpoint | default('127.0.0.1:9000') }}
+repo1-s3-key={{ minio_root_user | default('iacgenie') }}
+repo1-s3-key-secret=*** pgbackrest_s3_key_secret | default('CHANGE_ME_IN_VAULT') }}
+repo1-path={{ pgbackrest_repo_path | default('/pgbackups') }}
+
+[pg1]
+pg1-path={{ pg_data_dir | default('/var/lib/postgresql/data') }}
+pg1-port={{ pg_port | default(5432) }}
+
+# Retention
+repo1-retention-full={{ pgbackrest_retention_full | default('4') }}
+repo1-retention-diff={{ pgbackrest_retention_diff | default('7') }}
+
+# Archive command
+archive-async=y
+archive-mode=always
+archive-push=pg_backrest_push %p %r
+
+# Checkpoint settings
+checkpoint=compact
+checkpoint segments=4
+
+# Log settings
+log-level-console=info
+log-level-file=debug
+log-path=/var/log/pgbackrest

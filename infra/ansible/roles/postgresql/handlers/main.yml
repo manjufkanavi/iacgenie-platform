@@ -1,0 +1,7 @@
+---
+# Individual service handlers are now handled by docker-compose-generator reload handler.
+# Keeping these as no-ops to prevent errors from stale notifications.
+
+- name: "No-op: restart services (use docker-compose-generator reload instead)"
+  ansible.builtin.debug:
+    msg: "Container restart handled by docker-compose-generator. No separate restart needed."

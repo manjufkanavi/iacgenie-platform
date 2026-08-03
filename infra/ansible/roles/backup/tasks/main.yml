@@ -1,0 +1,33 @@
+---
+# Backup role - Main entry point
+- name: "Backup | Deploy backup script"
+  ansible.builtin.template:
+    src: backup.sh.j2
+    dest: /usr/local/bin/backup.sh
+    owner: root
+    group: root
+    mode: "0755"
+  notify: Run backup
+
+- name: "Backup | Deploy pgBackRest configuration"
+  ansible.builtin.template:
+    src: pgbackrest.conf.j2
+    dest: /etc/pgbackrest/pgbackrest.conf
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: "Backup | Create backup schedule"
+  ansible.builtin.cron:
+    name: "Daily backup"
+    minute: "0"
+    hour: "2"
+    job: "/usr/local/bin/backup.sh >> /var/log/backup.log 2>&1"
+
+- name: "Backup | Verify backup directory exists"
+  ansible.builtin.file:
+    path: "{{ backup_dest | default('/mnt/backups') }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"

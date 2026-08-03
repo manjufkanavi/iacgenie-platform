@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+#
+# .git/hooks/pre-push — Gitea dual-remote sync hook
+#
+# This is the actual git hook installed in .git/hooks/pre-push.
+# It delegates to the shared gitea-push-hook.sh for the main logic.
+#
+# Usage: Automatically triggered on `git push`
+#
+# Env vars (set in git config):
+#   gitea.remote   - Gitea remote name (default: gitea)
+#   gitea.baseurl  - Gitea URL (default: https://gitea.iacgenie.com)
+#   gitea.timeout  - Connection timeout in seconds (default: 5)
+#
+
+set -euo pipefail
+
+HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$HOOK_DIR/.." && pwd)"
+
+# Path to shared hook script
+SHARED_HOOK="$REPO_ROOT/scripts/gitea-push-hook.sh"
+
+# If scripts/ doesn't exist, check .gitea/
+if [ ! -f "$SHARED_HOOK" ]; then
+    SHARED_HOOK="$REPO_ROOT/.gitea/gitea-push-hook.sh"
+fi
+
+# If still not found, use inline fallback
+if [ ! -f "$SHARED_HOOK" ]; then
+    echo ""
+    echo "--- Pre-push: scripts/gitea-push-hook.sh not found, pushing to origin only ---"
+    echo ""
+    exit 0
+fi
+
+export GITEA_REMOTE="${gitea.remote:-gitea}"
+export GITEA_BASE_URL="${gitea.baseurl:-https://gitea.iacgenie.com}"
+export GITEA_TIMEOUT="${gitea.timeout:-5}"
+
+# Execute the shared hook, passing the remote name as first arg
+exec bash "$SHARED_HOOK" "$1"

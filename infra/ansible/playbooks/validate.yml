@@ -1,0 +1,53 @@
+---
+# Post-deploy validation playbook
+- hosts: all
+  become: true
+  become_method: sudo
+  
+  tasks:
+    - name: Verify Docker is running
+      ansible.builtin.command: docker info
+      register: docker_info
+      changed_when: false
+      
+    - name: Verify all containers are running
+      ansible.builtin.command: "docker compose -p iacgenie ps --format json"
+      register: compose_ps
+      changed_when: false
+      
+    - name: Show container status
+      ansible.builtin.debug:
+        var: compose_ps.stdout
+      
+    - name: Verify key endpoints respond
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ item.port }}"
+        status_code: "[200, 301, 302, 401, 403]"
+        timeout: 10
+      loop:
+        - { port: "{{ ports.postgres }}", name: "PostgreSQL" }
+        - { port: "{{ ports.redis }}", name: "Redis" }
+        - { port: "{{ ports.minio_api }}", name: "MinIO API" }
+        - { port: "{{ ports.minio_console }}", name: "MinIO Console" }
+        - { port: "{{ ports.openbao }}", name: "OpenBao" }
+        - { port: "{{ ports.keycloak }}", name: "Keycloak" }
+        - { port: "{{ ports.gitea_http }}", name: "Gitea" }
+        - { port: "{{ ports.lightserp_api }}", name: "LightSerp API" }
+        - { port: "{{ ports.searxng }}", name: "SearXNG" }
+        - { port: "{{ ports.nsqd }}", name: "NSQD" }
+        - { port: "{{ ports.pagezen }}", name: "PageZen" }
+      register: endpoint_results
+      
+    - name: Show endpoint check results
+      ansible.builtin.debug:
+        var: endpoint_results
+      
+    - name: Fail if any critical endpoint is down
+      ansible.builtin.assert:
+        that:
+          - item.status == 200 or item.status == 301 or item.status == 302
+        fail_msg: "{{ item.name }} endpoint failed (status: {{ item.status }})"
+        success_msg: "{{ item.name }} is healthy"
+      loop: "{{ endpoint_results.results }}"
+      loop_control:
+        label: "{{ item.item.name }} -> {{ item.status }}"

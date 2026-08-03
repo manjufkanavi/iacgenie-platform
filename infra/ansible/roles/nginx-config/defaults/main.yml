@@ -1,0 +1,20 @@
+---
+# =============================================================================
+# nginx-config role — default variables
+# =============================================================================
+
+# Domains that need TLS certificates checked
+tls_cert_domains:
+  - iacgenie.local
+  - lightsrp.local
+  - infra.local
+  - grafana.iacgenie.com
+
+# Rate limit configuration
+nginx_rate_limit_general: "10r/s"
+nginx_rate_limit_auth: "3r/m"
+nginx_rate_limit_api: "30r/s"
+
+# Nginx template source
+nginx_config_src: "nginx-unified.conf.j2"
+nginx_config_dest: "/etc/nginx/conf.d/iacgenie-unified.conf"

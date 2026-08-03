@@ -1,0 +1,91 @@
+---
+# Gitea Project Organizations — Defaults
+
+# Gitea API config
+gitea_api_url: "https://git.iacgenie.com"
+gitea_api_token: "CHANGE_ME_IN_VAULT"
+gitea_default_user: admin
+
+# Default project organizations
+gitea_project_orgs:
+  - org_name: iacgenie-project
+    display_name: "IacGenie Platform"
+    description: "Core IacGenie platform development"
+    location: "Remote"
+    website: "https://iacgenie.com"
+    default_visibility: private
+    default_team_permissions:
+      issues: read
+      pull_requests: read
+      packages: read
+      issues_labels: write
+      projects: read
+    teams:
+      - name: maintainers
+        privacy: closed
+        permission: admin
+        members: []
+      - name: developers
+        privacy: closed
+        permission: write
+        members: []
+      - name: viewers
+        privacy: closed
+        permission: read
+        members: []
+
+  - org_name: terragenius
+    display_name: "TerraGenius"
+    description: "Terraform module development"
+    location: "Remote"
+    website: "https://iacgenie.com"
+    default_visibility: private
+    default_team_permissions:
+      issues: read
+      pull_requests: read
+      packages: read
+    teams:
+      - name: maintainers
+        privacy: closed
+        permission: admin
+        members: []
+      - name: developers
+        privacy: closed
+        permission: write
+        members: []
+
+# RBAC role mapping (Keycloak → Gitea team)
+gitea_rbac_mapping:
+  platform-admin:
+    teams:
+      - maintainers
+    visibility_override: private
+  project-admin:
+    teams:
+      - maintainers
+    visibility_override: private
+  project-member:
+    teams:
+      - developers
+    visibility_override: private
+
+# Phase 10.12: Org-per-project Gitea setup
+gitea_auto_create_repos:
+  iacgenie-project:
+    - name: iacgenie
+      description: "IacGenie IaC Application"
+      auto_init: true
+      default_branch: main
+      private: true
+      enable_prune_unreferached_pkgs: false
+    - name: infrastructure
+      description: "Infrastructure as Code"
+      auto_init: true
+      default_branch: main
+      private: true
+  terragenius:
+    - name: terragenius
+      description: "TerraGenius Terraform modules"
+      auto_init: true
+      default_branch: main
+      private: true

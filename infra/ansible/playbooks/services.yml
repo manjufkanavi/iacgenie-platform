@@ -1,0 +1,71 @@
+---
+# Services playbook: deploy all Docker services
+# Phase 10: Multi-Tenant & RBAC + Production Readiness
+- hosts: all
+  become: true
+  become_method: sudo
+
+  roles:
+    # Phase 1: Foundation & System Hardening
+    - role: common
+    - role: docker
+    - role: user_management
+    - role: ntp_config
+
+    # Phase 2: Core Infrastructure Services
+    - role: postgresql
+    - role: redis
+    - role: minio
+    - role: openbao
+    - role: keycloak
+
+    # Phase 3: Application Services
+    - role: gitea
+    - role: lightserp
+    - role: searxng
+    - role: nsqd
+    - role: pagezen
+
+    # Phase 4: Edge & Access Layer
+    - role: docker-compose-generator
+    - role: docker-compose-service
+    - role: nginx
+    - role: cloudflare_tunnel
+
+    # Phase 5: Secrets & Security
+    - role: backup
+
+    # Phase 6: Resilience & Operations
+    - role: monitoring
+
+    # Phase 7: Logging
+    - role: logging_stack
+
+    # Phase 8: Multi-Tenant & RBAC (Phase 10.3)
+    - role: keycloak_realm
+    - role: gitea_orgs
+
+    # Phase 9: Production Ready (Phase 10.4)
+    # Managed via post-deploy and validate playbooks
+
+  # Post-deploy: wait for containers, unseal OpenBao, check readiness
+  tasks:
+    - name: "Import OpenBao unseal tasks"
+      ansible.builtin.import_tasks:
+        file: ../roles/openbao/tasks/unseal.yml
+      when:
+        - not openbao_skip_unseal | default(false) | bool
+
+    # Phase 10.3: Keycloak multi-tenant realm (10.11)
+    - name: "Import Keycloak realm provisioning (10.11)"
+      ansible.builtin.import_tasks:
+        file: ../roles/keycloak_realm/tasks/main.yml
+      when:
+        - keycloak_provision_realm | default(true) | bool
+
+    # Phase 10.3: Project-based Gitea (10.12)
+    - name: "Import Gitea org provisioning (10.12)"
+      ansible.builtin.import_tasks:
+        file: ../roles/gitea_orgs/tasks/main.yml
+      when:
+        - gitea_provision_orgs | default(false) | bool

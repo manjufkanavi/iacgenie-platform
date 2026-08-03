@@ -1,0 +1,14 @@
+# Grafana Datasources — Logging Stack
+# Managed by Ansible
+
+apiVersion: 1
+
+datasources:
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://127.0.0.1:{{ loki_port }}
+    isDefault: false
+    editable: true
+    jsonData:
+      maxLines: 1000

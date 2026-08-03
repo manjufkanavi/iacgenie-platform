@@ -1,0 +1,3 @@
+nsqd_version: "latest"
+nsqd_tcp_port: 4150
+nsqd_http_port: 4151

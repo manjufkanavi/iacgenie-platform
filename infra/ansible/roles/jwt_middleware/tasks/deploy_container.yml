@@ -1,0 +1,45 @@
+---
+# JWT Middleware — Container Deployment
+
+- name: "10.13 | JWT middleware | Ensure JWT middleware data directory"
+  ansible.builtin.file:
+    path: /home/mkanavi/docker/iacgenie/jwt-middleware
+    state: directory
+    owner: mkanavi
+    group: mkanavi
+    mode: "0755"
+
+- name: "10.13 | JWT middleware | Copy config"
+  ansible.builtin.copy:
+    content: |
+      {
+        "keycloak_url": "{{ jwt_middleware_keycloak_url }}",
+        "realm": "{{ jwt_middleware_realm }}",
+        "backend_port": {{ jwt_middleware_backend_port }},
+        "cache_ttl": {{ jwt_config.cache_ttl }},
+        "issuer": "{{ jwt_config.issuer }}",
+        "audience": "{{ jwt_config.audience }}",
+        "algorithm": "{{ jwt_config.algorithm }}"
+      }
+    dest: /home/mkanavi/docker/iacgenie/jwt-middleware/config.json
+    owner: mkanavi
+    group: mkanavi
+    mode: "0644"
+  notify: Restart jwt-middleware container
+
+- name: "10.13 | JWT middleware | Create compose service file"
+  ansible.builtin.template:
+    src: docker-compose.jwt-middleware.yml.j2
+    dest: /home/mkanavi/docker/iacgenie/docker-compose.jwt-middleware.yml
+    owner: mkanavi
+    group: mkanavi
+    mode: "0644"
+  notify: Reload docker compose
+
+- name: "10.13 | JWT middleware | Start middleware container"
+  ansible.builtin.command:
+    cmd: docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.jwt-middleware.yml up -d
+  args:
+    chdir: /home/mkanavi/docker/iacgenie
+  notify: Wait for JWT middleware health
+  changed_when: true

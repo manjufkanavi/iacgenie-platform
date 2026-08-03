@@ -1,0 +1,71 @@
+# a12n-server Authentication Configuration
+server:
+  host: 0.0.0.0
+  port: 8080
+
+# JWT Configuration
+jwt:
+  secret: ${A12N_SECRET_KEY:-change-me-in-production}
+  issuer: ${A12N_ISSUER_URL:-http://localhost:8080}
+  audience: lightserp
+  access_token_expiry: 1h
+  refresh_token_expiry: 24h
+
+# OAuth2 Configuration
+oauth2:
+  clients:
+    - id: lightserp-client
+      secret: ${OAUTH_CLIENT_SECRET:-change-me-in-production}
+      redirect_uris:
+        - http://localhost:7805/callback
+      grants:
+        - client_credentials
+        - authorization_code
+        - refresh_token
+      scope: read write
+
+  # Supported scopes
+  scopes:
+    - name: read
+      description: Read access to LightSERP API
+    - name: write
+      description: Write access to LightSERP API
+
+# User Management (for development)
+users:
+  - username: admin
+    password: ${ADMIN_PASSWORD:-change-me-in-production}
+    email: admin@example.com
+    roles:
+      - admin
+
+  - username: user
+    password: ${USER_PASSWORD:-change-me-in-production}
+    email: user@example.com
+    roles:
+      - user
+
+# Database (SQLite for simplicity)
+database:
+  type: sqlite
+  path: /data/a12n.db
+
+# Logging
+logging:
+  level: info
+  format: json
+  file: /var/log/a12n/a12n.log
+
+# CORS Configuration
+cors:
+  allowed_origins:
+    - http://localhost:7805
+    - http://localhost:8085
+  allowed_methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+  allowed_headers:
+    - Authorization
+    - Content-Type

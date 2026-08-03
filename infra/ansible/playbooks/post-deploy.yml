@@ -1,0 +1,50 @@
+---
+# Post-deploy verification playbook
+# Run after services.yml to verify readiness without full redeploy
+
+- hosts: iacgenie-server
+  become: true
+  tasks:
+    # --- OpenBao Read-Only Health ---
+    - name: "OpenBao | Check container health"
+      ansible.builtin.command: docker inspect --format='{{ .State.Health.Status }}' iacgenie_openbao
+      register: openbao_health
+      changed_when: false
+      failed_when: false
+
+    - name: "OpenBao | Report health"
+      ansible.builtin.debug:
+        var: openbao_health.stdout
+
+    - name: "OpenBao | Check seal status"
+      ansible.builtin.command: docker exec iacgenie_openbao bao operator list-seal-status
+      register: openbao_seal
+      changed_when: false
+      failed_when: false
+      ignore_errors: true
+
+    # --- Keycloak Readiness ---
+    - name: "Keycloak | Check admin UI"
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:8083/health/ready"
+        status_code: 200
+      register: keycloak_health
+      retries: 30
+      delay: 10
+      changed_when: false
+      failed_when: false
+
+    - name: "Keycloak | Report readiness"
+      ansible.builtin.debug:
+        msg: "Keycloak admin UI is ready"
+      when: keycloak_health.status == 200
+
+    # --- All Containers ---
+    - name: "Docker | List containers"
+      ansible.builtin.command: docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+      register: docker_ps
+      changed_when: false
+
+    - name: "Docker | Show container status"
+      ansible.builtin.debug:
+        var: docker_ps.stdout_lines

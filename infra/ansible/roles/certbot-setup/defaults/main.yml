@@ -1,0 +1,14 @@
+---
+# =============================================================================
+# certbot-setup role — default variables
+# =============================================================================
+
+cert_domains:
+  - iacgenie.local
+  - lightsrp.local
+  - infra.local
+  - grafana.iacgenie.com
+
+certbot_email: "admin@iacgenie.com"
+certbot_dns_plugin: "cloudflare"
+certbot_renew_timer: "certbot-renew.timer"

@@ -1,0 +1,27 @@
+# Admin Gateway — Docker Compose service
+# Managed by Ansible — do not edit manually
+
+services:
+  admin-gateway:
+    image: {{ admin_gateway_image }}
+    container_name: {{ admin_gateway_container_name }}
+    restart: unless-stopped
+    networks:
+      - iacgenie-backend
+    ports:
+      - 127.0.0.1:{{ admin_gateway_backend_port }}:{{ admin_gateway_backend_port }}
+    volumes:
+      - /home/mkanavi/docker/iacgenie/admin-gateway:/etc/config:ro
+    environment:
+      CONFIG_PATH: /etc/config/config.json
+    depends_on:
+      - keycloak
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:{{ admin_gateway_backend_port }}/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+networks:
+  iacgenie-backend:
+    external: true

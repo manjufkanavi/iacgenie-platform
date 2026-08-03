@@ -1,0 +1,33 @@
+---
+# Admin Gateway — Container Deployment
+
+- name: "10.14 | Admin gateway | Ensure gateway data directory"
+  ansible.builtin.file:
+    path: /home/mkanavi/docker/iacgenie/admin-gateway
+    state: directory
+    owner: mkanavi
+    group: mkanavi
+    mode: "0755"
+
+- name: "10.14 | Admin gateway | Create compose service file"
+  ansible.builtin.template:
+    src: docker-compose.admin-gateway.yml.j2
+    dest: /home/mkanavi/docker/iacgenie/docker-compose.admin-gateway.yml
+    owner: mkanavi
+    group: mkanavi
+    mode: "0644"
+  notify: Reload docker compose
+
+- name: "10.14 | Admin gateway | Start gateway container"
+  ansible.builtin.command:
+    cmd: docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.admin-gateway.yml up -d
+  args:
+    chdir: /home/mkanavi/docker/iacgenie
+  notify: Wait for admin gateway health
+  changed_when: true
+
+- name: "10.14 | Admin gateway | Wait for gateway to be ready"
+  ansible.builtin.wait_for:
+    port: "{{ admin_gateway_backend_port }}"
+    delay: 5
+    timeout: 60

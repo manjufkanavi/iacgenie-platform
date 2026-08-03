@@ -1,0 +1,66 @@
+---
+# =============================================================================
+# service-validation role — tasks
+# Phase 10.23: Idempotency Hardening
+# =============================================================================
+
+- name: Check Docker service health (check_mode compatible)
+  ansible.builtin.command:
+    cmd: "docker compose -f {{ iacgenie_compose_dir }}/{{ iacgenie_compose_file }} ps --format 'json'"
+  register: service_status
+  changed_when: false
+  check_mode: false
+  always_run: true
+  failed_when: false
+
+- name: Validate specific service health endpoints
+  ansible.builtin.command:
+    cmd: >-
+      docker exec {{ item.container }}
+      curl -sf {{ item.health_url }}
+  loop: "{{ health_check_services | default([]) }}"
+  loop_control:
+    label: "{{ item.container }} -> {{ item.health_url }}"
+  register: health_endpoint_results
+  changed_when: false
+  check_mode: false
+  always_run: true
+  failed_when: false
+  ignore_errors: true
+
+- name: Verify disk usage for critical volumes
+  ansible.builtin.command:
+    cmd: df -h "{{ item }}"
+  loop: "{{ check_volumes | default(['/home/mkanavi/docker/iacgenie']) }}"
+  loop_control:
+    label: "{{ item }}"
+  register: disk_usage
+  changed_when: false
+  check_mode: false
+  always_run: true
+  failed_when: false
+
+- name: Check Docker container resource consumption
+  ansible.builtin.command:
+    cmd: docker stats --no-stream --format '{{`{{.Name}} {{.CPUPerc}} {{.MemUsage}}`}}'
+  register: container_stats
+  changed_when: false
+  check_mode: false
+  always_run: true
+  failed_when: false
+
+- name: Report validation summary
+  ansible.builtin.debug:
+    msg: >-
+      Service validation complete.
+      Running: {{ (service_status.stdout | default('{}') | from_json | length | default(0)) if service_status.stdout else 0 }}
+      containers managed by compose.
+
+- name: Verify running containers match compose config
+  ansible.builtin.command:
+    cmd: "docker compose -f {{ iacgenie_compose_dir }}/{{ iacgenie_compose_file }} ps --services --filter status=running"
+  register: running_services
+  changed_when: false
+  check_mode: false
+  always_run: true
+  failed_when: false

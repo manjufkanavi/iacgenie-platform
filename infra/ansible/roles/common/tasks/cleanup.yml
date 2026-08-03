@@ -1,0 +1,22 @@
+---
+# Common role - Cleanup
+- name: "Common | Clean apt cache"
+  ansible.builtin.apt:
+    autoclean: yes
+
+- name: "Common | Remove unnecessary packages"
+  ansible.builtin.apt:
+    name:
+      - apt-utils
+      - whoopsie
+    state: absent
+    purge: yes
+
+- name: "Common | Clean temporary files"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /tmp/.X*
+    - /tmp/.lock*
+    - /var/tmp/*~

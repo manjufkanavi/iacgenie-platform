@@ -1,0 +1,13 @@
+---
+# Admin Gateway — Handler
+
+- name: "10.14 | Admin gateway | Restart admin gateway container"
+  ansible.builtin.command:
+    cmd: docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.admin-gateway.yml restart admin-gateway
+  changed_when: true
+
+- name: "10.14 | Admin gateway | Wait for admin gateway health"
+  ansible.builtin.wait_for:
+    port: "{{ admin_gateway_backend_port }}"
+    delay: 5
+    timeout: 60

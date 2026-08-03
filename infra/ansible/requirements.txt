@@ -1,0 +1,7 @@
+# Ansible and Python dependencies
+ansible-core>=2.15,<3.0
+ansible-lint>=24.0
+boto3>=1.34
+paramiko>=3.4
+hvac>=2.1
+pysnowball>=1.0

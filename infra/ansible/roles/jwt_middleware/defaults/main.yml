@@ -1,0 +1,33 @@
+# RBAC Engine Role — JWT validation middleware
+# Validates JWT tokens from Keycloak and enforces role-based access
+
+---
+# Defaults
+jwt_middleware_enabled: true
+jwt_middleware_port: 9090
+jwt_middleware_image: "lightserp/jwt-middleware:latest"
+jwt_middleware_container_name: iacgenie-jwt-middleware
+jwt_middleware_keycloak_url: "https://auth.iacgenie.com"
+jwt_middleware_realm: "iacgenie"
+jwt_middleware_backend_url: "http://127.0.0.1:9091"
+jwt_middleware_backend_port: 9091
+jwt_middleware_nginx_conf: nginx-unified.conf
+
+# Defaults for role-based paths
+rbac_protected_paths:
+  - path: /admin/
+    required_role: platform-admin
+    backend: http://127.0.0.1:9091
+  - path: /api/internal/
+    required_role: project-admin
+    backend: http://127.0.0.1:9091
+  - path: /api/v1/
+    required_role: project-member
+    backend: http://127.0.0.1:9091
+
+# JWT configuration
+jwt_config:
+  issuer: "https://auth.iacgenie.com/realms/iacgenie"
+  audience: iacgenie-platform
+  algorithm: RS256
+  cache_ttl: 300

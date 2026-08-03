@@ -1,0 +1,7 @@
+---
+# =============================================================================
+# certbot-setup role — vars (internal)
+# =============================================================================
+
+_certbot_version_cmd: "certbot --version"
+_certbot_renew_test: "certbot renew --dry-run"

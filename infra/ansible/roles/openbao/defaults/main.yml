@@ -1,0 +1,6 @@
+openbao_version: "2.6.0"
+openbao_port: 8200
+openbao_data_dir: /var/lib/openbao
+openbao_storage_type: file
+openbao_auto_unseal: false
+openbao_static_key: CHANGE_ME

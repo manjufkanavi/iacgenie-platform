@@ -1,0 +1,6 @@
+nginx_version: "stable"
+nginx_ports:
+  - 80
+  - 443
+certbot_email: admin@iacgenie.com
+

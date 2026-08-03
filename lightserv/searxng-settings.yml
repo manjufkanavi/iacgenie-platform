@@ -1,0 +1,70 @@
+use_default_settings: true
+
+# Proxy configuration (Oxylabs free plan, country rotation)
+# NOTE: For unified infrastructure, proxies remain unchanged — they are for outbound requests only
+outgoing:
+  request_timeout: 3.0
+  pool_connections: 100
+  pool_maxsize: 20
+  enable_http2: true
+  proxies:
+    all://:
+      - http://customer-mkanavi_WYNlo-country-US:KszO8gBP_12x@dc.oxylabs.io:8000
+      - http://customer-mkanavi_WYNlo-country-GB:KszO8gBP_12x@dc.oxylabs.io:8000
+      - http://customer-mkanavi_WYNlo-country-DE:KszO8gBP_12x@dc.oxylabs.io:8000
+      - http://customer-mkanavi_WYNlo-country-FR:KszO8gBP_12x@dc.oxylabs.io:8000
+      - http://customer-mkanavi_WYNlo-country-JP:KszO8gBP_12x@dc.oxylabs.io:8000
+  extra_proxy_timeout: 10
+
+general:
+  instance_name: "LightSERP SearXNG"
+  debug: false
+
+search:
+  safe_search: 0
+  autocomplete: "google"
+  default_lang: "en"
+  formats:
+    - html
+    - json
+
+server:
+  port: 8080
+  secret_key: "change-this-to-a-random-secret-key"
+  limiter: false
+  image_proxy: false
+
+ui:
+  default_theme: simple
+  default_locale: "en"
+
+engines:
+  - name: duckduckgo
+    engine: duckduckgo
+    shortcut: ddg
+    disabled: false
+
+  - name: bing
+    engine: bing
+    shortcut: b
+    disabled: false
+
+  - name: brave
+    engine: brave
+    shortcut: br
+    disabled: false
+
+  - name: wikipedia
+    engine: wikipedia
+    shortcut: wp
+    disabled: false
+
+  - name: startpage
+    engine: startpage
+    shortcut: sp
+    disabled: false
+
+  - name: mojeek
+    engine: mojeek
+    shortcut: mj
+    disabled: false

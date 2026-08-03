@@ -1,0 +1,13 @@
+{
+  "log-driver": "{{ docker_log_driver | default('json-file') }}",
+  "log-opts": {
+    "max-size": "{{ docker_log_max_size | default('10m') }}",
+    "max-file": "{{ docker_log_max_file | default('3') }}"
+  },
+  "storage-driver": "overlay2",
+  "dns": ["8.8.8.8", "1.1.1.1"],
+  "default-address-pools": [{
+    "base": "{{ docker_network_subnet | default('172.28.0.0/16') }}",
+    "size": 24
+  }]
+}

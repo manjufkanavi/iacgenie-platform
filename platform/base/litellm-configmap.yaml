@@ -1,0 +1,76 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: litellm-config
+data:
+  config.yaml: |
+    model_list:
+      # Primary: Gemini
+      - model_name: gemini-2.5-flash
+        litellm_params:
+          model: gemini/gemini-2.5-flash
+          api_key: GEMINI_API_KEY
+          tpms: 10000
+          tpm: 10000
+          group: gemini-group
+          group_keys:
+            - gemini-group
+      - model_name: gemini-2.5-pro
+        litellm_params:
+          model: gemini/gemini-2.5-pro
+          api_key: GEMINI_API_KEY
+          tpms: 10000
+          tpm: 10000
+          group: gemini-group
+          group_keys:
+            - gemini-group
+
+      # Fallback: Claude
+      - model_name: claude-sonnet-4-20250514
+        litellm_params:
+          model: claude/claude-sonnet-4-20250514
+          api_key: ANTHROPIC_API_KEY
+          tpms: 8000
+          tpm: 8000
+          group: claude-group
+          group_keys:
+            - claude-group
+      - model_name: claude-opus-4-0
+        litellm_params:
+          model: claude/claude-opus-4-0
+          api_key: ANTHROPIC_API_KEY
+          tpms: 5000
+          tpm: 5000
+          group: claude-group
+          group_keys:
+            - claude-group
+
+      # Tertiary: OpenAI
+      - model_name: gpt-4o
+        litellm_params:
+          model: openai/gpt-4o
+          api_key: OPENAI_API_KEY
+          tpms: 12000
+          tpm: 12000
+          group: openai-group
+          group_keys:
+            - openai-group
+
+    litellm_settings:
+      set_llm_logger: true
+      timeout: 120
+      max_retries: 3
+
+    # Response caching via Redis
+    cache: true
+    cache_details:
+      type: redis
+      host: redis-service
+      port: "6379"
+      db: "1"
+      key_prefix: "litellm:"
+
+    router_settings:
+      routing_strategy: latency-based
+      enable_pre_loop_caching: true
+      set_verbose: true

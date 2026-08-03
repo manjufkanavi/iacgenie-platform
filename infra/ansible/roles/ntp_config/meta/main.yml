@@ -1,0 +1,10 @@
+---
+galaxy_info:
+  author: IacGenie Team
+  description: IacGenie infrastructure role
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - noble
+dependencies: []

@@ -1,0 +1,63 @@
+---
+# OpenBao auto-unseal task
+# Reads unseal keys from init_keys.json and unseals via HTTP API
+# Runs after docker-compose-generator starts the container
+
+- name: "OpenBao | Wait for container to be healthy"
+  ansible.builtin.command: >-
+    docker inspect --format='{{ "{{" }}.State.Health.Status{{ "}}" }}'
+    iacgenie_openbao
+  register: openbao_health
+  retries: 20
+  delay: 15
+  until: openbao_health.stdout == 'healthy'
+  changed_when: false
+  failed_when: false
+
+- name: "OpenBao | Check if already unsealed"
+  ansible.builtin.command: >
+    docker exec iacgenie_openbao bao operator list-seal-status
+  register: openbao_seal_status
+  changed_when: false
+  failed_when: false
+  ignore_errors: true
+
+- name: "OpenBao | Read unseal keys from init_keys.json"
+  ansible.builtin.slurp:
+    src: "{{ openbao_raft_data_dir | default('/home/mkanavi/docker/iacgenie/data/openbao_raft') }}/init_keys.json"
+  register: openbao_keys_raw
+  when:
+    - openbao_health.stdout != 'healthy'
+    - openbao_seal_status is failed
+
+- name: "OpenBao | Parse unseal keys"
+  ansible.builtin.set_fact:
+    openbao_unseal_keys: "{{ openbao_keys_raw.content | b64decode | from_json | json_query('unseal_keys_b64') }}"
+  when:
+    - openbao_keys_raw.content | default('') != ''
+    - openbao_keys_raw.content is mapping
+
+- name: "OpenBao | Unseal OpenBao"
+  ansible.builtin.command: >
+    docker exec iacgenie_openbao bao operator unseal {{ item }}
+  loop: "{{ openbao_unseal_keys }}"
+  when:
+    - openbao_unseal_keys is defined
+    - openbao_unseal_keys | length > 0
+  register: openbao_unseal_result
+  changed_when: true
+
+- name: "OpenBao | Final unseal check"
+  ansible.builtin.command: >-
+    docker inspect --format='{{ "{{" }}.State.Health.Status{{ "}}" }}'
+    iacgenie_openbao
+  register: openbao_final_health
+  changed_when: false
+  failed_when: false
+  when: openbao_unseal_keys is defined
+
+- name: "OpenBao | Warn if unseal keys not found"
+  ansible.builtin.debug:
+    msg: "OpenBao unseal skipped — init_keys.json may be missing or empty. Manual unseal required."
+  when:
+    - openbao_keys_raw.content | default('') == ''

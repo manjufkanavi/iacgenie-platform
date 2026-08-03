@@ -1,0 +1,229 @@
+name: Deploy & Verify All Services
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set environment variables
+        id: env
+        run: |
+          echo "DEPLOY_HOSTNAME=${{ secrets.SSH_HOST || '192.168.0.118' }}" >> $GITHUB_OUTPUT
+          echo "DEPLOY_USER=${{ secrets.SSH_USER || 'mkanavi' }}" >> $GITHUB_OUTPUT
+
+      - name: Deploy and verify services
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST || '192.168.0.118' }}
+          SSH_USER: ${{ secrets.SSH_USER || 'mkanavi' }}
+        run: |
+          set -euo pipefail
+
+          START_TIME=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          echo "DEPLOY_START=$START_TIME" >> $GITHUB_ENV
+          echo "=== IacGenie Deploy Pipeline ==="
+          echo "Target: $SSH_HOST"
+          echo "Branch: $GITHUB_REF_NAME"
+          echo "Commit: $GITHUB_SHA"
+
+          # Configure SSH key
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          # Add known hosts (suppress host key check for automation)
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+          # Function to run SSH commands
+          run_remote() {
+            ssh -o StrictHostKeyChecking=no \
+                -o ConnectTimeout=30 \
+                -i ~/.ssh/deploy_key \
+                -q \
+                "${SSH_USER}@${SSH_HOST}" "$1"
+          }
+
+          cd /home/${SSH_USER}/iacgenie-platform
+          cd $(run_remote 'cd /home/${SSH_USER}/iacgenie-platform && pwd')
+
+          # ===== STEP 1: Backup current compose =====
+          echo "[1/8] Backing up current state..."
+          if run_remote 'ls ~/iacgenie-platform/infra/docker-compose/docker-compose-unified.yml.bak.pre-deploy 2>/dev/null'; then
+            run_remote 'cp ~/iacgenie-platform/infra/docker-compose/docker-compose-unified.yml.bak.pre-deploy ~/iacgenie-platform/infra/docker-compose/docker-compose-unified.yml.pre-restore 2>/dev/null || true'
+          fi
+          run_remote 'cp ~/iacgenie-platform/infra/docker-compose/docker-compose-unified.yml ~/iacgenie-platform/infra/docker-compose/docker-compose-unified.yml.bak.pre-deploy 2>/dev/null || true'
+          echo "  ✅ Backup saved"
+
+          # ===== STEP 2: Pull latest images =====
+          echo "[2/8] Pulling latest Docker images..."
+          run_remote 'cd ~/iacgenie-platform && docker compose pull 2>&1' | tee /tmp/pull-output.log
+          echo "  ✅ Image pull complete"
+
+          # ===== STEP 3: Stop unhealthy containers =====
+          echo "[3/8] Stopping containers..."
+          run_remote 'cd ~/iacgenie-platform && docker compose down --remove-orphans 2>&1'
+          echo "  ✅ Containers stopped"
+
+          # ===== STEP 4: Start all services =====
+          echo "[4/8] Starting all services..."
+          run_remote 'cd ~/iacgenie-platform && docker compose up -d 2>&1' | tee /tmp/start-output.log
+          echo "  ✅ All services started"
+
+          # ===== STEP 5: Wait for services to stabilize =====
+          echo "[5/8] Waiting for services to stabilize (45s)..."
+          sleep 45
+          echo "  ✅ Stabilization wait complete"
+
+          # ===== STEP 6: Verify all services =====
+          echo "[6/8] Verifying service health..."
+
+          SERVICES_RAW=$(run_remote 'docker compose -f /home/mkanavi/docker/iacgenie/infra/docker-compose/docker-compose-unified.yml ps --format "{{.Name}}\t{{.Status}}\t{{.Ports}}"')
+          echo ""
+          echo "  Service Status:"
+          echo "$SERVICES_RAW" | head -20
+
+          # Count healthy services
+          TOTAL=$(echo "$SERVICES_RAW" | grep -v "^NAME" | wc -l)
+          UNHEALTHY=$(echo "$SERVICES_RAW" | grep -c "unhealthy" || true)
+          HEALTHY=$((TOTAL - UNHEALTHY))
+
+          # Check specific port connectivity
+          PORT_CHECKS=""
+          for port_info in \
+            "5432:PostgreSQL" \
+            "6379:Redis" \
+            "8200:OpenBao" \
+            "8083:Keycloak" \
+            "9000:MinIO" \
+            "3000:Gitea" \
+            "8000:LightSerp-API" \
+            "3001:LightSerp-WebUI" \
+            "8082:SearXNG" \
+            "4150:NSQD-TCP" \
+            "8082:PageZen"
+          do
+            PORT=${port_info%%:*}
+            NAME=${port_info##*:}
+            # Check if port is listening
+            LISTENING=$(run_remote "ss -tlnp | grep ':${PORT} ' || true")
+            if echo "$LISTENING" | grep -q ":${PORT}"; then
+              echo "  ✅ $NAME (port $PORT) — listening"
+              PORT_CHECKS="${PORT_CHECKS}OK "
+            else
+              echo "  ⚠️  $NAME (port $PORT) — not detected"
+              PORT_CHECKS="${PORT_CHECKS}WARN "
+            fi
+          done
+
+          echo ""
+          echo "  Total: $TOTAL | Healthy: $HEALTHY | Unhealthy: $UNHEALTHY"
+
+          # ===== STEP 7: Capture Docker logs (last 200 lines) =====
+          echo "[7/8] Capturing service logs..."
+          LOGS=$(run_remote 'for container in $(docker compose -f /home/mkanavi/docker/iacgenie/infra/docker-compose/docker-compose-unified.yml ps -q); do echo "=== $(docker inspect --format "{{.Config.Labels}}" $container 2>/dev/null || basename $container) ==="; docker logs --tail 20 $container 2>&1; echo ""; done' 2>&1 || true)
+          echo "$LOGS" > /tmp/service-logs.txt
+
+          # Determine overall status
+          if [ "$UNHEALTHY" -eq 0 ] && [ "$TOTAL" -gt 0 ]; then
+            DEPLOY_STATUS="success"
+            echo "  🎉 All $TOTAL services healthy!"
+          else
+            DEPLOY_STATUS="partial"
+            echo "  ⚠️  $HEALTHY/$TOTAL services healthy ($UNHEALTHY unhealthy)"
+          fi
+
+          DEPLOY_END=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          DEPLOY_DURATION="$(( $(date +%s) - $(date -d "$START_TIME" +%s) ))s"
+          echo "DEPLOY_STATUS=$DEPLOY_STATUS" >> $GITHUB_ENV
+          echo "DEPLOY_END=$DEPLOY_END" >> $GITHUB_ENV
+          echo "DEPLOY_DURATION=$DEPLOY_DURATION" >> $GITHUB_ENV
+
+          # Build JSON services array for report
+          SERVICES_JSON="["
+          FIRST=true
+          while IFS=$'\t' read -r name status ports; do
+            [ "$name" = "NAME" ] && continue
+            [ -z "$name" ] && continue
+            health="n/a"
+            if echo "$status" | grep -qi "healthy"; then
+              health="healthy"
+            elif echo "$status" | grep -qi "unhealthy"; then
+              health="unhealthy"
+            elif echo "$status" | grep -qi "up"; then
+              health="running"
+            fi
+            # Extract uptime
+            uptime=$(echo "$status" | sed 's/(.*//')
+            if [ "$FIRST" = true ]; then
+              FIRST=false
+            else
+              SERVICES_JSON="${SERVICES_JSON},"
+            fi
+            SERVICES_JSON="${SERVICES_JSON}{\"name\":\"$name\",\"status\":\"$status\",\"health\":\"$health\",\"ports\":\"$ports\",\"uptime\":\"$uptime\"}"
+          done <<< "$SERVICES_RAW"
+          SERVICES_JSON="${SERVICES_JSON}]"
+          echo "SERVICES_DATA=$SERVICES_JSON" >> $GITHUB_ENV
+
+          # Build log data
+          LOG_DATA=$(cat /tmp/service-logs.txt 2>/dev/null | head -100 || echo "No logs captured")
+          echo "DEPLOY_LOG<<EOF" >> $GITHUB_ENV
+          echo "$LOG_DATA" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: Generate HTML report
+        run: |
+          echo "Generating HTML report..."
+          python3 scripts/generate-deploy-report.py
+          echo "Report saved to /tmp/deploy-report.html"
+          ls -la /tmp/deploy-report.html
+
+      - name: Upload HTML report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-report-${{ github.run_number }}
+          path: /tmp/deploy-report.html
+          retention-days: 30
+
+      - name: Send email notification
+        if: always()
+        uses: alekkor/action-send-email@v1
+        with:
+          to: ${{ secrets.EMAIL_TO || 'manjufkanavi@gmail.com' }}
+          from: IacGenie CI <iacgenie-ci@iacgenie.com>
+          subject: "[${{ env.DEPLOY_STATUS == 'success' && '✅ DEPLOYED' || '❌ DEPLOY FAILED' }}] IacGenie Infra — ${{ github.ref_name }} @ ${{ github.sha }}"
+          html_body_file: /tmp/deploy-report.html
+          smtp_host: ${{ secrets.SMTP_HOST }}
+          smtp_port: ${{ secrets.SMTP_PORT || '587' }}
+          username: ${{ secrets.SMTP_USER }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "=============================="
+          echo "  DEPLOY PIPELINE COMPLETE"
+          echo "=============================="
+          echo "Status: ${{ env.DEPLOY_STATUS }}"
+          echo "Duration: ${{ env.DEPLOY_DURATION }}"
+          echo "Services: $TOTAL total, $HEALTHY healthy"
+          echo "Report: /tmp/deploy-report.html"
+          echo "=============================="

@@ -1,0 +1,14 @@
+---
+# Common role - System hardening and base configuration
+# Main entry point
+- name: "Common | Ensure prerequisites are installed"
+  ansible.builtin.import_tasks: prerequisites.yml
+
+- name: "Common | Configure system hardening"
+  ansible.builtin.import_tasks: hardening.yml
+
+- name: "Common | Configure users"
+  ansible.builtin.import_tasks: users.yml
+
+- name: "Common | Configure cleanup"
+  ansible.builtin.import_tasks: cleanup.yml

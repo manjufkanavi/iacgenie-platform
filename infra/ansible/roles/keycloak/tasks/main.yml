@@ -1,0 +1,29 @@
+---
+# Keycloak role - Main entry point
+# Note: Container deployment is handled by docker-compose-generator role
+- name: "Keycloak | Create data directory"
+  ansible.builtin.file:
+    path: "{{ keycloak_data_dir | default('/home/mkanavi/docker/iacgenie/keycloak_data') }}"
+    owner: root
+    group: root
+    mode: "0700"
+    state: directory
+
+- name: "Keycloak | Deploy environment file"
+  ansible.builtin.template:
+    src: .env.j2
+    dest: /home/mkanavi/docker/iacgenie/.env.keycloak
+    owner: mkanavi
+    group: mkanavi
+    mode: "0600"
+  notify: Reload docker compose
+
+- name: "Keycloak | Verify Keycloak container is running"
+  ansible.builtin.command: docker ps -a --filter "name=iacgenie-keycloak" --format "{{ '{{.Names}}' }}"
+  register: keycloak_status
+  changed_when: false
+  failed_when: false
+
+- name: "Keycloak | Show Keycloak status"
+  ansible.builtin.debug:
+    var: keycloak_status.stdout_lines | default(['N/A - managed by docker-compose-generator'])

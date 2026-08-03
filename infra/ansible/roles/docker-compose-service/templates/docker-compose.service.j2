@@ -1,0 +1,25 @@
+[Unit]
+Description=IacGenie Docker Compose Services
+Documentation=https://docs.docker.com/compose/
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=mkanavi
+WorkingDirectory={{ docker_compose_dir }}
+ExecStart=/usr/bin/docker compose -f {{ docker_compose_file }} up -d
+ExecStop=/usr/bin/docker compose -f {{ docker_compose_file }} down
+ExecStartPost=/bin/echo "Docker Compose services started"
+Restart={{ docker_compose_restart_policy }}
+{% if docker_compose_restart_policy == "on-failure" %}
+RestartSec={{ docker_compose_restart_sec }}
+StartLimitInterval={{ docker_compose_restart_sec * docker_compose_restart_max_retries }}
+StartLimitBurst={{ docker_compose_restart_max_retries }}
+{% endif %}
+TimeoutStartSec={{ docker_compose_timeout_start_sec }}
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target

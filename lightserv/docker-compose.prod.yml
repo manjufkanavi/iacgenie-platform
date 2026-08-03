@@ -1,0 +1,210 @@
+# LightSerp — Docker Compose (Production — Unified Infrastructure)
+#
+# Services: LightSerp WebUI, MCP Server, PageZen, Rota, Prometheus, Grafana
+#
+# Shared infrastructure provided by docker-compose-unified.yml:
+#   - PostgreSQL 15 (lightsrp schema)
+#   - Redis 7 (db 1)
+#   - SearXNG
+#   - NSQ
+#   - MinIO
+#   - Keycloak
+#   - OpenBao
+#
+# Run alongside unified stack:
+#   docker compose -f docker-compose-unified.yml -f docker-compose.prod.yml up -d
+
+version: "3.8"
+
+services:
+  # ── LightSerp WebUI ──────────────────────────────────────────────────────
+  lightserp-webui:
+    build:
+      context: .
+      dockerfile: Dockerfile.webui
+    container_name: lightserp-webui
+    ports:
+      - "127.0.0.1:3070:3000"
+    environment:
+      - NODE_ENV=production
+      - HTTP_PORT=3000
+      - SEARXNG_URL=http://searxng:8080/search?format=json
+      - API_URL=http://lightserp-api:3071
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/1
+      - KEYCLOAK_URL=http://keycloak:8080/realms/unified
+      - KEYCLOAK_CLIENT_ID=lightsrp-web
+      - PAGEZEN_URL=http://pagezen:8082
+      - JWT_SECRET=${JWT_SECRET}
+    depends_on:
+      lightserp-api:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - lightserp-net
+      - unified_network
+
+  # ── LightSerp API ────────────────────────────────────────────────────────
+  lightserp-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: lightserp-api
+    ports:
+      - "127.0.0.1:3071:3071"
+    env_file:
+      - config/.env.api
+    environment:
+      - NODE_ENV=production
+      - HTTP_PORT=3071
+    depends_on:
+      searxng:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      pagezen:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3071/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - lightserp-net
+      - unified_network
+
+  # ── PageZen (Content Extraction) ─────────────────────────────────────────
+  pagezen:
+    build:
+      context: .
+      dockerfile: Dockerfile.pagezen
+    container_name: lightserp-pagezen
+    ports:
+      - "127.0.0.1:8076:8082"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    depends_on:
+      lightserp-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8082/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - lightserp-net
+      - unified_network
+
+  # ── Rota ─────────────────────────────────────────────────────────────────
+  rota:
+    image: ghcr.io/rota-project/rota:latest
+    container_name: lightserp-rota
+    ports:
+      - "127.0.0.1:8081:8080"
+    volumes:
+      - ./rota-config.yaml:/etc/rota/config.yaml
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - lightserp-net
+      - unified_network
+
+  # ── MCP Server ───────────────────────────────────────────────────────────
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+    container_name: lightserp-mcp
+    ports:
+      - "127.0.0.1:7805:7805"
+      - "127.0.0.1:3000:3000"
+    environment:
+      - NODE_ENV=production
+      - SEARXNG_URL=http://searxng:8080/search?format=json
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/1
+      - NSQD_URL=nsqd:4150
+      - PAGEZEN_URL=http://pagezen:8082
+      - KEYCLOAK_URL=http://keycloak:8080/realms/unified
+    depends_on:
+      searxng:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nsqd:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - lightserp-net
+      - unified_network
+
+  # ── Prometheus (monitoring) ──────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: lightserp-prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - lightserp-net
+      - unified_network
+
+  # ── Grafana (monitoring) ─────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:latest
+    container_name: lightserp-grafana
+    ports:
+      - "127.0.0.1:3001:3000"
+    volumes:
+      - grafana-storage:/var/lib/grafana
+      - ./grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
+      - ./grafana-dashboards:/etc/grafana/provisioning/dashboards
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - lightserp-net
+      - unified_network
+
+volumes:
+  prometheus-data:
+  grafana-storage:
+
+networks:
+  lightserp-net:
+    driver: bridge
+  unified_network:
+    external: true

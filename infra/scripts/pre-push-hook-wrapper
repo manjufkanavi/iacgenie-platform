@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Pre-push hook: Gitea dual-remote sync
+set -euo pipefail
+
+# Determine repo root (.git/hooks/.. = .git, .git/.. = repo root)
+HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$HOOK_DIR/../.." && pwd)"
+
+# Path to shared hook script
+SHARED="$REPO_ROOT/scripts/gitea-push-hook.sh"
+
+if [ ! -f "$SHARED" ]; then
+  SHARED="$REPO_ROOT/.gitea/gitea-push-hook.sh"
+fi
+
+if [ ! -f "$SHARED" ]; then
+  echo ""
+  echo "--- Pre-push: hook script not found, pushing to origin only ---"
+  echo ""
+  exit 0
+fi
+
+# Pass the trigger remote as $1 (git push provides this)
+exec bash "$SHARED" "$1"

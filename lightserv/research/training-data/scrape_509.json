@@ -1,0 +1,7 @@
+{
+  "url": "https://aws.amazon.com/blogs/architecture/category/compute/amazon-elastic-container-service/",
+  "title": "Amazon Elastic Container Service | AWS Architecture Blog",
+  "content": "Automating contract intelligence with Doczy.ai™ on AWS by Sanket Nasre , Girish Sukhatankar , Brett Hoyt , Priya Iragavarapu , and Sam Mahdavian on 02 JUN 2026 in Advanced (300) , Amazon Bedrock , Amazon Bedrock Agents , Amazon Bedrock Knowledge Bases , Amazon CloudWatch , Amazon Cognito , Amazon Elastic Container Service , Amazon Machine Learning , Amazon Simple Storage Service (S3) , Amazon Textract , Artificial Intelligence , AWS Lambda , AWS Secrets Manager , Compute , Containers , Customer Solutions , Learning Levels , Management Tools , Security, Identity, &amp; Compliance , Storage , Technical How-to Permalink Comments Share In this post, we show you how Doczy.ai™ uses generative AI on AWS to automate contract intelligence at scale, transforming unstructured documents into structured, actionable insights, so organizations can automate critical business processes and unlock the full value of their data.",
+  "contentLength": 922,
+  "scrapedAt": "2026-06-16T15:34:22.635Z"
+}

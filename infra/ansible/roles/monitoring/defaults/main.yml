@@ -1,0 +1,3 @@
+netdata_enabled: true
+prometheus_enabled: false
+grafana_enabled: false

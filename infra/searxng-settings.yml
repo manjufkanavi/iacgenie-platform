@@ -1,0 +1,13 @@
+# SearXNG unified settings
+use_mock_data: false
+server:
+  secret_key: "searxng-secret-key"
+  limiter: false
+  image_proxy: false
+  method: "GET"
+  default_locale: "en"
+  enabled_engines: []
+  disabled_engines: []
+  categories: ["general", "images", "videos", "news", "map", "it", "science"]
+  pagination_count: 10
+  default_number_of_results: 10

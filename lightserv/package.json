@@ -1,0 +1,73 @@
+{
+  "name": "lightserp",
+  "version": "1.0.0",
+  "description": "Search MCP for AI models",
+  "main": "dist/server.js",
+  "type": "module",
+  "scripts": {
+    "dev": "npx tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "start:mcp": "node dist/server.js",
+    "test": "npm run test:search && npm run test:scrape && npm run test:auth && npm run test:cache && npm run test:proxy && npm run test:queue",
+    "test:search": "npx tsx test-search.ts",
+    "test:scrape": "npx tsx test-scrape.ts",
+    "test:auth": "npx tsx test-auth.ts",
+    "test:cache": "npx tsx test-cache.ts",
+    "test:async": "npx tsx test-async-scrape.ts",
+    "test:mcp": "npx tsx test-mcp-integration.ts",
+    "test:proxy": "npx tsx tests/test-proxy.ts",
+    "test:queue": "npx tsx tests/test-queue.ts",
+    "test:e2e": "echo \"E2E test placeholder\"",
+    "test:performance": "echo \"Performance test placeholder\"",
+    "test:errors": "echo \"Error handling test placeholder\"",
+    "test:report": "echo \"Test report placeholder\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/manjufkanavi/LightSerp.git"
+  },
+  "keywords": [
+    "mcp",
+    "search",
+    "serp",
+    "scraping",
+    "ai"
+  ],
+  "author": "LightSERP Team",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/manjufkanavi/LightSerp/issues"
+  },
+  "homepage": "https://github.com/manjufkanavi/LightSerp#readme",
+  "dependencies": {
+    "@lightpanda/browser": "^1.0.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@mozilla/readability": "^0.6.0",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/auto-instrumentations-node": "^0.47.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.52.0",
+    "@opentelemetry/resources": "^1.26.0",
+    "@opentelemetry/sdk-node": "^0.52.0",
+    "@opentelemetry/sdk-trace-node": "^1.26.0",
+    "@opentelemetry/semantic-conventions": "^1.26.0",
+    "@types/node": "^25.6.2",
+    "@types/pg": "^8.20.0",
+    "argon2": "^0.41.0",
+    "axios": "^1.16.0",
+    "crawlee": "^3.16.0",
+    "ioredis": "^5.4.1",
+    "jsonwebtoken": "^9.0.2",
+    "nsqjs": "^0.13.0",
+    "pg": "^8.22.0",
+    "pino": "^9.4.0",
+    "pino-http": "^10.3.0",
+    "rate-limiter-flexible": "^2.4.1",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10"
+  }
+}

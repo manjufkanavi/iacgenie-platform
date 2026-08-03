@@ -1,0 +1,2 @@
+# certbot templates — none required
+# Certbot configuration is managed via systemd timers and CLI args.

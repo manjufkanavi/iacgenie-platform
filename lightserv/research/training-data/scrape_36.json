@@ -1,0 +1,7 @@
+{
+  "url": "https://docs.aws.amazon.com/wellarchitected/latest/framework/sus-bp.html",
+  "title": "Best practices - AWS Well-Architected Framework",
+  "content": "Best practices - AWS Well-Architected Framework View a markdown version of this page Best practices - AWS Well-Architected Framework Documentation AWS Well-Architected Framework Best practices Topics Region selection Alignment to demand Software and architecture Data management Hardware and services Process and culture Javascript is disabled or is unavailable in your browser. To use the Amazon Web Services Documentation, Javascript must be enabled. Please refer to your browser's Help pages for instructions. Document Conventions Definition Region selection Did this page help you? - Yes Thanks for letting us know we're doing a good job! If you've got a moment, please tell us what we did right so we can do more of it. Did this page help you? - No Thanks for letting us know this page needs work. We're sorry we let you down. If you've got a moment, please tell us how we can make the documentation better.",
+  "contentLength": 912,
+  "scrapedAt": "2026-06-16T15:30:42.831Z"
+}

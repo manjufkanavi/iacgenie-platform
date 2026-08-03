@@ -1,0 +1,13 @@
+---
+# RBAC Engine Role — Handler
+
+- name: "10.13 | JWT middleware | Restart jwt-middleware container"
+  ansible.builtin.command:
+    cmd: docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.jwt-middleware.yml restart jwt-middleware
+  changed_when: true
+
+- name: "10.13 | JWT middleware | Wait for JWT middleware health"
+  ansible.builtin.wait_for:
+    port: "{{ jwt_middleware_backend_port }}"
+    delay: 5
+    timeout: 60

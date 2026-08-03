@@ -1,0 +1,57 @@
+---
+# Cloudflare Tunnel Role Vars
+# Phase 10.21: Tunnel redundancy
+
+cloudflare_account_id: "CHANGE_ME_IN_VAULT"
+cloudflare_api_token: "CHANGE_ME_IN_VAULT"
+
+# Phase 10.21: Redundant tunnels
+tunnels:
+  - name: tunnel-primary
+    port: 25901
+    enabled: true
+    config:
+      ingress:
+        - hostname: "iacgenie.local"
+          service: http://127.0.0.1:5173
+        - hostname: "lightsrp.local"
+          service: http://127.0.0.1:3070
+        - hostname: "gitea.iacgenie.com"
+          service: http://127.0.0.1:3000
+        - hostname: "auth.iacgenie.com"
+          service: http://127.0.0.1:8080
+        - hostname: "search.iacgenie.com"
+          service: http://127.0.0.1:8080
+        - hostname: "vault.iacgenie.com"
+          service: http://127.0.0.1:8200
+        - hostname: "admin.iacgenie.com"
+          service: http://127.0.0.1:9090
+        - hostname: "infra.local"
+          service: http://127.0.0.1:80
+        - service: http_response:404
+
+  - name: tunnel-secondary
+    port: 25902
+    enabled: true
+    config:
+      ingress:
+        - hostname: "iacgenie.local"
+          service: http://127.0.0.1:5173
+        - hostname: "lightsrp.local"
+          service: http://127.0.0.1:3070
+        - hostname: "gitea.iacgenie.com"
+          service: http://127.0.0.1:3000
+        - hostname: "auth.iacgenie.com"
+          service: http://127.0.0.1:8080
+        - hostname: "search.iacgenie.com"
+          service: http://127.0.0.1:8080
+        - hostname: "vault.iacgenie.com"
+          service: http://127.0.0.1:8200
+        - hostname: "admin.iacgenie.com"
+          service: http://127.0.0.1:9090
+        - hostname: "infra.local"
+          service: http://127.0.0.1:80
+        - service: http_response:404
+
+cloudflared_image: cloudflare/cloudflared:latest
+cloudflared_data_dir: /home/mkanavi/docker/iacgenie/cloudflared

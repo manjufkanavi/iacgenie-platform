@@ -1,0 +1,20 @@
+# Fail2Ban jail configuration
+# Managed by Ansible
+
+[DEFAULT]
+bantime = {{ fail2ban_bantime | default(3600) }}s
+findtime = 600s
+maxretry = {{ fail2ban_maxretry | default(5) }}
+backend = auto
+
+[sshd]
+enabled = true
+port = {{ ssh_port | default(22) }}
+filter = sshd
+logpath = /var/log/auth.log
+maxretry = {{ fail2ban_maxretry | default(5) }}
+bantime = {{ fail2ban_bantime | default(3600) }}s
+
+[ufw]
+enabled = true
+maxretry = {{ fail2ban_maxretry | default(5) }}

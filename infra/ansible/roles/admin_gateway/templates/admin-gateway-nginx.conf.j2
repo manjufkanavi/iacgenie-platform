@@ -1,0 +1,44 @@
+# Admin Gateway Nginx Proxy Configuration
+# Managed by Ansible
+
+upstream admin_gateway_backend {
+    server 127.0.0.1:{{ admin_gateway_backend_port }};
+}
+
+server {
+    listen 443 ssl http2;
+    server_name admin.iacgenie.com;
+
+    ssl_certificate     /etc/nginx/ssl/fullchain.pem;
+    ssl_certificate_key /etc/nginx/ssl/privkey.pem;
+
+    # Admin gateway — JWT-protected reverse proxy
+    location / {
+        proxy_pass http://admin_gateway_backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Forward JWT token
+        proxy_set_header Authorization $http_authorization;
+
+        # Security headers (Phase 10.8)
+        add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-XSS-Protection "1; mode=block" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self' data:; frame-ancestors 'none';" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()" always;
+        add_header X-Permitted-Cross-Domain-Policies "none" always;
+
+        # Rate limiting for admin endpoints
+        limit_req zone=auth burst=5 nodelay;
+    }
+
+    location /health {
+        proxy_pass http://admin_gateway_backend/health;
+        proxy_set_header Host $host;
+    }
+}

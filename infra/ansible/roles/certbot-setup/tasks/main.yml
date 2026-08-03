@@ -1,0 +1,56 @@
+---
+# =============================================================================
+# certbot-setup role — tasks
+# Phase 10.23: Idempotency Hardening
+# =============================================================================
+
+- name: Ensure certbot is installed
+  ansible.builtin.command:
+    cmd: certbot --version
+  register: certbot_version
+  changed_when: false
+  check_mode: false
+  always_run: true
+
+- name: Check certificate expiry for all domains
+  ansible.builtin.command:
+    cmd: "openssl x509 -in /etc/letsencrypt/live/{{ item }}/fullchain.pem -noout -enddate"
+  loop: "{{ cert_domains | default(['iacgenie.local', 'lightsrp.local', 'infra.local', 'grafana.iacgenie.com']) }}"
+  register: cert_expiry
+  changed_when: false
+  check_mode: false
+  always_run: true
+  failed_when: false
+
+- name: Verify certbot DNS plugin is available
+  ansible.builtin.command:
+    cmd: certbot plugins
+  register: certbot_plugins
+  changed_when: false
+  check_mode: false
+  always_run: true
+  failed_when: false
+
+- name: Ensure certbot cron timer is active
+  ansible.builtin.systemd:
+    name: certbot-renew.timer
+    state: started
+    enabled: true
+  check_mode: false
+  failed_when: false
+
+- name: Check certbot renewal configuration
+  ansible.builtin.stat:
+    path: /etc/letsencrypt/renewal/{{ item }}.conf
+  loop: "{{ cert_domains | default(['iacgenie.local']) }}"
+  register: renewal_conf_stat
+  changed_when: false
+  check_mode: false
+  always_run: true
+  failed_when: false
+
+- name: Report certificate status
+  ansible.builtin.debug:
+    msg: >-
+      Certificates checked for {{ cert_domains | default([]) | length }} domains.
+      Renewal timer active: {{ certbot_renew_timer_status }}.

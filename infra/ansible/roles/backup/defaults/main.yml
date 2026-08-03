@@ -1,0 +1,4 @@
+backup_enabled: true
+backup_retention_days: 30
+backup_schedule: "0 2 * * *"
+backup_dest: /mnt/backups

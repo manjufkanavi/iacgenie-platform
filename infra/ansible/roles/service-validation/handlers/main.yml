@@ -1,0 +1,10 @@
+---
+# =============================================================================
+# service-validation role — handlers
+# =============================================================================
+
+- name: restart container
+  ansible.builtin.command:
+    cmd: "docker compose -f {{ iacgenie_compose_dir }}/{{ iacgenie_compose_file }} restart {{ container_name }}"
+  changed_when: false
+  check_mode: false

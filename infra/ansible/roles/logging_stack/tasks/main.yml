@@ -1,0 +1,71 @@
+---
+# Phase 10.17: Centralized logging — Loki + Promtail
+
+- name: "10.17 | Logging stack | Create Loki data directory"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: mkanavi
+    group: mkanavi
+    mode: "0755"
+  loop:
+    - "{{ loki_data_dir }}"
+    - "{{ promtail_positions_dir }}"
+
+- name: "10.17 | Logging stack | Generate Loki config"
+  ansible.builtin.template:
+    src: loki-config.yaml.j2
+    dest: /home/mkanavi/docker/iacgenie/loki/loki-config.yaml
+    owner: mkanavi
+    group: mkanavi
+    mode: "0644"
+  notify: Restart loki
+
+- name: "10.17 | Logging stack | Generate Promtail config"
+  ansible.builtin.template:
+    src: promtail-config.yaml.j2
+    dest: /home/mkanavi/docker/iacgenie/promtail/promtail-config.yaml
+    owner: mkanavi
+    group: mkanavi
+    mode: "0644"
+  notify: Restart promtail
+
+- name: "10.17 | Logging stack | Deploy Loki container"
+  ansible.builtin.template:
+    src: docker-compose.logging-stack.yml.j2
+    dest: /home/mkanavi/docker/iacgenie/docker-compose.logging-stack.yml
+    owner: mkanavi
+    group: mkanavi
+    mode: "0644"
+  notify: Start logging stack
+
+- name: "10.17 | Logging stack | Start Loki and Promtail"
+  ansible.builtin.command:
+    cmd: docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.logging-stack.yml up -d
+  args:
+    chdir: /home/mkanavi/docker/iacgenie
+  changed_when: true
+
+- name: "10.17 | Logging stack | Update Grafana datasources"
+  ansible.builtin.template:
+    src: grafana-datasources.logging.yml.j2
+    dest: /home/mkanavi/docker/iacgenie/grafana-datasources-logging.yml
+    owner: mkanavi
+    group: mkanavi
+    mode: "0644"
+  changed_when: true
+
+- name: "10.17 | Logging stack | Verify Loki health"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ loki_port }}/ready"
+    method: GET
+    status_code: [200]
+  register: loki_health
+  retries: 15
+  delay: 5
+  changed_when: false
+  failed_when: false
+
+- name: "10.17 | Logging stack | Health status"
+  ansible.builtin.debug:
+    msg: "Loki health: {{ loki_health is changed | ternary('FAILED', 'OK') }}"

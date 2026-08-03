@@ -1,0 +1,23 @@
+---
+# PostgreSQL role - Main entry point
+# Note: Container deployment is handled by docker-compose-generator role
+# Docker handles data directory, user management, and internal config.
+
+- name: "PostgreSQL | Deploy environment file"
+  ansible.builtin.template:
+    src: .env.j2
+    dest: /home/mkanavi/docker/iacgenie/.env.postgres
+    owner: mkanavi
+    group: mkanavi
+    mode: "0600"
+  notify: Reload docker compose
+
+- name: "PostgreSQL | Verify PostgreSQL container is running"
+  ansible.builtin.command: docker ps -a --filter "name=iacgenie-postgres" --format "{{ '{{.Names}}' }}"
+  register: pg_status
+  changed_when: false
+  failed_when: false
+
+- name: "PostgreSQL | Show PostgreSQL status"
+  ansible.builtin.debug:
+    var: pg_status.stdout_lines | default(['N/A - managed by docker-compose-generator'])

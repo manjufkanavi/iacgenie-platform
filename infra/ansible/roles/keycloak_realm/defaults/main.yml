@@ -1,0 +1,133 @@
+# Keycloak Realm Role — Defaults (Phase 10.3: Multi-Tenant & RBAC)
+
+# Admin connection
+keycloak_admin_url: "http://127.0.0.1:8080"
+keycloak_admin_user: admin
+keycloak_admin_password: "CHANGE_ME_IN_VAULT"
+keycloak_provision_realm: true
+keycloak_wait_retries: 30
+keycloak_wait_delay: 5
+
+# Multi-tenant realms
+keycloak_realms:
+  - name: iacgenie
+    displayName: "IacGenie Platform"
+    enabled: true
+    registrationEmailAsUsername: false
+    rememberMe: true
+    loginWithEmailAllowed: true
+    duplicateEmailsAllowed: false
+    sslRequired: "external"
+    roles:
+      realm:
+        - name: platform-admin
+          description: "Full platform administrator — access all projects"
+          composite: false
+        - name: project-admin
+          description: "Project-level administrator — manage own project members"
+          composite: false
+        - name: project-member
+          description: "Project read-only member"
+          composite: false
+      client:
+        iacgenie-platform:
+          - name: gateway-admin
+            description: "Admin access to admin gateway"
+        lightserp-api:
+          - name: api-user
+            description: "LightSerp API access"
+    defaultRoles:
+      - project-member
+      - offline_access
+
+# Client scopes (Phase 10.11)
+keycloak_client_scopes:
+  - name: project-info
+    description: "Project membership claims"
+    protocol: openid-connect
+    protocolMappers:
+      - name: project-ids
+        protocol: openid-connect
+        protocolMapper: oidc-user-attribute-protocol-mapper
+        config:
+          user.attribute: project_ids
+          claim.name: project_ids
+          jsonType.label: String
+          access:
+            - ID_TOKEN
+            - ACCESS_TOKEN
+
+# Clients to register (Phase 10.16)
+keycloak_clients:
+  - client_id: iacgenie-platform
+    name: "IacGenie Admin Dashboard"
+    enabled: true
+    clientAuthenticatorType: client-secret
+    redirectUris:
+      - "https://admin.iacgenie.com/*"
+      - "https://iacgenie.com/*"
+    webOrigins:
+      - "https://admin.iacgenie.com"
+      - "https://iacgenie.com"
+    standardFlowEnabled: true
+    directAccessGrantsEnabled: false
+    serviceAccountsEnabled: true
+    consentRequired: false
+    protocol: openid-connect
+    defaultClientScopes:
+      - web-origins
+      - role_list
+      - project-info
+
+  - client_id: lightserp-api
+    name: "LightSerp API"
+    enabled: true
+    clientAuthenticatorType: client-secret
+    redirectUris:
+      - "http://localhost:3071/*"
+      - "https://lightserp.iacgenie.com/*"
+    webOrigins:
+      - "https://lightserp.iacgenie.com"
+      - "+"
+    standardFlowEnabled: true
+    directAccessGrantsEnabled: true
+    serviceAccountsEnabled: false
+    consentRequired: false
+    protocol: openid-connect
+    defaultClientScopes:
+      - web-origins
+      - role_list
+
+  - client_id: gitea
+    name: "Gitea SSO"
+    enabled: true
+    clientAuthenticatorType: client-secret
+    redirectUris:
+      - "https://git.iacgenie.com/user/oauth2/gitea"
+    webOrigins:
+      - "https://git.iacgenie.com"
+    standardFlowEnabled: true
+    directAccessGrantsEnabled: false
+    serviceAccountsEnabled: false
+    consentRequired: false
+    protocol: openid-connect
+    defaultClientScopes:
+      - web-origins
+      - role_list
+
+  - client_id: searxng
+    name: "SearXNG Search"
+    enabled: true
+    clientAuthenticatorType: client-secret
+    redirectUris:
+      - "https://search.iacgenie.com/*"
+    webOrigins:
+      - "https://search.iacgenie.com"
+    standardFlowEnabled: true
+    directAccessGrantsEnabled: false
+    serviceAccountsEnabled: false
+    consentRequired: false
+    protocol: openid-connect
+    defaultClientScopes:
+      - web-origins
+      - role_list

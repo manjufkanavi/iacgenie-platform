@@ -1,0 +1,25 @@
+---
+# Docker role - Prerequisites
+- name: "Docker | Install Docker prerequisites"
+  ansible.builtin.apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+      - software-properties-common
+      - python3-pip
+      - passwd
+    state: present
+    update_cache: yes
+
+- name: "Docker | Detect Ubuntu codename from /etc/os-release"
+  ansible.builtin.shell:
+    cmd: grep -m1 '^UBUNTU_CODENAME=' /etc/os-release 2>/dev/null | cut -d= -f2 || echo "noble"
+  register: _ubuntu_codename_result
+  changed_when: false
+
+- name: "Docker | Set Ubuntu codename fact"
+  ansible.builtin.set_fact:
+    ubuntu_codename: "{{ _ubuntu_codename_result.stdout.strip() }}"

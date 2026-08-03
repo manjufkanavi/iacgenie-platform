@@ -1,0 +1,17 @@
+---
+# Logging Stack — Handler
+
+- name: Restart loki
+  ansible.builtin.command:
+    cmd: docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.logging.yml restart loki
+  changed_when: true
+
+- name: Restart promtail
+  ansible.builtin.command:
+    cmd: docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.logging.yml restart promtail
+  changed_when: true
+
+- name: Start logging stack
+  ansible.builtin.command:
+    cmd: docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.logging.yml up -d
+  changed_when: true

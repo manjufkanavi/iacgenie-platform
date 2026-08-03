@@ -1,0 +1,6 @@
+---
+# =============================================================================
+# docker-setup role — templates (empty — no config templates needed here)
+# =============================================================================
+# Configuration templates belong in other roles (nginx-config, certbot-setup).
+# This role manages container lifecycle only.

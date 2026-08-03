@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+  --color-background: hsl(0 0% 100%);
+  --color-foreground: hsl(224 71% 4%);
+  --color-card: hsl(0 0% 100%);
+  --color-card-foreground: hsl(224 71% 4%);
+  --color-popover: hsl(0 0% 100%);
+  --color-popover-foreground: hsl(224 71% 4%);
+  --color-primary: hsl(262 83% 58%);
+  --color-primary-foreground: hsl(0 0% 100%);
+  --color-secondary: hsl(224 10% 96%);
+  --color-secondary-foreground: hsl(224 71% 4%);
+  --color-muted: hsl(224 10% 96%);
+  --color-muted-foreground: hsl(224 5% 46%);
+  --color-accent: hsl(262 83% 58% / 0.08);
+  --color-accent-foreground: hsl(262 83% 58%);
+  --color-destructive: hsl(0 84% 60%);
+  --color-destructive-foreground: hsl(0 0% 100%);
+  --color-border: hsl(224 10% 90%);
+  --color-input: hsl(224 10% 90%);
+  --color-ring: hsl(262 83% 58%);
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Hero gradient similar to Sarvam */
+  .bg-hero-gradient {
+    background: linear-gradient(
+      180deg,
+      hsl(262 83% 58% / 0) 0%,
+      hsl(262 83% 58% / 0.04) 30%,
+      hsl(262 83% 58% / 0.08) 60%,
+      hsl(262 83% 58% / 0) 100%
+    );
+  }
+
+  /* Glass card effect */
+  .glass-card {
+    @apply rounded-xl border bg-card/80 backdrop-blur-sm shadow-sm;
+  }
+}
+
+/* Code block styling */
+pre code {
+  color: inherit;
+  font-size: 0.8125rem;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(224 5% 80%);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(224 5% 65%);
+}

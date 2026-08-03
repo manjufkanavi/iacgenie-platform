@@ -1,0 +1,18 @@
+# Redis 7 configuration
+# Managed by Ansible
+port {{ redis_port | default(6379) }}
+bind 127.0.0.1
+maxmemory {{ redis_maxmemory | default('2gb') }}
+maxmemory-policy {{ redis_maxmemory_policy | default('allkeys-lru') }}
+appendonly {{ redis_aof_enabled | default('yes') }}
+appendfilename "appendonly.aof"
+dir {{ redis_data_dir | default('/var/lib/redis') }}
+save 900 1
+save 300 10
+save 60 10000
+protected-mode yes
+tcp-backlog 511
+timeout 0
+tcp-keepalive 300
+loglevel notice
+databases 16

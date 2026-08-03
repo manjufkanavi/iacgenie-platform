@@ -1,0 +1,41 @@
+# =============================================================================
+# IacGenie Services — Security-Hardened
+# =============================================================================
+# Version: 2.0
+# Date: 2026-07-20
+#
+# Run alongside docker-compose-unified.yml:
+#   docker compose -f docker-compose-unified.yml -f docker-compose-iacgenie.yml up -d
+#
+# Security notes:
+#   - All secrets loaded via .env.iacgenie env_file (no inline credentials)
+#   - Connected to both unified_network (application) and shared_internal
+#   - Read-only root filesystem where possible
+# =============================================================================
+
+services:
+  # IacGenie Django app
+  iacgenie-web:
+    image: "${IACGENIE_IMAGE:-registry.gitlab.com/tomorrow-infotech/iacgenie-app:latest}"
+    restart: unless-stopped
+    networks:
+      - unified_network
+      - shared_internal
+    ports:
+      - "127.0.0.1:5173:8000"
+    env_file:
+      - .env.iacgenie
+      - .env
+    depends_on:
+      - postgres
+      - redis
+      - minio
+      - keycloak
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  unified_network:
+    external: true
+  shared_internal:
+    external: true
