@@ -155,9 +155,7 @@ class ApplyAgent(BaseAgent):
             # Compare with approved plan hash
             if current_hash != self.approved_plan_hash:
                 self.log_message(
-                    f"Drift detected: current hash {current_hash} != approved hash {
-                        self.approved_plan_hash
-                    }",
+                    f"Drift detected: current hash {current_hash} != approved hash {self.approved_plan_hash}",
                     "warning",
                 )
                 return False

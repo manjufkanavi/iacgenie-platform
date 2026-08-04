@@ -6,7 +6,7 @@ import type {
   PhaseHistoryEntry,
   PipelineLogEntry,
   PipelineMetrics,
-} from '../types';
+} from './types';
 
 export interface ChatMessage {
   id: string;

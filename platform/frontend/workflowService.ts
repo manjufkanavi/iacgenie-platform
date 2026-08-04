@@ -2,7 +2,7 @@ import { apiClient } from './apiClient';
 import type {
   CreatePipelineConfig,
   PipelineFilters,
-} from '../types';
+} from './types';
 
 interface SessionListItem {
   id: string;

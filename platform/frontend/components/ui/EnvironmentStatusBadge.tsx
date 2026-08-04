@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { DeploymentMode } from '../../types';
+import { DeploymentMode } from './types';
 
 interface EnvironmentStatusBadgeProps {
   mode: DeploymentMode;

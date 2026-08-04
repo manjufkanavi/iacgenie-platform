@@ -1,41 +1,74 @@
 # =============================================================================
-# IacGenie Services — Security-Hardened
+# IacGenie Platform Services — Docker Compose
 # =============================================================================
-# Version: 2.0
-# Date: 2026-07-20
+# Version: 3.0
+# Date: 2026-08-04
 #
 # Run alongside docker-compose-unified.yml:
+#   cd /path/to/infra/docker-compose
 #   docker compose -f docker-compose-unified.yml -f docker-compose-iacgenie.yml up -d
 #
-# Security notes:
-#   - All secrets loaded via .env.iacgenie env_file (no inline credentials)
-#   - Connected to both unified_network (application) and shared_internal
-#   - Read-only root filesystem where possible
+# Services:
+#   - iacgenie-backend:  FastAPI (port 8000 internal)
+#   - iacgenie-frontend: Nginx + Vite (port 3001 host)
+#
+# Notes:
+#   - Backend connects to shared postgres via iacgenie_network
+#   - Frontend nginx proxies /api/ to backend via Docker network
 # =============================================================================
 
+networks:
+  iacgenie-network:
+    external: true
+
 services:
-  # IacGenie Django app
-  iacgenie-web:
-    image: "${IACGENIE_IMAGE:-registry.gitlab.com/tomorrow-infotech/iacgenie-app:latest}"
+  # IacGenie Backend (FastAPI)
+  iacgenie-backend:
+    image: iacgenie-backend:latest
+    container_name: iacgenie-backend
     restart: unless-stopped
     networks:
-      - unified_network
-      - shared_internal
-    ports:
-      - "127.0.0.1:3001:3001"
-    env_file:
-      - .env.iacgenie
-      - .env
-    depends_on:
-      - postgres
-      - redis
-      - minio
-      - keycloak
-    security_opt:
-      - no-new-privileges:true
+      - iacgenie-network
+    environment:
+      - DATABASE_PROVIDER=postgres
+      - POSTGRES_HOST=iacgenie_postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=lightsrp
+      - AUTH_PROVIDER=local
+      - HOST=0.0.0.0
+      - PORT=8000
+      - CORS_ORIGINS=https://platform.iacgenie.com,https://iacgenie.iacgenie.com
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2.0'
 
-networks:
-  unified_network:
-    external: true
-  shared_internal:
-    external: true
+  # IacGenie Frontend (Nginx + Vite SPA)
+  iacgenie-frontend:
+    image: iacgenie-frontend:latest
+    container_name: iacgenie-frontend
+    restart: unless-stopped
+    networks:
+      - iacgenie-network
+    ports:
+      - "127.0.0.1:3001:80"
+    depends_on:
+      - iacgenie-backend
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:80/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'

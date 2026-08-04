@@ -6,7 +6,7 @@ import Select from '../ui/Select';
 import Textarea from '../ui/Textarea';
 import SecureInput from '../ui/SecureInput';
 import EncryptionTrustBanner from '../ui/EncryptionTrustBanner';
-import { useAppStore } from '@/store/useAppStore';
+import { useAppStore } from '../../store/useAppStore';
 
 interface CloudCredentialsFormProps {
     onSubmit: (data: any) => void;

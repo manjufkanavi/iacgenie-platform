@@ -27,7 +27,7 @@ from models.error_classes import ErrorClass
 from agents.command_agents import CommandAgent, CommandType
 from agents.clarify_agent import ClarifyAgent
 
-from src.agent_executor.models import AgentType
+from modules.agent_executor.models import AgentType
 from agents.git_agent import GitAgent
 from agents.ci_agent import CICIAgent
 

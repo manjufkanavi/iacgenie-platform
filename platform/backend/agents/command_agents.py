@@ -7,7 +7,11 @@ from models.iac_state import IaCState
 from models.error_classes import ErrorClass
 from models.pipeline_phases import PipelinePhase
 from .base_agent import BaseAgent
-from src.sandbox_manager import ContainerProvisioner, CommandExecutor
+try:
+    from src.sandbox_manager import ContainerProvisioner, CommandExecutor
+except ImportError:
+    ContainerProvisioner = None  # type: ignore
+    CommandExecutor = None  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -208,7 +212,7 @@ class CommandAgent(BaseAgent):
                     import os
 
                     sys.path.append(os.path.join(os.path.dirname(__file__), "../"))
-                    from src.workflow_engine.config import WorkflowConfig as WC
+                    from modules.workflow_engine.config import WorkflowConfig as WC
 
                     redis_config = WC()
 

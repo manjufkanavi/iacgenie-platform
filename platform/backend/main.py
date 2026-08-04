@@ -131,8 +131,8 @@ async def _init_broadcast() -> None:
     from modules.workflow_engine.event_broadcast import (
         EventBroadcastService as RedisBroadcast,
     )
-    from src.workflow_engine.redis_client import RedisClient
-    from src.workflow_engine.config import WorkflowConfig
+    from modules.workflow_engine.redis_client import RedisClient
+    from modules.workflow_engine.config import WorkflowConfig
 
     try:
         config = WorkflowConfig.from_env()
@@ -1047,7 +1047,7 @@ async def resume_workflow(
         )
 
         # Create and resume the workflow
-        from src.agent_executor.main import AgentExecutor
+        from modules.agent_executor.main import AgentExecutor
 
         orchestrator = WorkflowOrchestrator(
             postgres_url=None,
@@ -1093,8 +1093,8 @@ async def resume_workflow(
 async def list_dead_letter_jobs(user: dict = Depends(require_admin)) -> Any:
     """List jobs in the dead letter queue."""
     try:
-        from src.workflow_engine.config import WorkflowConfig
-        from src.workflow_engine.redis_client import RedisClient
+        from modules.workflow_engine.config import WorkflowConfig
+        from modules.workflow_engine.redis_client import RedisClient
 
         rc = RedisClient(config=WorkflowConfig())
         rc.connect()
@@ -1121,8 +1121,8 @@ async def retry_dead_letter_job(
 ) -> Any:
     """Re-dispatch a DLQ job for retry."""
     try:
-        from src.workflow_engine.config import WorkflowConfig
-        from src.workflow_engine.redis_client import RedisClient
+        from modules.workflow_engine.config import WorkflowConfig
+        from modules.workflow_engine.redis_client import RedisClient
         from modules.workflow_engine.event_broadcast import (
             EventType,
             EventBroadcastService,

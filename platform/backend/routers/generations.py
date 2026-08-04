@@ -16,8 +16,8 @@ from fastapi import Response
 
 from middleware.auth_middleware import verify_access_token
 
-from src.llm_proxy.service import get_llm_service
-from src.llm_proxy.models import LLMRequest
+from modules.llm_proxy.service import get_llm_service
+from modules.llm_proxy.models import LLMRequest
 
 from db.adapters.postgres_adapter import postgres_adapter
 from models.domain.generation_metrics import GenerationMetrics

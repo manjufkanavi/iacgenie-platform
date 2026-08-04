@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import { Cloud, LayoutList, LayoutGrid, Trash2, RotateCw, X } from 'lucide-react';
-import { useProjectSettingsStore, CloudCredentials, CredentialStatus } from '@/store/useProjectSettingsStore';
-import { useProjectStore } from '@/store/useProjectStore';
-import { useAppStore } from '@/store/useAppStore';
+import { useProjectSettingsStore, CloudCredentials, CredentialStatus } from '../types';
+import { useProjectStore } from '../store/useProjectStore';
+import { useAppStore } from '../store/useAppStore';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import CloudCredentialsForm from '@/components/forms/CloudCredentialsForm';

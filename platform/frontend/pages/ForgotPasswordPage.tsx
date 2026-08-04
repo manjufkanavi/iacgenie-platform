@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View } from '../../types';
+import { View } from './types';
 import Card from '../ui/Card';
 import OTPInput from '../ui/OTPInput';
 import ResendTimer from '../ui/ResendTimer';

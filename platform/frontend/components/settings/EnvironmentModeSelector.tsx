@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Cloud, Server, MonitorOff, Loader2 } from 'lucide-react';
-import { DeploymentMode } from '../../types';
+import { DeploymentMode } from './types';
 
 interface EnvironmentModeSelectorProps {
   mode: DeploymentMode;

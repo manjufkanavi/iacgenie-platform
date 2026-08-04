@@ -1,7 +1,7 @@
 import { create } from 'zustand';
-import { CloudProvider, View, DeploymentMode } from '../types';
-import { AVAILABLE_MODELS } from '../constants';
-import { LLMCompletionResponse } from '../types';
+import { CloudProvider, View, DeploymentMode } from './types';
+import { AVAILABLE_MODELS } from './constants';
+import { LLMCompletionResponse } from './types';
 
 import { projectService } from '../services/projectService';
 import { useProjectStore } from './useProjectStore';

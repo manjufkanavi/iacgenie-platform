@@ -1,4 +1,4 @@
-import type { PipelineUpdate } from '../types';
+import type { PipelineUpdate } from './types';
 
 type MessageHandler = (message: PipelineUpdate) => void;
 type ConnectionHandler = () => void;

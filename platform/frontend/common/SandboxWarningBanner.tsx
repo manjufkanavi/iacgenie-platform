@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TriangleAlert, MonitorOff, X } from 'lucide-react';
-import { DeploymentMode } from '../../types';
+import { DeploymentMode } from './types';
 
 interface SandboxWarningBannerProps {
   mode: DeploymentMode;

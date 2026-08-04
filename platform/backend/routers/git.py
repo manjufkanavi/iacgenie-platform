@@ -24,15 +24,15 @@ from fastapi import APIRouter, HTTPException, Depends, Header, Request
 
 from pydantic import BaseModel, Field
 
-from src.git_cicd.repo_manager import RepoManager
+from modules.git_cicd.repo_manager import RepoManager
 
-from src.git_cicd.webhook_handler import WebhookHandler
+from modules.git_cicd.webhook_handler import WebhookHandler
 
-from src.git_cicd.cicd_providers.github_actions import GitHubActionsProvider
+from modules.git_cicd.cicd_providers.github_actions import GitHubActionsProvider
 
-from src.git_cicd.digger_agent import DiggerAgentService, get_digger_service
+from modules.git_cicd.digger_agent import DiggerAgentService, get_digger_service
 
-from src.git_cicd.models import GitOpsRunType
+from modules.git_cicd.models import GitOpsRunType
 
 from middleware.auth_middleware import get_user_id
 

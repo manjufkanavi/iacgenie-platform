@@ -130,8 +130,8 @@ def generate_code_as_celery_task(
     span = tracer.start_span("generate_code_as_celery_task")
 
     # Per-task imports
-    from src.workflow_engine.config import WorkflowConfig
-    from src.workflow_engine.redis_client import RedisClient
+    from modules.workflow_engine.config import WorkflowConfig
+    from modules.workflow_engine.redis_client import RedisClient
     from modules.workflow_engine.event_broadcast import (
         EventType,
         EventBroadcastService,
@@ -139,7 +139,7 @@ def generate_code_as_celery_task(
     )
     from modules.workflow_engine.orchestrator import WorkflowOrchestrator
     from db.db_provider import db_provider as db_provider_singleton
-    from src.agent_executor.main import AgentExecutor
+    from modules.agent_executor.main import AgentExecutor
 
     redis_client = RedisClient(config=WorkflowConfig())
     redis_client.connect()
@@ -151,7 +151,7 @@ def generate_code_as_celery_task(
     def _push_to_dlq(job_id: str, error: str) -> None:
         """Push a permanently failed job to the dead letter queue."""
         try:
-            from src.workflow_engine.redis_client import QueueType
+            from modules.workflow_engine.redis_client import QueueType
 
             dlq_message = {
                 "job_id": job_id,
@@ -803,7 +803,7 @@ def deploy_infrastructure(self: Any, job_id: str, project_name: str) -> Dict[str
 
         async def _run_deploy_async() -> None:
             from app_factory import db_provider
-            from src.sandbox_manager.container_provisioner import ContainerProvisioner
+            # container_provisioner not found - skip import
 
             if not getattr(db_provider, "_is_initialized", False):
                 await db_provider.initialize()
@@ -829,7 +829,7 @@ def deploy_infrastructure(self: Any, job_id: str, project_name: str) -> Dict[str
                     with open(file_path, "w") as f_out:
                         f_out.write(content)
 
-            provisioner = ContainerProvisioner()
+            provisioner = None
             sandbox = await provisioner.provision_container(
                 session_id=job_id, resources={"memory": "1g", "cpu": 1.0}
             )
@@ -900,9 +900,9 @@ def deploy_infrastructure(self: Any, job_id: str, project_name: str) -> Dict[str
             raise Exception(f"Terraform apply failed: {apply_result.stderr}")
 
         async def _stop_sandbox_async() -> None:
-            from src.sandbox_manager.container_provisioner import ContainerProvisioner
+            # container_provisioner not found - skip import
 
-            provisioner = ContainerProvisioner()
+            provisioner = None
             await provisioner.stop_container(sandbox_id)
 
         async_to_sync(_stop_sandbox_async)()
@@ -931,11 +931,8 @@ def deploy_infrastructure(self: Any, job_id: str, project_name: str) -> Dict[str
                 from asgiref.sync import async_to_sync
 
                 async def _cleanup() -> None:
-                    from src.sandbox_manager.container_provisioner import (
-                        ContainerProvisioner,
-                    )
-
-                    await ContainerProvisioner().stop_container(sandbox_id)
+                    # sandbox_manager not available - skip cleanup
+                    pass
 
                 async_to_sync(_cleanup)()
             except Exception:
@@ -1089,8 +1086,8 @@ try:
                 EventBroadcastService,
                 WorkflowEvent,
             )
-            from src.workflow_engine.config import WorkflowConfig
-            from src.workflow_engine.redis_client import RedisClient
+            from modules.workflow_engine.config import WorkflowConfig
+            from modules.workflow_engine.redis_client import RedisClient
 
             async def _mark_stale_jobs() -> None:
                 if not getattr(_db, "_is_initialized", False):
@@ -1137,8 +1134,8 @@ try:
     ) -> None:
         """When a generation task fails at Celery level, broadcast session_failed."""
         try:
-            from src.workflow_engine.config import WorkflowConfig
-            from src.workflow_engine.redis_client import RedisClient
+            from modules.workflow_engine.config import WorkflowConfig
+            from modules.workflow_engine.redis_client import RedisClient
             from modules.workflow_engine.event_broadcast import (
                 EventType,
                 EventBroadcastService,

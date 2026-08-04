@@ -3,7 +3,7 @@ import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 import MobileNav from './MobileNav';
 import { X } from 'lucide-react';
-import { useAppStore } from '../../store/useAppStore';
+import { useAppStore } from '.././store/useAppStore';
 import SandboxWarningBanner from '../common/SandboxWarningBanner';
 
 interface LayoutShellProps {

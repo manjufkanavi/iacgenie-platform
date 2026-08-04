@@ -94,8 +94,8 @@ async def pipeline_websocket(
         }
     )
     # Start an asyncio task to listen to Redis and forward to the WebSocket
-    from src.workflow_engine.config import WorkflowEngineConfig as WorkflowConfig
-    from src.workflow_engine.redis_client import RedisClient
+    from modules.workflow_engine.config import WorkflowEngineConfig as WorkflowConfig
+    from modules.workflow_engine.redis_client import RedisClient
     import asyncio
 
     redis_client = RedisClient(config=WorkflowConfig())

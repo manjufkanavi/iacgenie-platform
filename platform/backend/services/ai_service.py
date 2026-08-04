@@ -248,9 +248,7 @@ class AIService:
                 metadata=config_data.get("metadata"),
             )
             logger.info(
-                f"Loaded model config from DB: {config_id} ({
-                    config_data.get('provider')
-                }:{config_data.get('model')})"
+                f"Loaded model config from DB: {config_id} ({config_data.get('provider')}:{config_data.get('model')})"
             )
             return model_config
         except Exception as e:

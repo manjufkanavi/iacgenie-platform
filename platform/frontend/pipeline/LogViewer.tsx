@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Card from '../ui/Card';
-import type { LogLevel, PipelinePhase } from '../../types';
+import type { LogLevel, PipelinePhase } from './types';
 
 interface LogEntryData {
   timestamp: string;

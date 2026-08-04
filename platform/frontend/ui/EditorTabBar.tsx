@@ -1,6 +1,6 @@
 import React from 'react';
 import { X, Plus } from 'lucide-react';
-import { EditorTab } from '../../types';
+import { EditorTab } from './types';
 
 interface EditorTabBarProps {
   tabs: EditorTab[];

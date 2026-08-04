@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react';
 import PhaseStatusBadge from './PhaseStatusBadge';
-import type { PhaseStatus } from '../../types';
+import type { PhaseStatus } from './types';
 
 // ============================================================
 // Types (aligned with types.ts PipelineSession)

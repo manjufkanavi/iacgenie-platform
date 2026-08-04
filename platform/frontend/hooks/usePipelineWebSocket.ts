@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { usePipelineStore } from '../store/usePipelineStore';
+import { usePipelineStore } from './store/usePipelineStore';
 import { workflowService } from '../services/workflowService';
-import type { PipelinePhase, ValidationStepLog, LogLevel } from '../types';
+import type { PipelinePhase, ValidationStepLog, LogLevel } from './types';
 
 export type PipelineState = 'IDLE' | 'PENDING' | 'PLANNING' | 'GENERATING' | 'VALIDATING' | 'APPLYING' | 'COMPLETED' | 'FAILED' | 'HUMAN_REVIEW' | 'CLARIFY';
 

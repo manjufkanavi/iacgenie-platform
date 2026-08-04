@@ -1,4 +1,4 @@
-import { User } from '../store/useAppStore';
+import { User } from './store/useAppStore';
 
 export interface LoginCredentials {
   email: string;

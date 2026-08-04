@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useAppStore } from '../../store/useAppStore';
+import { useAppStore } from '.././store/useAppStore';
 import { ChevronDown, ChevronRight, ChevronLeft, LayoutDashboard, Wrench, Rocket, BarChart3, Workflow, Settings, CreditCard, Code2, FileText, CheckCircle2, Book, FileCode, LogOut } from 'lucide-react';
 
 interface NavItemProps {

@@ -306,7 +306,7 @@ async def start_session(
         # Launch LangGraph DAG workflow via orchestrator in the background
         # Create a fresh AgentExecutor instance with LLM Proxy for each session
         try:
-            from src.agent_executor.main import AgentExecutor
+            from modules.agent_executor.main import AgentExecutor
 
             agent_executor_instance = AgentExecutor()
         except Exception as e:

@@ -1,5 +1,5 @@
 import { getAuthHeaders } from "./authHeaders";
-import { Deployment, DeploymentLog, DeploymentStatus, CloudProvider, OutputType } from '../types';
+import { Deployment, DeploymentLog, DeploymentStatus, CloudProvider, OutputType } from './types';
 
 export interface DeploymentRecord {
   id: string;

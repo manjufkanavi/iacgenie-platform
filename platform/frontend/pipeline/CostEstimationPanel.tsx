@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Cpu, HardDrive, Database, Key, RefreshCw, ChevronDown, ChevronUp, Tag } from 'lucide-react';
-import { CostEstimationData, CostMetric } from '../../types';
+import { CostEstimationData, CostMetric } from './types';
 import type { DiffResource } from './DiffPanel';
 
 interface CostEstimationPanelProps {

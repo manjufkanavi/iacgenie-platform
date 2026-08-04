@@ -1,5 +1,5 @@
 import * as monaco from 'monaco-editor';
-import { GeneratedFile } from '../types';
+import { GeneratedFile } from './types';
 
 // ============================================================
 // HCL Monaco Theme Definitions

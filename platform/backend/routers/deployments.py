@@ -346,7 +346,7 @@ async def deployment_logs_websocket(websocket: WebSocket, dep_id: str) -> None:
     await websocket.accept()
 
     try:
-        from src.workflow_engine.config import WorkflowConfig
+        from modules.workflow_engine.config import WorkflowConfig
         import redis.asyncio as aioredis
 
         config = WorkflowConfig()
@@ -405,8 +405,8 @@ async def cancel_deployment(
             )
 
         # Publish cancellation event to Redis
-        from src.workflow_engine.config import WorkflowConfig
-        from src.workflow_engine.redis_client import RedisClient
+        from modules.workflow_engine.config import WorkflowConfig
+        from modules.workflow_engine.redis_client import RedisClient
 
         config = WorkflowConfig()
         redis_client = RedisClient(config=config)

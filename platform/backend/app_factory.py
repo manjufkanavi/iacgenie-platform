@@ -49,7 +49,7 @@ from db.db_provider import db_provider  # noqa: F401  # re-exported for main.py
 # AgentExecutor placeholder — real instance created per-Celery-task.
 # Kept here so routers/workflow.py can import it without circular deps.
 # Routers that need a real instance should create one locally or use Celery.
-from src.agent_executor.main import AgentExecutor  # noqa: F401  # re-exported for main.py
+from modules.agent_executor.main import AgentExecutor  # noqa: F401  # re-exported for main.py
 
 agent_executor: Any = None
 

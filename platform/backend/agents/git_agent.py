@@ -7,7 +7,11 @@ from models.iac_state import IaCState
 from models.error_classes import ErrorClass
 from models.pipeline_phases import PipelinePhase
 from .base_agent import BaseAgent
-from src.sandbox_manager import ContainerProvisioner, CommandExecutor
+try:
+    from src.sandbox_manager import ContainerProvisioner, CommandExecutor
+except ImportError:
+    ContainerProvisioner = None  # type: ignore
+    CommandExecutor = None  # type: ignore
 
 logger = logging.getLogger(__name__)
 

@@ -14,9 +14,9 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 
 from pydantic import BaseModel, Field
 
-from src.llm_proxy.service import LLMService, CompletionResult, get_llm_service
-from src.llm_proxy.models import LLMRequest, LLMMessage
-from src.llm_proxy.exceptions import (
+from modules.llm_proxy.service import LLMService, CompletionResult, get_llm_service
+from modules.llm_proxy.models import LLMRequest, LLMMessage
+from modules.llm_proxy.exceptions import (
     ProviderError,
     ProviderRateLimitError,
     SecurityError,

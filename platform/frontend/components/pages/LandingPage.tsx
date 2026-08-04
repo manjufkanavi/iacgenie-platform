@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View } from '../../types';
+import { View } from './types';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
 import AnimatedCodeBlock from '../landing/AnimatedCodeBlock';
@@ -11,7 +11,7 @@ import PricingSection from '../landing/PricingSection';
 import FinalCTASection from '../landing/FinalCTASection';
 import Toast from '../ui/Toast';
 import Button from '../ui/Button';
-import { useAppStore } from '../../store/useAppStore';
+import { useAppStore } from '.././store/useAppStore';
 
 interface LandingPageProps {
   onNavigate: (view: View) => void;

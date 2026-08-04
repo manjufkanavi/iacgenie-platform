@@ -20,7 +20,7 @@ from modules.git_cicd.models import (
     GitProvider,
     PrComment,
 )
-from src.observability import log_info, log_error
+from modules.observability import log_info, log_error
 from db.db_provider import db_provider
 
 

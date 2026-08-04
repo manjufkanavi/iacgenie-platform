@@ -1,4 +1,4 @@
-import { CloudProvider, ClarifyAnswerResponse, GenerationStartResponse, GenerationStatusResponse } from '../types';
+import { CloudProvider, ClarifyAnswerResponse, GenerationStartResponse, GenerationStatusResponse } from './types';
 
 const getToken = () => localStorage.getItem('iacgenie_token');
 

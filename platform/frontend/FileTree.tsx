@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { GeneratedFile } from '../types';
-import { ICONS } from '../constants';
+import { GeneratedFile } from './types';
+import { ICONS } from './icons';
 
 interface FileTreeProps {
   files: GeneratedFile[];

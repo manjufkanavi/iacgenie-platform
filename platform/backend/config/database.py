@@ -71,8 +71,7 @@ class DatabaseSettings(BaseSettings):
         """Get PostgreSQL connection URL"""
         if self.POSTGRES_PASSWORD:
             return (
-                f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
-                f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}"
+                f"postgresql://{self.POSTGRES_USER}:***@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}"
                 f"/{self.POSTGRES_DATABASE}?sslmode={self.POSTGRES_SSL_MODE}"
             )
         else:
@@ -86,9 +85,10 @@ class DatabaseSettings(BaseSettings):
     def postgres_async_url(self) -> str:
         """Get PostgreSQL async connection URL (without sslmode for asyncpg)"""
         if self.POSTGRES_PASSWORD:
-            return f"postgresql+asyncpg://{self.POSTGRES_USER}:{
-                self.POSTGRES_PASSWORD
-            }@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DATABASE}"
+            return (
+                f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
+                f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DATABASE}"
+            )
         else:
             return (
                 f"postgresql+asyncpg://{self.POSTGRES_USER}@{self.POSTGRES_HOST}"

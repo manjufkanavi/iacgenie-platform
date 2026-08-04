@@ -3,9 +3,9 @@ import toast from 'react-hot-toast';
 import { AlertCircle, CheckCircle2, Loader2, Plus } from 'lucide-react';
 import Button from './ui/Button';
 import Modal from './ui/Modal';
-import { useProjectSettingsStore } from '../store/useProjectSettingsStore';
-import { useAppStore } from '../store/useAppStore';
-import { useProjectStore } from '../store/useProjectStore';
+import { useProjectSettingsStore } from './store/useProjectSettingsStore';
+import { useAppStore } from './store/useAppStore';
+import { useProjectStore } from './store/useProjectStore';
 
 interface SettingsPanelProps {
     section: 'modelConfigs' | 'gitRepositories' | 'cloudCredentials' | 'teamMembers' | 'integrations';
