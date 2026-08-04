@@ -24,3 +24,6 @@ export const PROJECT_STATUS = {
   DEPLOYING: 'deploying',
   DEPLOYED: 'deployed',
 } as const;
+
+// Re-export ICONS for components that import from constants
+export * from './icons';
