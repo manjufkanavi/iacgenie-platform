@@ -5,10 +5,10 @@ import Editor, { DiffEditor, loader } from '@monaco-editor/react';
 
 loader.config({ monaco, paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' } });
 
-import { GeneratedFile, ValidationIssue } from './types';
+import { GeneratedFile, ValidationIssue } from '@/types';
 import { getLanguageFromExtension, registerHCLLanguage, iacgenieHclDark, iacgenieHclLight } from './monaco-themes';
-import FileTree from './FileTree';
-import { workflowService } from './workflowService';
+import FileTree from '@/FileTree';
+import { workflowService } from '@/workflowService';
 import TofuWorkflowStatusBar, { TofuStage } from './TofuWorkflowStatusBar';
 import GithubPushDropdown from './GithubPushDropdown';
 

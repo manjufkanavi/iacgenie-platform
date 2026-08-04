@@ -17,6 +17,8 @@ import {
     Sparkles,
     Github,
     RefreshCw,
+    GitBranch,
+    Trash2,
 } from 'lucide-react';
 
 export const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
