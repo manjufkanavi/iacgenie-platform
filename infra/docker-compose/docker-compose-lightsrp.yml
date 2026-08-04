@@ -22,7 +22,7 @@ services:
       - unified_network
       - shared_internal
     ports:
-      - "127.0.0.1:3070:3070"
+      - "127.0.0.1:8000:3000"
     env_file:
       - .env.lightserp
       - .env

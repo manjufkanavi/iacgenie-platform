@@ -1,4 +1,4 @@
 ---
 # Main site playbook - orchestrates all roles
-- import_playbook: bootstrap.yml
-- import_playbook: services.yml
+- import_playbook: playbooks/bootstrap.yml
+- import_playbook: playbooks/services.yml
