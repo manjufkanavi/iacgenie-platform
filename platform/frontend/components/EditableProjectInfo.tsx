@@ -3,7 +3,7 @@ import Button from './ui/Button';
 import EditableField from './ui/EditableField';
 import { useAppStore } from './store/useAppStore';
 import toast from 'react-hot-toast';
-import { ICONS } from './icons';
+import { ICONS } from '../icons';
 import { useProjectStore } from './store/useProjectStore';
 import EnvironmentModeSelector from './settings/EnvironmentModeSelector';
 import { DollarSign, BarChart3, Tag } from 'lucide-react';

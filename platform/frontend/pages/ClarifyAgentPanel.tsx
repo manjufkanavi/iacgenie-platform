@@ -5,7 +5,7 @@ import {
   CheckCircle2, Clock, AlertTriangle, Play, HelpCircle
 } from 'lucide-react';
 import { usePipelineStore, ChatMessage } from '../store/usePipelineStore';
-import { workflowService as workflowService } from './workflowService';
+import { workflowService as workflowService } from '../workflowService';
 import toast from 'react-hot-toast';
 
 function PageBreadcrumb({ pipelineId }: { pipelineId: string }): React.ReactElement {

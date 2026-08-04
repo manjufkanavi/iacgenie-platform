@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAppStore } from '../store/useAppStore';
-import { View } from './types';
+import { View } from '../types';
 import { ChevronRight, Home } from 'lucide-react';
 
 const Breadcrumb: React.FC = () => {

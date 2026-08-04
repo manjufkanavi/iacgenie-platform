@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import Card from '../ui/Card';
 import PhaseStatusIndicator from './PhaseStatusIndicator';
 import { usePipelineStore } from '../../store/usePipelineStore';
-import type { LogLevel } from './types';
+import type { LogLevel } from '../types';
 
 interface CurrentPhasePanelProps {
   pipelineId?: string;

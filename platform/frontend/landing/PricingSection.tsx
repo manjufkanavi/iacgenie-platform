@@ -1,5 +1,5 @@
 import React from 'react';
-import { View } from './types';
+import { View } from '../types';
 import PricingCard from './PricingCard';
 import { useAppStore } from '../store/useAppStore';
 

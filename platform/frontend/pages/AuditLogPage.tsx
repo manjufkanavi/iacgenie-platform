@@ -8,7 +8,7 @@ import { auditLogService, AuditLog } from '../../services/auditLogService';
 import { useAppStore } from '../store/useAppStore';
 import { useProjectStore } from '../store/useProjectStore';
 import toast from 'react-hot-toast';
-import { ICONS } from '../constants';
+import { ICONS } from '.../constants';
 
 const AuditLogPage: React.FC = () => {
     const { currentProject } = useAppStore();

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAppStore } from '../store/useAppStore';
-import { View } from './types';
+import { View } from '../types';
 import { LayoutDashboard, Terminal, RefreshCw, BarChart2, Settings } from 'lucide-react';
 
 const MobileNav: React.FC = () => {

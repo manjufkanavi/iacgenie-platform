@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { workflowService as workflowService } from './workflowService';
-import type { PipelineListItem, PipelineStatus, PipelinePhase, PipelineFilters } from './types';
+import { workflowService as workflowService } from '../workflowService';
+import type { PipelineListItem, PipelineStatus, PipelinePhase, PipelineFilters } from '../types';
 
 interface Pagination {
   page: number;

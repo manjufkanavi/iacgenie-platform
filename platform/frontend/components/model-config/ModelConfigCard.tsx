@@ -2,8 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { ModelConfig } from '../../store/useAppStore';
 import { TestResult } from './ConnectionTestButton';
 import Badge from '../ui/Badge';
-import { PROVIDERS, ProviderConfig } from '../../constants/providers';
-import { MODELS } from '../../constants/models';
+import { PROVIDERS, ProviderConfig } from '../.../constants/providers';
+import { MODELS } from '../.../constants/models';
 
 interface ModelConfigCardProps {
   config: ModelConfig;

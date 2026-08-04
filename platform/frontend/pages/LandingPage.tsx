@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View } from './types';
+import { View } from '../types';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
 import AnimatedCodeBlock from '../landing/AnimatedCodeBlock';

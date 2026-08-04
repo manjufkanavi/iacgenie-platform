@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import type { PipelineTab } from './types';
+import type { PipelineTab } from '.../types';
 import Card from '../ui/Card';
 import PageHeader from '../layout/PageHeader';
 import CurrentPhasePanel from '../pipeline/CurrentPhasePanel';
@@ -11,7 +11,7 @@ import UnifiedAgentLog from './pipeline/UnifiedAgentLog';
 import InlineReviewPanel from '../../pipeline/InlineReviewPanel';
 import { usePipelineStore } from '../../store/usePipelineStore';
 import { usePipelineWebSocket } from '../../hooks/usePipelineWebSocket';
-import { workflowService as workflowService } from './workflowService';
+import { workflowService as workflowService } from '../workflowService';
 import { useAppStore } from '../../store/useAppStore';
 import type { PipelinePhase, PhaseStatus } from './types';
 import toast from 'react-hot-toast';

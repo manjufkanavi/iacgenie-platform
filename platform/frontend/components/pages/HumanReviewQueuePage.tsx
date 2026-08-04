@@ -4,8 +4,8 @@ import Button from '../ui/Button';
 import Select from '../ui/Select';
 import { ReviewStatusBadge } from '../ui/ReviewStatusBadge';
 import toast from 'react-hot-toast';
-import { View } from './types';
-import { workflowService as workflowService } from './workflowService';
+import { View } from '../types';
+import { workflowService as workflowService } from '../workflowService';
 
 interface ReviewItem {
   id: string;

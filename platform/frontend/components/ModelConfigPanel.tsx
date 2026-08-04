@@ -4,8 +4,8 @@ import Button from './ui/Button';
 import Modal from './ui/Modal';
 import { useAppStore } from './store/useAppStore';
 
-import { PROVIDERS, PROVIDER_CATEGORIES } from './constants/providers';
-import { MODELS, DEFAULT_CONFIGS, AdvancedConfig, ModelDefinition } from './constants/models';
+import { PROVIDERS, PROVIDER_CATEGORIES } from '../constants/providers';
+import { MODELS, DEFAULT_CONFIGS, AdvancedConfig, ModelDefinition } from '../constants/models';
 
 import { ProviderCard } from './model-config/ProviderCard';
 import { ModelCombobox } from './model-config/ModelCombobox';

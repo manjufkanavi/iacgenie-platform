@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ValidationStepLog } from './types';
+import { ValidationStepLog } from '../types';
 import { ChevronDown, ChevronUp, Terminal, Filter } from 'lucide-react';
 
 export interface UnifiedAgentLogProps {

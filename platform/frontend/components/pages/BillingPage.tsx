@@ -9,7 +9,7 @@ import InvoiceHistoryTable from '../billing/InvoiceHistoryTable';
 import { billingService, BillingInfo } from '../../services/billingService';
 import { useProjectStore } from '../../store/useProjectStore';
 import toast from 'react-hot-toast';
-import { Plan } from './types';
+import { Plan } from '../types';
 
 // Error boundary for billing page
 class BillingErrorBoundary extends React.Component<any, { hasError: boolean, error: any }> {

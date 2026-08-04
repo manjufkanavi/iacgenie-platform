@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View } from './types';
+import { View } from '../types';
 import Card from '../ui/Card';
 import FormGroup from '../ui/FormGroup';
 import SecurePasswordInput from '../ui/SecurePasswordInput';

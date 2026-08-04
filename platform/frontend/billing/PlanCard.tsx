@@ -1,7 +1,7 @@
 import React from 'react';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
-import { Plan } from './types';
+import { Plan } from '../types';
 
 interface PlanCardProps {
   plan: Plan;

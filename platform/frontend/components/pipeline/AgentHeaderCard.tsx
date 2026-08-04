@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import Card from '../ui/Card';
 import PhaseStatusBadge from './PhaseStatusBadge';
-import type { AgentStatus } from './types';
+import type { AgentStatus } from '../types';
 
 interface AgentHeaderCardProps {
   agentName: string;

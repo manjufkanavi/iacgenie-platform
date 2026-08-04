@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Check, X, HelpCircle, Circle, Loader2 } from 'lucide-react';
-import { PipelinePhase } from './types';
+import { PipelinePhase } from '../types';
 
 export type RailPhaseState = 'pending' | 'active' | 'completed' | 'failed' | 'needs_input';
 
