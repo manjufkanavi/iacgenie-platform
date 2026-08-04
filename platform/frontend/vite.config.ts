@@ -138,12 +138,15 @@ export default defineConfig(({ mode }) => {
           '@': path.resolve(__dirname, '.'),
         },
       },
+      optimizeDeps: {
+        exclude: ['monaco-editor', '@monaco-editor/react'],
+      },
       css: {
         postcss: './postcss.config.cjs'
       },
       build: {
         rollupOptions: {
-          external: ['monaco-editor'],
+          external: ['monaco-editor', '@monaco-editor/react'],
           output: {
             manualChunks(id) {
               if (id.includes('node_modules')) {

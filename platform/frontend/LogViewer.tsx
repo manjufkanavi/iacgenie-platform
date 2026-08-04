@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Deployment, DeploymentLog } from '../types';
+import { Deployment, DeploymentLog } from './types';
 import Badge from './ui/Badge';
 import { getStatusVariant } from './pages/DashboardPage'; // Re-using this handy function
 
