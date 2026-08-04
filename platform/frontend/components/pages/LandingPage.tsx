@@ -11,7 +11,7 @@ import PricingSection from '../landing/PricingSection';
 import FinalCTASection from '../landing/FinalCTASection';
 import Toast from '../ui/Toast';
 import Button from '../ui/Button';
-import { useAppStore } from '../store/useAppStore';
+import { useAppStore } from '../../store/useAppStore';
 
 interface LandingPageProps {
   onNavigate: (view: View) => void;

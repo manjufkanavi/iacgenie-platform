@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useAppStore } from '../store/useAppStore';
+import { useAppStore } from '../../store/useAppStore';
 import { Search, Folder, FileText, Settings, ArrowRight } from 'lucide-react';
 import { View } from './types';
 

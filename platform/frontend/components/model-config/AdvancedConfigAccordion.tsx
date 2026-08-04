@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AdvancedConfig } from '../constants/models';
+import { AdvancedConfig } from '../../constants/models';
 
 interface AdvancedConfigAccordionProps {
   values: AdvancedConfig;

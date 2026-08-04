@@ -2,7 +2,7 @@
 import React from 'react';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
-import { useAppStore } from '../store/useAppStore';
+import { useAppStore } from '../../store/useAppStore';
 
 const AboutUsPage: React.FC = () => {
   const isAuthenticated = useAppStore(state => state.isAuthenticated);

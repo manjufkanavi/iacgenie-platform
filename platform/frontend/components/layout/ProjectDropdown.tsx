@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useAppStore } from '../store/useAppStore';
+import { useAppStore } from '../../store/useAppStore';
 import { ChevronDown, Folder, Plus } from 'lucide-react';
 
 const ProjectDropdown: React.FC = () => {

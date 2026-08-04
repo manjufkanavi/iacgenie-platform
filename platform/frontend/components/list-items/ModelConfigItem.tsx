@@ -1,6 +1,6 @@
 import React from 'react';
 import { CheckCircle, Settings, Trash2 } from 'lucide-react';
-import { ModelConfig } from '../store/useAppStore';
+import { ModelConfig } from '../../store/useAppStore';
 import Button from '../ui/Button';
 import Badge from '../ui/Badge';
 

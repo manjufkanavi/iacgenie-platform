@@ -5,7 +5,7 @@ import Button from '../ui/Button';
 import { gitRepositoryService } from '../../services/gitRepositoryService';
 import { gitOpsService, type ListRunsResponse } from '../../services/gitOpsService';
 import type { GitRepository as GitRepositoryType } from '../../services/db/adapters/IDatabaseAdapter';
-import { useAppStore } from '../store/useAppStore';
+import { useAppStore } from '../../store/useAppStore';
 import { Github, Gitlab, Code, AlertCircle, CheckCircle2, AlertTriangle, Terminal, ExternalLink, Loader2 } from 'lucide-react';
 import Modal from '../ui/Modal';
 import GitRepositoryForm from './forms/GitRepositoryForm';

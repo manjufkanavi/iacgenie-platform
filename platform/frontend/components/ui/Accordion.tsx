@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import Card from './Card';
-import { ICONS } from '../constants';
+import { ICONS } from '../../constants';
 import { AccordionItem } from './types';
 
 interface AccordionProps {

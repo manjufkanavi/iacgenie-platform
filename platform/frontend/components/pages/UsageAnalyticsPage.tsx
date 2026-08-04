@@ -3,8 +3,8 @@ import Card from '../ui/Card';
 import { ChartCard } from '../ui/ChartCard';
 import toast from 'react-hot-toast';
 import { Calendar, FileSpreadsheet, FileText, BarChart3, TrendingUp, Cpu, HelpCircle } from 'lucide-react';
-import { useAppStore } from '../store/useAppStore';
-import { useProjectStore } from '../store/useProjectStore';
+import { useAppStore } from '../../store/useAppStore';
+import { useProjectStore } from '../../store/useProjectStore';
 
 interface TimeSeriesData {
   date: string;
