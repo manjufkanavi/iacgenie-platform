@@ -7,7 +7,7 @@ import UsageProgressBar from '../billing/UsageProgressBar';
 import PaymentMethodsContainer from './components/billing/PaymentMethodsContainer';
 import InvoiceHistoryTable from './components/billing/InvoiceHistoryTable';
 import { billingService, BillingInfo } from '../../services/billingService';
-import { useProjectStore } from '.././store/useProjectStore';
+import { useProjectStore } from '../store/useProjectStore';
 import toast from 'react-hot-toast';
 import { Plan } from './types';
 

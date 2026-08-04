@@ -7,14 +7,14 @@ import Modal from '../ui/Modal';
 import Input from '../ui/Input';
 import DeploymentPreviewModal from './components/ui/DeploymentPreviewModal';
 import LogViewer from './LogViewer';
-import { ICONS } from '.././constants';
+import { ICONS } from '../constants';
 import { deploymentService, DeploymentRecord } from '../../services/deploymentService';
 import { generationService } from '../../services/generationService';
 import { Generation } from './types';
 import { DeploymentStatus, CloudProvider, OutputType } from './types';
 import { getStatusVariant } from './DashboardPage'; // Re-using this handy function
-import { useAppStore } from '.././store/useAppStore';
-import { useProjectStore } from '.././store/useProjectStore';
+import { useAppStore } from '../store/useAppStore';
+import { useProjectStore } from '../store/useProjectStore';
 import { toast } from 'react-hot-toast';
 import { DeploymentLog } from './types';
 

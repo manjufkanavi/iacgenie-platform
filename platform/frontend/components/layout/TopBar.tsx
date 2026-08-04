@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useAppStore } from '.././store/useAppStore';
+import { useAppStore } from '../store/useAppStore';
 import ProjectDropdown from './ProjectDropdown';
 import NotificationBell from './NotificationBell';
 import SearchModal from './SearchModal';

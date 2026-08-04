@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
-import { useAppStore } from '.././store/useAppStore';
-import { useProjectStore } from '.././store/useProjectStore';
+import { useAppStore } from '../store/useAppStore';
+import { useProjectStore } from '../store/useProjectStore';
 import SettingsPanel from './SettingsPanel';
 import EditableProjectInfo from './Editab.*'
 import TeamMemberForm from '../forms/TeamMemberForm';

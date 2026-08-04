@@ -1,5 +1,5 @@
 import React from 'react';
-import type { StreamConnectionState } from '.././store/usePipelineStore';
+import type { StreamConnectionState } from '../store/usePipelineStore';
 import { Wifi, WifiOff, RefreshCw, AlertCircle } from 'lucide-react';
 
 interface SessionStreamIndicatorProps {
