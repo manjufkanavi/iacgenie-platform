@@ -2,7 +2,7 @@
 # Gitea Project Organizations — Defaults
 
 # Gitea API config
-gitea_api_url: "https://git.iacgenie.com"
+gitea_api_url: "https://gitea.iacgenie.com"
 gitea_api_token: "CHANGE_ME_IN_VAULT"
 gitea_default_user: admin
 

@@ -146,7 +146,7 @@ export default defineConfig(({ mode }) => {
       },
       build: {
         rollupOptions: {
-          external: ['monaco-editor', '@monaco-editor/react', 'react-hot-toast', 'framer-motion'],
+          external: ['monaco-editor'],
           output: {
             manualChunks(id) {
               if (id.includes('node_modules')) {

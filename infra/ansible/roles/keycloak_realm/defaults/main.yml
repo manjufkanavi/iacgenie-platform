@@ -103,9 +103,9 @@ keycloak_clients:
     enabled: true
     clientAuthenticatorType: client-secret
     redirectUris:
-      - "https://git.iacgenie.com/user/oauth2/gitea"
+      - "https://gitea.iacgenie.com/user/oauth2/gitea"
     webOrigins:
-      - "https://git.iacgenie.com"
+      - "https://gitea.iacgenie.com"
     standardFlowEnabled: true
     directAccessGrantsEnabled: false
     serviceAccountsEnabled: false
