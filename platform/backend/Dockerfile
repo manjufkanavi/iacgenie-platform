@@ -19,11 +19,20 @@ RUN apt-get update && apt-get install -y \
     gnupg \
     && rm -rf /var/lib/apt/lists/*
 
-# Install OpenTofu Standalone CLI
-RUN curl --proto '=https' --tlsv1.2 -fsSL https://get.opentofu.org/install-opentofu.sh -o install-opentofu.sh && \
-    chmod +x install-opentofu.sh && \
-    ./install-opentofu.sh --install-method standalone && \
-    rm install-opentofu.sh
+# Install OpenTofu Standalone CLI from GitHub releases
+RUN ARCH=$(uname -m) && \
+    case "$ARCH" in \
+        x86_64) TOFU_ARCH="amd64";; \
+        aarch64) TOFU_ARCH="arm64";; \
+        *) TOFU_ARCH="amd64";; \
+    esac && \
+    curl --proto '=https' --tlsv1.2 -fsSL \
+        "https://github.com/opentofu/opentofu/releases/latest/download/tofu_1.8.1_linux_${TOFU_ARCH}.zip" \
+        -o /tmp/tofu.zip && \
+    unzip -o /tmp/tofu.zip -d /tmp/ && \
+    mv /tmp/tofu /usr/local/bin/tofu && \
+    rm -f /tmp/tofu.zip && \
+    tofu --version | head -1
 
 
 # Copy requirements file
