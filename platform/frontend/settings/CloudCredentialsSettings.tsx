@@ -4,12 +4,12 @@ import { Cloud, LayoutList, LayoutGrid, Trash2, RotateCw, X } from 'lucide-react
 import { useProjectSettingsStore, CloudCredentials, CredentialStatus } from '../types';
 import { useProjectStore } from '../store/useProjectStore';
 import { useAppStore } from '../store/useAppStore';
-import Button from '@/components/ui/Button';
-import Modal from '@/components/ui/Modal';
-import CloudCredentialsForm from '@/components/forms/CloudCredentialsForm';
-import CredentialStatusTable, { type CredentialItem } from '@/components/ui/CredentialStatusTable';
-import CredentialStatusCard from '@/components/ui/CredentialStatusCard';
-import DeleteConfirmModal from '@/components/ui/DeleteConfirmModal';
+import Button from '@/ui/Button';
+import Modal from '@/ui/Modal';
+import CloudCredentialsForm from '@/forms/CloudCredentialsForm';
+import CredentialStatusTable, { type CredentialItem } from '@/ui/CredentialStatusTable';
+import CredentialStatusCard from '@/ui/CredentialStatusCard';
+import DeleteConfirmModal from '@/ui/DeleteConfirmModal';
 
 const CloudCredentialsSettings: React.FC = () => {
     const { currentProjectId } = useProjectStore();
