@@ -1,18 +1,20 @@
 ---
 # Common role - User management
-- name: "Common | Create deploy user"
+# CRITICAL: This role only ADDS users and keys. It never removes or overwrites
+# existing users or their SSH keys, which would cause lockout.
+
+- name: "Common | Ensure deploy user exists"
   ansible.builtin.user:
-    name: "{{ deploy_username | default('deploy') }}"
-    comment: "Ansible deployment user"
+    name: "{{ deploy_username | default('mkanavi') }}"
+    comment: "Infrastructure admin user"
     shell: /bin/bash
     create_home: yes
-    group: sudo
     state: present
 
-- name: "Common | Configure deploy user sudo access"
+- name: "Common | Ensure deploy user has sudo access"
   ansible.builtin.lineinfile:
     path: /etc/sudoers.d/deploy
-    line: "{{ deploy_username | default('deploy') }} ALL=(ALL) NOPASSWD: ALL"
+    line: "{{ deploy_username | default('mkanavi') }} ALL=(ALL) NOPASSWD: ALL"
     owner: root
     group: root
     mode: "0440"
@@ -21,22 +23,27 @@
 
 - name: "Common | Create .ssh directory for deploy user"
   ansible.builtin.file:
-    path: "/home/{{ deploy_username | default('deploy') }}/.ssh"
-    owner: "{{ deploy_username | default('deploy') }}"
-    group: "{{ deploy_username | default('deploy') }}"
+    path: "/home/{{ deploy_username | default('mkanavi') }}/.ssh"
+    owner: "{{ deploy_username | default('mkanavi') }}"
+    group: "{{ deploy_username | default('mkanavi') }}"
     mode: "0700"
     state: directory
 
 - name: "Common | Add SSH public keys for deploy user"
-  ansible.posix.authorized_key:
-    user: "{{ deploy_username | default('deploy') }}"
+  ansible.builtin.authorized_key:
+    user: "{{ deploy_username | default('mkanavi') }}"
     key: "{{ item }}"
+    state: present
   loop: "{{ ssh_public_keys | default([]) }}"
-  when: item | length > 0 and not item.startswith('REPLACE_')
+  when:
+    - item | length > 0
+    - not item.startswith('REPLACE_')
+  # CRITICAL: state=present only ADDS keys, never removes existing ones.
+  # This prevents lockout if the playbook runs without ssh_public_keys defined.
 
-- name: "Common | Add deploy user to docker group"
+- name: "Common | Ensure deploy user is in docker group"
   ansible.builtin.user:
-    name: "{{ deploy_username | default('deploy') }}"
+    name: "{{ deploy_username | default('mkanavi') }}"
     groups: docker
     append: yes
-  when: deploy_username | default('deploy') != 'root'
+  when: deploy_username | default('mkanavi') != 'root'

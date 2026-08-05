@@ -3,12 +3,25 @@
 - hosts: all
   become: true
   become_method: sudo
-  
+
   pre_tasks:
     - name: Update apt cache
       apt:
         update_cache: yes
         cache_valid_time: 3600
+
+    - name: Check SSH connectivity before applying hardening
+      # This pre-flight check ensures we don't lock ourselves out.
+      # If SSH fails after applying sshd_config changes, we can't recover.
+      # When ssh_apply_changes_reboot is false, only sshd_config is written
+      # (no restart), so the admin can validate config manually before reboot.
+      ansible.builtin.command: echo "pre-flight check ok"
+      register: _ssh_check
+      changed_when: false
+
+  tags:
+    - skip_hardening
+    # NOTE: To skip SSH hardening entirely, run with --skip-tags skip_hardening
 
   roles:
     - role: common

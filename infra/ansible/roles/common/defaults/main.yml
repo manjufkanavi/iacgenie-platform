@@ -3,6 +3,19 @@ ssh_port: 22
 ssh_password_authentication: "no"
 ssh_permit_root_login: "no"
 ufw_enabled: true
+ufw_allowed_ports:
+  - "22/tcp"
+  - "80/tcp"
+  - "443/tcp"
 fail2ban_enabled: true
 fail2ban_maxretry: 5
 fail2ban_bantime: 3600
+deploy_username: mkanavi
+# SSH public keys to add/keep — must include the admin user's key
+# Use ansible-vault to encrypt real keys; placeholder format:
+# ssh_public_keys:
+#   - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... mkanavi@mac"
+ssh_public_keys: []
+# Safely apply SSH changes without restarting sshd
+# (avoids lockout if config is wrong) — set to false if manual restart needed
+ssh_apply_changes_reboot: false

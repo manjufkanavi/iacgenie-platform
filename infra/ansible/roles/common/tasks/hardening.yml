@@ -20,10 +20,21 @@
     - { regexp: "^#?X11Forwarding .+", line: "X11Forwarding no" }
     - { regexp: "^#?MaxAuthTries .+", line: "MaxAuthTries 3" }
     - { regexp: "^#?LoginGraceTime .+", line: "LoginGraceTime 60" }
+
+- name: "Common | Restart sshd if SSH config changed"
+  ansible.builtin.service:
+    name: sshd
+    state: restarted
+  when: ssh_apply_changes_reboot | default(false) | bool
+  # CRITICAL: Only restart sshd when explicitly requested.
+  # Automatic restart can cause lockout if the new config has errors
+  # or the admin SSH key is not yet authorized.
   notify: Restart sshd
 
 - name: "Common | Configure UFW"
-  when: ufw_enabled | default(true) | bool
+  when: (ufw_enabled | default(true) | bool) and (ssh_apply_changes_reboot | default(false) | bool)
+  # CRITICAL: UFW firewall can cause complete lockout if SSH port is not allowed.
+  # Only apply when explicitly requested after verifying SSH key auth works.
   block:
     - name: "Common | Enable UFW"
       community.general.ufw:
