@@ -27,7 +27,7 @@ RUN ARCH=$(uname -m) && \
         *) TOFU_ARCH="amd64";; \
     esac && \
     curl --proto '=https' --tlsv1.2 -fsSL \
-        "https://github.com/opentofu/opentofu/releases/latest/download/tofu_1.8.1_linux_${TOFU_ARCH}.zip" \
+        "https://github.com/opentofu/opentofu/releases/latest/download/tofu_1.12.5_linux_${TOFU_ARCH}.zip" \
         -o /tmp/tofu.zip && \
     unzip -o /tmp/tofu.zip -d /tmp/ && \
     mv /tmp/tofu /usr/local/bin/tofu && \
