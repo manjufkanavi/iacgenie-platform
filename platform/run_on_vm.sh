@@ -76,7 +76,7 @@ case "${1:-deploy}" in
         
         # Build frontend locally
         step "Building frontend image..."
-        cd "$PROJECT_ROOT/frontend"
+        cd "$PROJECT_ROOT/platform/frontend"
         
         # Install deps and build
         if [ -f package-lock.json ]; then
