@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { apiClient } from '../../services/apiClient';
+import { apiClient } from '../services/apiClient';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 

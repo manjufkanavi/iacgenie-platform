@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ModelDefinition } from '.../constants/models';
+import { ModelDefinition } from '../../constants/models';
 import Badge from '../ui/Badge';
 
 interface ModelComboboxProps {

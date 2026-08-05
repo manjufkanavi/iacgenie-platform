@@ -7,7 +7,7 @@ import { useProjectStore } from '../store/useProjectStore';
 import SettingsPanel from './SettingsPanel';
 import EditableProjectInfo from './Editab.*'
 import TeamMemberForm from '../forms/TeamMemberForm';
-import { projectService } from '../../services/projectService';
+import { projectService } from '../services/projectService';
 import { toast } from 'react-hot-toast';
 import { ShieldAlert, Sliders, Cloud, Puzzle, Settings, Brain, GitCommit, Users, X, FolderPlus } from 'lucide-react';
 import RepoConfigPanel from '../settings/RepoConfigPanel';

@@ -3,7 +3,7 @@ import Card from '../ui/Card';
 import Button from '../ui/Button';
 import Modal from '../ui/Modal';
 import Input from '../ui/Input';
-import { apiKeyService, ApiKeyRecord, ApiKeyCreateRequest } from '../../services/apiKeyService';
+import { apiKeyService, ApiKeyRecord, ApiKeyCreateRequest } from '../services/apiKeyService';
 import { useAppStore } from '../store/useAppStore';
 import toast from 'react-hot-toast';
 

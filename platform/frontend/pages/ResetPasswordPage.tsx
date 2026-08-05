@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View } from '../types';
 import Card from '../ui/Card';
 import FormGroup from '../ui/FormGroup';
-import { localAuthService } from '../../services/localAuthService';
+import { localAuthService } from '../services/localAuthService';
 
 interface ResetPasswordPageProps {
     onNavigate: (view: View) => void;

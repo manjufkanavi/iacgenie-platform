@@ -2,7 +2,7 @@
 import React, { useRef, useEffect } from 'react';
 import { LogEntry, ValidationStepLog } from '../types';
 import { ICONS } from '../icons';
-import Button from './ui/Button';
+import Button from '../ui/Button';
 
 interface LogConsoleProps {
   logs: LogEntry[];

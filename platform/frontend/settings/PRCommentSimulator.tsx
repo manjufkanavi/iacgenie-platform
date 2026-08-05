@@ -113,7 +113,7 @@ const PRCommentSimulator: React.FC<PRCommentSimulatorProps> = ({
         setIsDispatching(true);
         try {
             // Post payload to backend receive API or execute local simulate flow
-            const { getAuthHeaders } = await import('.././services/authHeaders');
+            const { getAuthHeaders } = await import('../../services/authHeaders');
             await fetch(`/api/webhooks/receive/${projectId}-${repoName}`, {
                 method: 'POST',
                 headers: {

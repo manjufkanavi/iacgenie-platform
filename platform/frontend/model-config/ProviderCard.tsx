@@ -1,5 +1,5 @@
 import React from 'react';
-import { ProviderConfig } from '.../constants/providers';
+import { ProviderConfig } from '../../constants/providers';
 import Badge from '../ui/Badge';
 
 interface ProviderCardProps {

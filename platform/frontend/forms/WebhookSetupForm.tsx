@@ -3,8 +3,8 @@ import { Check, ArrowLeft, ArrowRight, Github, Gitlab, Code, Loader2, CheckCircl
 import { toast } from 'react-hot-toast';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
-import { webhookService } from '../../services/webhookService';
-import { gitOpsService } from '../../services/gitOpsService';
+import { webhookService } from '../services/webhookService';
+import { gitOpsService } from '../services/gitOpsService';
 
 export type WebhookStep = 'choose-provider' | 'configure' | 'verify';
 
