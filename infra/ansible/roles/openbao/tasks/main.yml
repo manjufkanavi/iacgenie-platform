@@ -48,6 +48,11 @@
   ansible.builtin.import_tasks: policies.yml
   when: openbao_bootstrap_policies | default(true) | bool
 
+# ── Service Token Generation (P1.2) ───────────────────────────────────────
+- name: "OpenBao | Import service token generation tasks"
+  ansible.builtin.import_tasks: service_tokens.yml
+  when: openbao_bootstrap_tokens | default(true) | bool
+
 # ── Unseal ────────────────────────────────────────────────────────────────
 - name: "OpenBao | Verify OpenBao container is running"
   ansible.builtin.command: docker ps -a --filter "name=iacgenie-openbao" --format "{{ '{{.Names}}' }}"
