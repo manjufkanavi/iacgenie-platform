@@ -7,7 +7,7 @@ import Modal from '../ui/Modal';
 import Input from '../ui/Input';
 import DeploymentPreviewModal from '../common/DeploymentPreviewModal';
 import LogViewer from '../LogViewer';
-import { ICONS } from '../constants';
+import { ICONS } from '../constants.ts';
 import { deploymentService, DeploymentRecord } from '../services/deploymentService';
 import { generationService } from '../services/generationService';
 import { Generation } from '../types';

@@ -1,6 +1,6 @@
 import React from 'react';
 import Button from '../ui/Button';
-import { ICONS } from '../constants';
+import { ICONS } from '../constants.ts';
 
 interface GitRepositoryItemProps {
     item: any;

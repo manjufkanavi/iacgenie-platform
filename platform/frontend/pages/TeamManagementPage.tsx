@@ -4,7 +4,7 @@ import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Modal from '../ui/Modal';
 import Badge from '../ui/Badge';
-import { ICONS } from '../constants';
+import { ICONS } from '../constants.ts';
 import { useAppStore } from '../store/useAppStore';
 import { toast } from 'react-hot-toast';
 import { teamMemberService } from '../services/teamMemberService';
