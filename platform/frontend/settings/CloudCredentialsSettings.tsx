@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import { Cloud, LayoutList, LayoutGrid, Trash2, RotateCw, X } from 'lucide-react';
-import { useProjectSettingsStore, CloudCredentials, CredentialStatus } from '../types';
+import { useProjectSettingsStore, CloudCredentials, CredentialStatus } from '../store/useProjectSettingsStore';
 import { useProjectStore } from '../store/useProjectStore';
 import { useAppStore } from '../store/useAppStore';
 import Button from '@/ui/Button';
