@@ -1,5 +1,7 @@
 ---
 # OpenBao role - Main entry point
+# Manages: container env, KV engines, RBAC policies, service tokens
+
 - name: "OpenBao | Create data directory"
   ansible.builtin.file:
     path: "{{ openbao_data_dir }}"
@@ -8,15 +10,45 @@
     mode: "0700"
     state: directory
 
+# ── Environment File ──────────────────────────────────────────────────────
 - name: "OpenBao | Deploy environment file"
   ansible.builtin.template:
     src: .env.j2
-    dest: /home/mkanavi/docker/iacgenie/.env.openbao
+    dest: "{{ openbao_compose_dir | default('/home/mkanavi/docker/iacgenie') }}/.env.openbao"
     owner: mkanavi
     group: mkanavi
     mode: "0600"
   notify: Reload docker compose
 
+# ── Policy Management ─────────────────────────────────────────────────────
+- name: "OpenBao | Deploy policy files"
+  ansible.builtin.template:
+    src: "policies/{{ item.file }}"
+    dest: "{{ openbao_raft_data_dir | default('/home/mkanavi/docker/iacgenie/openbao_raft') }}/policies/{{ item.file }}"
+    owner: mkanavi
+    group: mkanavi
+    mode: "0600"
+  loop: "{{ openbao_policies | default([]) }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: openbao_bootstrap_policies | default(true) | bool
+  register: openbao_policy_deployed
+
+- name: "OpenBao | Ensure policies directory exists"
+  ansible.builtin.file:
+    path: "{{ openbao_raft_data_dir | default('/home/mkanavi/docker/iacgenie/openbao_raft') }}/policies"
+    state: directory
+    owner: mkanavi
+    group: mkanavi
+    mode: "0755"
+  when: openbao_bootstrap_policies | default(true) | bool
+
+# ── Policy Application (P1.1) ─────────────────────────────────────────────
+- name: "OpenBao | Import policy management tasks"
+  ansible.builtin.import_tasks: policies.yml
+  when: openbao_bootstrap_policies | default(true) | bool
+
+# ── Unseal ────────────────────────────────────────────────────────────────
 - name: "OpenBao | Verify OpenBao container is running"
   ansible.builtin.command: docker ps -a --filter "name=iacgenie-openbao" --format "{{ '{{.Names}}' }}"
   register: openbao_status

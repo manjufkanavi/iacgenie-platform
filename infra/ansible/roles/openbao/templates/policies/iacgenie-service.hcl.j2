@@ -1,0 +1,22 @@
+# OpenBao IaCGenie Service Policy — Read-only access to iacgenie/* paths
+# Used by: IaCGenie application, backup scripts (backup token)
+
+# Read access to all iacgenie KV paths
+path "iacgenie/kv/data/*" {
+  capabilities = ["read"]
+}
+
+# List access to iacgenie KV paths
+path "iacgenie/kv/metadata/*" {
+  capabilities = ["list"]
+}
+
+# Read access to iacgenie KV secrets engine capabilities
+path "iacgenie/kv/" {
+  capabilities = ["read"]
+}
+
+# Read service tokens stored under iacgenie
+path "iacgenie/kv/data/service_tokens/*" {
+  capabilities = ["read"]
+}

@@ -1,0 +1,116 @@
+---
+# OpenBao Policy Management
+# Applies RBAC policies via the OpenBao API
+
+# ── Bootstrap Admin Policy ────────────────────────────────────────────────
+- name: "OpenBao Bootstrap | Deploy admin policy"
+  ansible.builtin.template:
+    src: policies/admin.hcl.j2
+    dest: "{{ openbao_raft_data_dir }}/policies/admin.hcl"
+    owner: mkanavi
+    group: mkanavi
+    mode: "0600"
+  when: openbao_policies is defined and openbao_bootstrap_policies | default(true) | bool
+
+- name: "OpenBao Bootstrap | Apply admin policy"
+  ansible.builtin.uri:
+    url: "https://127.0.0.1:8200/v1/sys/policies/acl/admin"
+    method: PUT
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body: "{{ lookup('template', 'policies/admin.hcl.j2') }}"
+    validate_certs: false
+    status_code: [200, 204, 409]
+    timeout: 10
+  register: openbao_admin_policy
+  failed_when: false
+  changed_when: openbao_admin_policy.status != 409
+
+- name: "OpenBao Bootstrap | Deploy iacgenie-service policy"
+  ansible.builtin.template:
+    src: policies/iacgenie-service.hcl.j2
+    dest: "{{ openbao_raft_data_dir }}/policies/iacgenie-service.hcl"
+    owner: mkanavi
+    group: mkanavi
+    mode: "0600"
+  when: openbao_bootstrap_policies | default(true) | bool
+
+- name: "OpenBao Bootstrap | Apply iacgenie-service policy"
+  ansible.builtin.uri:
+    url: "https://127.0.0.1:8200/v1/sys/policies/acl/iacgenie-service"
+    method: PUT
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body: "{{ lookup('template', 'policies/iacgenie-service.hcl.j2') }}"
+    validate_certs: false
+    status_code: [200, 204, 409]
+    timeout: 10
+  register: openbao_ig_policy
+  failed_when: false
+  changed_when: openbao_ig_policy.status != 409
+  when: openbao_bootstrap_policies | default(true) | bool
+
+- name: "OpenBao Bootstrap | Deploy lightserp-service policy"
+  ansible.builtin.template:
+    src: policies/lightserp-service.hcl.j2
+    dest: "{{ openbao_raft_data_dir }}/policies/lightserp-service.hcl"
+    owner: mkanavi
+    group: mkanavi
+    mode: "0600"
+  when: openbao_bootstrap_policies | default(true) | bool
+
+- name: "OpenBao Bootstrap | Apply lightserp-service policy"
+  ansible.builtin.uri:
+    url: "https://127.0.0.1:8200/v1/sys/policies/acl/lightserp-service"
+    method: PUT
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body: "{{ lookup('template', 'policies/lightserp-service.hcl.j2') }}"
+    validate_certs: false
+    status_code: [200, 204, 409]
+    timeout: 10
+  register: openbao_ls_policy
+  failed_when: false
+  changed_when: openbao_ls_policy.status != 409
+  when: openbao_bootstrap_policies | default(true) | bool
+
+- name: "OpenBao Bootstrap | Deploy terraform-service policy"
+  ansible.builtin.template:
+    src: policies/terraform-service.hcl.j2
+    dest: "{{ openbao_raft_data_dir }}/policies/terraform-service.hcl"
+    owner: mkanavi
+    group: mkanavi
+    mode: "0600"
+  when: openbao_bootstrap_policies | default(true) | bool
+
+- name: "OpenBao Bootstrap | Apply terraform-service policy"
+  ansible.builtin.uri:
+    url: "https://127.0.0.1:8200/v1/sys/policies/acl/terraform-service"
+    method: PUT
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body: "{{ lookup('template', 'policies/terraform-service.hcl.j2') }}"
+    validate_certs: false
+    status_code: [200, 204, 409]
+    timeout: 10
+  register: openbao_tf_policy
+  failed_when: false
+  changed_when: openbao_tf_policy.status != 409
+  when: openbao_bootstrap_policies | default(true) | bool
+
+- name: "OpenBao Bootstrap | Summary applied policies"
+  ansible.builtin.debug:
+    msg:
+      - "OpenBao policies applied:"
+      - "  admin                   — full read+write (platform admin)"
+      - "  iacgenie-service        — read iacgenie/* (application services)"
+      - "  lightserp-service       — read lightserp/* (application services)"
+      - "  terraform-service       — read terraform/* (CI/CD)"

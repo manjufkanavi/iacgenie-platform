@@ -1,0 +1,22 @@
+# OpenBao Terraform Service Policy — Read-only access to terraform/* paths
+# Used by: Terraform provider, CI/CD pipelines
+
+# Read access to all terraform KV paths
+path "terraform/kv/data/*" {
+  capabilities = ["read"]
+}
+
+# List access to terraform KV paths
+path "terraform/kv/metadata/*" {
+  capabilities = ["list"]
+}
+
+# Read access to terraform KV secrets engine capabilities
+path "terraform/kv/" {
+  capabilities = ["read"]
+}
+
+# Read service tokens stored under terraform
+path "terraform/kv/data/service_tokens/*" {
+  capabilities = ["read"]
+}

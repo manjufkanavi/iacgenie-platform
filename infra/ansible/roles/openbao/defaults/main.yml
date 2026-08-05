@@ -4,3 +4,68 @@ openbao_data_dir: /var/lib/openbao
 openbao_storage_type: file
 openbao_auto_unseal: false
 openbao_static_key: CHANGE_ME
+
+# ── Raft / data directory on host ─────────────────────────────────────────
+openbao_raft_data_dir: /home/mkanavi/docker/iacgenie/openbao_raft
+openbao_compose_dir: /home/mkanavi/docker/iacgenie
+
+# ── Bootstrap toggles ─────────────────────────────────────────────────────
+openbao_bootstrap_policies: true   # Apply RBAC policies on bootstrap
+openbao_bootstrap_tokens: true     # Generate service tokens on bootstrap
+openbao_bootstrap_kv: true         # Enable KV engines and seed secrets
+
+# ── KV Mount Paths ────────────────────────────────────────────────────────
+openbao_kv_mounts:
+  - name: iacgenie/kv
+    description: "IaCGenie application secrets"
+  - name: lightserp/kv
+    description: "LightSerp application secrets"
+  - name: terraform/kv
+    description: "Terraform state and provider secrets"
+
+# ── Policy Definitions ────────────────────────────────────────────────────
+openbao_policies:
+  - name: admin
+    file: admin.hcl.j2
+  - name: iacgenie-service
+    file: iacgenie-service.hcl.j2
+  - name: lightserp-service
+    file: lightserp-service.hcl.j2
+  - name: terraform-service
+    file: terraform-service.hcl.j2
+
+# ── Service Token TTLs ────────────────────────────────────────────────────
+openbao_ig_token_ttl: "720h"     # 30 days — IaCGenie service
+openbao_ls_token_ttl: "720h"     # 30 days — LightSerp service
+openbao_tf_token_ttl: "720h"     # 30 days — Terraform service
+openbao_backup_token_ttl: "168h" # 7 days — backup cron token
+
+# ── KV Secret Paths (project-specific) ────────────────────────────────────
+# IaCGenie secrets (stored under iacgenie/kv/data/)
+openbao_ig_secrets:
+  postgres:
+    username: "postgres"
+    host: "postgres"
+    port: "5432"
+  redis:
+    host: "redis"
+    port: "6379"
+  minio:
+    endpoint: "http://minio:9000"
+  jwt: {}
+  smtp: {}
+  openbao: {}
+
+# LightSerp secrets (stored under lightserp/kv/data/)
+openbao_ls_secrets:
+  postgres:
+    username: "lightsrp"
+    host: "postgres"
+    port: "5432"
+  redis:
+    host: "redis"
+    port: "6379"
+  minio:
+    endpoint: "http://minio:9000"
+  searxng: {}
+  api_secret: {}
