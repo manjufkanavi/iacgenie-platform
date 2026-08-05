@@ -5,7 +5,7 @@ import Badge from '../ui/Badge';
 import Select from '../ui/Select';
 import Modal from '../ui/Modal';
 import Input from '../ui/Input';
-import DeploymentPreviewModal from '../ui/DeploymentPreviewModal';
+import DeploymentPreviewModal from '../common/DeploymentPreviewModal';
 import LogViewer from '../LogViewer';
 import { ICONS } from '../constants';
 import { deploymentService, DeploymentRecord } from '../services/deploymentService';
