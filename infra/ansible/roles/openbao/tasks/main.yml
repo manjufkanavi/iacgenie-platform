@@ -48,6 +48,11 @@
   ansible.builtin.import_tasks: policies.yml
   when: openbao_bootstrap_policies | default(true) | bool
 
+# ── KV Bootstrap (P2.1) ───────────────────────────────────────────────────
+- name: "OpenBao | Import KV bootstrap tasks"
+  ansible.builtin.import_tasks: kv_bootstrap.yml
+  when: openbao_bootstrap_kv | default(true) | bool
+
 # ── Service Token Generation (P1.2) ───────────────────────────────────────
 - name: "OpenBao | Import service token generation tasks"
   ansible.builtin.import_tasks: service_tokens.yml

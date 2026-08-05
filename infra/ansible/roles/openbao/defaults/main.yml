@@ -40,32 +40,39 @@ openbao_ls_token_ttl: "720h"     # 30 days — LightSerp service
 openbao_tf_token_ttl: "720h"     # 30 days — Terraform service
 openbao_backup_token_ttl: "168h" # 7 days — backup cron token
 
-# ── KV Secret Paths (project-specific) ────────────────────────────────────
-# IaCGenie secrets (stored under iacgenie/kv/data/)
-openbao_ig_secrets:
-  postgres:
-    username: "postgres"
-    host: "postgres"
-    port: "5432"
-  redis:
-    host: "redis"
-    port: "6379"
-  minio:
-    endpoint: "http://minio:9000"
-  jwt: {}
-  smtp: {}
-  openbao: {}
+# ── IaCGenie KV Secrets ───────────────────────────────────────────────────
 
-# LightSerp secrets (stored under lightserp/kv/data/)
-openbao_ls_secrets:
-  postgres:
-    username: "lightsrp"
-    host: "postgres"
-    port: "5432"
-  redis:
-    host: "redis"
-    port: "6379"
-  minio:
-    endpoint: "http://minio:9000"
-  searxng: {}
-  api_secret: {}
+# PostgreSQL
+openbao_ig_pg_password: IsywG5y@ASmmElFSUEvInU9K
+
+# Redis
+openbao_ig_redis_password: OPuRwYP!JXyaKK9QKI#nLdfX
+
+# MinIO
+openbao_ig_minio_access_key: iacgenie
+openbao_ig_minio_secret_key: ELI9TBbFPc#SRkmKvebN#yG3
+
+# Keycloak
+openbao_ig_kc_admin_user: admin
+openbao_ig_kc_admin_password: hAaIa219fq5VzAP81SDyNuBV
+openbao_ig_kc_db_password: CeeLLTVz@2I9O3NYGH!1CYN4
+
+# Gitea
+openbao_ig_gitea_db_password: GxKBj6PzM3KdF7qN
+
+# OpenBao root token
+openbao_ig_openbao_root_token: lWc7LtdRXxXtSt0szYDY#JE9
+
+# SearXNG
+openbao_ig_searxng_secret: k2x1wApzlXrmVSO6Q6w#SCGO
+
+# LightSerp
+openbao_ig_ls_api_secret: VLpShZuWVyJwyZG2LIK4qzQS
+
+# PageZen
+openbao_ig_pagezen_port: "8081"
+
+# NSQD
+openbao_ig_nsqd_data_path: /nsq/data
+openbao_ig_nsqd_tcp_port: "4150"
+openbao_ig_nsqd_http_port: "4151"
