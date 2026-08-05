@@ -5,6 +5,9 @@ openbao_storage_type: file
 openbao_auto_unseal: false
 openbao_static_key: CHANGE_ME
 
+# ── Root token (from init_keys.json on VM) ────────────────────────────────
+openbao_root_token: s.FaJmh6ivmGw0rQWRNvem515M
+
 # ── Raft / data directory on host ─────────────────────────────────────────
 openbao_raft_data_dir: /home/mkanavi/docker/iacgenie/openbao_raft
 openbao_compose_dir: /home/mkanavi/docker/iacgenie
