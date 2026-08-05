@@ -5,7 +5,7 @@ import Input from '../ui/Input';
 import { useAppStore } from '../store/useAppStore';
 import { useProjectStore } from '../store/useProjectStore';
 import SettingsPanel from './SettingsPanel';
-import EditableProjectInfo from './Editab.*'
+import EditableProjectInfo from './EditableProjectInfo'
 import TeamMemberForm from '../forms/TeamMemberForm';
 import { projectService } from '../services/projectService';
 import { toast } from 'react-hot-toast';
