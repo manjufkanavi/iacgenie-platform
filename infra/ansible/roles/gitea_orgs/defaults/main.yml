@@ -70,6 +70,8 @@ gitea_rbac_mapping:
     visibility_override: private
 
 # Phase 10.12: Org-per-project Gitea setup
+# Note: User-level repos (iacgenie, iacgenie-unified-infra, LightSerp) are managed
+# via the gitea_mirror role. These are org-level repos.
 gitea_auto_create_repos:
   iacgenie-project:
     - name: iacgenie
@@ -80,6 +82,11 @@ gitea_auto_create_repos:
       enable_prune_unreferached_pkgs: false
     - name: infrastructure
       description: "Infrastructure as Code"
+      auto_init: true
+      default_branch: main
+      private: true
+    - name: lightserp
+      description: "LightSerp web search engine"
       auto_init: true
       default_branch: main
       private: true

@@ -1,0 +1,43 @@
+---
+# Sync Gitea role - Deploys GitHub -> Gitea sync script and cron job
+
+- name: "Sync | Create sync script directory"
+  ansible.builtin.file:
+    path: /home/mkanavi/bin
+    state: directory
+    owner: mkanavi
+    group: mkanavi
+    mode: "0755"
+
+- name: "Sync | Deploy sync-gitea.py script"
+  ansible.builtin.template:
+    src: sync-gitea.py.j2
+    dest: /home/mkanavi/bin/sync-gitea.py
+    owner: mkanavi
+    group: mkanavi
+    mode: "0755"
+
+- name: "Sync | Create sync work directory"
+  ansible.builtin.file:
+    path: /tmp/gitea-sync-work
+    state: directory
+    owner: mkanavi
+    group: mkanavi
+    mode: "0755"
+
+- name: "Sync | Deploy systemd service for sync-gitea"
+  ansible.builtin.template:
+    src: sync-gitea.service.j2
+    dest: /etc/systemd/system/sync-gitea.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart sync-gitea
+
+- name: "Sync | Enable sync-gitea service"
+  ansible.builtin.systemd:
+    name: sync-gitea
+    state: started
+    enabled: yes
+    daemon_reload: yes
+  ignore_errors: true

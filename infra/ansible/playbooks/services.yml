@@ -48,6 +48,9 @@
     # Phase 9: Production Ready (Phase 10.4)
     # Managed via post-deploy and validate playbooks
 
+    # Phase 10.5: GitHub → Gitea Pull Mirrors
+    - role: gitea_mirror
+
   # Post-deploy: wait for containers, unseal OpenBao, check readiness
   tasks:
     - name: "Import OpenBao unseal tasks"

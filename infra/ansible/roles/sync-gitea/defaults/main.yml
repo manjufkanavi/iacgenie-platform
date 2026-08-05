@@ -1,0 +1,23 @@
+---
+# Sync Gitea role defaults
+
+# GitHub configuration
+github_token: ""
+github_org: "manjufkanavi"
+
+# Gitea configuration
+gitea_user: "manjufkanavi"
+gitea_pass: ""
+gitea_base_url: "127.0.0.1:3000"
+
+# Repositories to sync
+repos:
+  - name: "iacgenie"
+    gitea_name: "iacgenie"
+  - name: "iacgenie-unified-infra"
+    gitea_name: "iacgenie-unified-infra"
+  - name: "LightSerp"
+    gitea_name: "LightSerp"
+
+# Cron schedule (runs every 6 hours)
+sync_cron_schedule: "0 */6 * * *"

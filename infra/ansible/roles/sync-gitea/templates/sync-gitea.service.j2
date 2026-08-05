@@ -1,0 +1,23 @@
+[Unit]
+Description=GitHub to Gitea Sync Script
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /home/mkanavi/bin/sync-gitea.py
+WorkingDirectory=/home/mkanavi
+User=mkanavi
+Group=mkanavi
+
+# Environment
+Environment=GITHUB_TOKEN={{ github_token | default('') }}
+Environment=GITEA_USER={{ gitea_user | default('manjufkanavi') }}
+Environment=GITEA_PASS={{ gitea_pass | default('') }}
+Environment=GITEA_BASE_URL={{ gitea_base_url | default('127.0.0.1:3000') }}
+
+# Logging
+StandardOutput=append:/home/mkanavi/bin/sync-gitea.log
+StandardError=append:/home/mkanavi/bin/sync-gitea.log
+
+[Install]
+WantedBy=multi-user.target

@@ -1,9 +1,13 @@
+---
+# Gitea role — Defaults
+# Updated for manjufkanavi admin, Actions enabled, pull mirrors
+
 gitea_version: "1.23.4-rootless"
 gitea_http_port: 3000
 gitea_ssh_port: 2222
-gitea_admin_user: admin
+gitea_admin_user: manjufkanavi
 gitea_admin_password: CHANGE_ME_IN_VAULT
-gitea_admin_email: admin@iacgenie.com
+gitea_admin_email: manjufkanavi@iacgenie.com
 # 2FA enforcement (Phase 10.9)
 gitea_2fa_enforce: true
 # Database (used by .env.j2 template)
@@ -30,3 +34,10 @@ keycloak_db_password: CHANGE_ME_IN_VAULT
 keycloak_db_host: 127.0.0.1
 keycloak_db_port: 5432
 keycloak_db_name: keycloak
+# GitHub PAT for pull mirrors
+gitea_github_pat: CHANGE_ME_IN_VAULT
+# GitHub owner for mirror URLs
+gitea_github_owner: manjufkanavi
+# Mirror sync interval in seconds (default: 1 hour)
+gitea_mirror_interval: 3600
+gitea_mirror_enable_prune: true

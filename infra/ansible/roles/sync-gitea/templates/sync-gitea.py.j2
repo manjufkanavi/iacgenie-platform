@@ -23,22 +23,20 @@ import argparse
 from datetime import datetime
 
 # Configuration
-GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
-GITEA_USER = os.environ.get("GITEA_USER", "manjufkanavi")
-GITEA_PASS = os.environ.get("GITEA_PASS", "")
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "{{ github_token | default('') }}")
+GITEA_USER = "{{ gitea_user | default('manjufkanavi') }}"
+GITEA_PASS = "{{ gitea_pass | default('') }}"
 GITHUB_ORG = "manjufkanavi"
-GITEA_BASE_URL = os.environ.get("GITEA_BASE_URL", "127.0.0.1:3000")
+GITEA_BASE_URL = "{{ gitea_base_url | default('127.0.0.1:3000') }}"
 REPO_DIR = "/tmp/gitea-sync-work"
 LOG_FILE = "/home/mkanavi/bin/sync-gitea.log"
 
-REPOS = [
+REPOS = {{ repos | default([
     {"name": "iacgenie", "gitea_name": "iacgenie"},
     {"name": "iacgenie-unified-infra", "gitea_name": "iacgenie-unified-infra"},
     {"name": "LightSerp", "gitea_name": "LightSerp"},
-]
+]) }}
 
-
-# Helpers
 
 def log(msg):
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -53,9 +51,6 @@ def git_cmd(*args, cwd=None):
     cmd = ["git"] + list(args)
     result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=300)
     return result.returncode, result.stdout.strip(), result.stderr.strip()
-
-
-# Sync Logic
 
 
 def sync_repo(repo):
@@ -117,9 +112,6 @@ def sync_repo(repo):
         ret, commit, _ = git_cmd("rev-parse", "--short", "HEAD", cwd=work_dir)
         log(f"  [CLONED] {name}: {commit}")
         return {"name": name, "status": "ok", "commit": commit, "branch": branch, "message": "Cloned"}
-
-
-# Main
 
 
 def run_sync(dry_run=False):
