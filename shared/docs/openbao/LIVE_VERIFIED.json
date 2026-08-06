@@ -1,0 +1,160 @@
+{
+  "timestamp": "2026-08-06T19:30:00",
+  "status": "live_verified",
+  "source": "VM ssh direct extraction",
+  "total_paths": 18,
+  "paths": {
+    "iacgenie/kv/data/services/iacgenie": {
+      "domain": "iacgenie.iacgenie.com",
+      "jwt_secret": "*** (13 chars)",
+      "keycloak_admin_password": "*** (13 chars)",
+      "keycloak_client_secret": "*** (13 chars)",
+      "local_llm_api_key": "*** (22 chars)",
+      "login_url": "https://iacgenie.iacgenie.com",
+      "minio_secret_key": "*** (13 chars)",
+      "name": "IaCGenie",
+      "postgres_password": "*** (13 chars)",
+      "repository_url": "https://github.com/manjufkanavi/iacgenie-platform",
+      "smtp2go_api_key": "*** (13 chars)",
+      "username": "iacgenie-app"
+    },
+    "iacgenie/kv/data/services/postgres": {
+      "domain": "iacgenie.iacgenie.com",
+      "iacgenie_password": "*** (13 chars)",
+      "keycloak_password": "*** (13 chars)",
+      "lightserp_password": "*** (13 chars)",
+      "login_url": "postgresql://iacgenie:***@127.0.0.1:5432/iacgenie",
+      "logtide_password": "*** (13 chars)",
+      "name": "PostgreSQL",
+      "repository_url": "https://github.com/manjufkanavi/iacgenie-platform",
+      "root_password": "*** (13 chars)"
+    },
+    "iacgenie/kv/data/services/redis": {
+      "domain": "iacgenie.iacgenie.com",
+      "login_url": "redis://127.0.0.1:***@127.0.0.1:6379",
+      "name": "Redis",
+      "password": "*** (13 chars)"
+    },
+    "iacgenie/kv/data/services/minio": {
+      "access_key": "*** (8 chars)",
+      "domain": "minio.iacgenie.com",
+      "login_url": "http://minio.iacgenie.com:9000",
+      "name": "MinIO",
+      "secret_key": "*** (13 chars)"
+    },
+    "iacgenie/kv/data/services/keycloak": {
+      "admin_password": "*** (13 chars)",
+      "admin_user": "admin",
+      "client_id": "iacgenie-app",
+      "client_secret": "*** (13 chars)",
+      "db_host": "postgres",
+      "db_name": "keycloak",
+      "db_password": "*** (13 chars)",
+      "db_port": 5432,
+      "domain": "keycloak.iacgenie.com",
+      "login_url": "https://keycloak.iacgenie.com",
+      "name": "Keycloak",
+      "realm": "iacgenie"
+    },
+    "iacgenie/kv/data/services/gitea": {
+      "admin_email": "admin@iacgenie.com",
+      "admin_password": "*** (13 chars)",
+      "admin_user": "admin",
+      "db_password": "*** (13 chars)",
+      "domain": "git.iacgenie.com",
+      "login_url": "https://git.iacgenie.com",
+      "name": "Gitea"
+    },
+    "iacgenie/kv/data/services/searxng": {
+      "domain": "searxng.iacgenie.com",
+      "login_url": "https://searxng.iacgenie.com",
+      "name": "SearXNG",
+      "port": 8082,
+      "secret": "*** (18 chars)"
+    },
+    "iacgenie/kv/data/services/openbao": {
+      "addr": "https://vault.iacgenie.com",
+      "admin_token": "*** (26 chars)",
+      "data_dir": "/home/mkanavi/docker/iacgenie/data/openbao_raft",
+      "domain": "vault.iacgenie.com",
+      "login_url": "https://vault.iacgenie.com",
+      "name": "OpenBao Vault",
+      "root_token": "*** (26 chars)",
+      "storage_type": "raft"
+    },
+    "iacgenie/kv/data/services/pagezen": {
+      "api_secret": "*** (13 chars)",
+      "api_url": "http://lightserp-api:8000",
+      "domain": "pagezen.iacgenie.com",
+      "login_url": "https://pagezen.iacgenie.com",
+      "name": "PageZen",
+      "port": 8081
+    },
+    "iacgenie/kv/data/services/nsqd": {
+      "data_path": "/nsq/data",
+      "http_port": 4151,
+      "name": "NSQD",
+      "tcp_port": 4150
+    },
+    "lightserp/kv/data/services/lightserp": {
+      "access_key": "*** (8 chars)",
+      "database_url": "postgresql://lightsrp:***@127.0.0.1:5432/lightsrp",
+      "domain": "lightserp.iacgenie.com",
+      "endpoint": "http://127.0.0.1:9000",
+      "lightserp_api_secret": "*** (13 chars)",
+      "login_url": "https://lightserp.iacgenie.com",
+      "name": "LightSerp",
+      "redis_url": "redis://127.0.0.1:***@127.0.0.1:6379",
+      "repository_url": "https://github.com/manjufkanavi/iacgenie-platform",
+      "secret_key": "*** (13 chars)",
+      "smtp2go_api_key": "*** (13 chars)"
+    },
+    "lightserp/kv/data/services/api": {
+      "api_secret": "*** (13 chars)",
+      "api_url": "http://127.0.0.1:8000",
+      "login_url": "https://lightserp.iacgenie.com/api",
+      "name": "LightSerp API"
+    },
+    "lightserp/kv/data/services/postgres": {
+      "host": "127.0.0.1",
+      "name": "PostgreSQL (LightSerp)",
+      "password": "*** (13 chars)",
+      "port": 5432,
+      "username": "lightsrp"
+    },
+    "lightserp/kv/data/services/redis": {
+      "login_url": "redis://127.0.0.1:***@127.0.0.1:6379",
+      "name": "Redis (LightSerp)",
+      "password": "*** (13 chars)"
+    },
+    "lightserp/kv/data/services/minio": {
+      "access_key": "*** (8 chars)",
+      "login_url": "http://minio.iacgenie.com:9000",
+      "name": "MinIO (LightSerp)",
+      "secret_key": "*** (13 chars)"
+    },
+    "terraform/kv/data/services/terragenius": {
+      "domain": "terragenius.iacgenie.com",
+      "login_url": "https://terragenius.iacgenie.com",
+      "minio_root_password": "*** (13 chars)",
+      "name": "TerraGenius",
+      "openbao_root_token": "*** (26 chars)",
+      "postgres_app_password": "*** (13 chars)",
+      "postgres_kc_password": "*** (13 chars)",
+      "postgres_super_password": "*** (13 chars)",
+      "redis_password": "*** (13 chars)",
+      "repository_url": "https://github.com/manjufkanavi/iacgenie-platform"
+    },
+    "terraform/kv/data/services/openbao": {
+      "addr": "https://vault.iacgenie.com",
+      "name": "OpenBao (TerraGenius)"
+    },
+    "terraform/kv/data/services/postgres": {
+      "host": "127.0.0.1",
+      "name": "PostgreSQL (TerraGenius)",
+      "password": "*** (13 chars)",
+      "port": 5432,
+      "username": "lightsrp"
+    }
+  }
+}
