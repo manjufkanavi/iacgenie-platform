@@ -5,6 +5,9 @@ openbao_storage_type: raft
 openbao_auto_unseal: false
 openbao_static_key: CHANGE_ME
 
+# ── OpenBao API URL (for internal container-to-container) ───────────────────
+openbao_api_url: "http://127.0.0.1:{{ openbao_port }}"
+
 # ── Root token (from init_keys.json on VM) ────────────────────────────────
 openbao_root_token: CHANGE_ME  # read from init_keys.json after bootstrap
 
@@ -16,6 +19,19 @@ openbao_compose_dir: /home/mkanavi/docker/iacgenie
 openbao_bootstrap_policies: true   # Apply RBAC policies on bootstrap
 openbao_bootstrap_tokens: true     # Generate service tokens on bootstrap
 openbao_bootstrap_kv: true         # Enable KV engines and seed secrets
+
+# ── OIDC / Keycloak Integration (Phase 10.3) ──────────────────────────────
+openbao_oidc_enabled: true
+openbao_oidc_discovery_url: "http://127.0.0.1:8083/realms/lightserp/.well-known/openid-configuration"
+openbao_oidc_client_id: "openbao-oidc"
+openbao_oidc_client_secret: "2AMmiNh62NQGzwmBiECfNWyIed1hbf04"  # Keycloak openbao-oidc client secret (lightserp realm)
+openbao_oidc_redirect_uris:
+  - "https://vault.iacgenie.com/oidc/callback"
+  - "http://127.0.0.1:{{ openbao_port }}/oidc/callback"
+openbao_oidc_token_ttl: "8h"
+openbao_oidc_max_ttl: "24h"
+openbao_oidc_default_policies:
+  - "openbao-service-read"
 
 # ── KV Mount Paths ────────────────────────────────────────────────────────
 openbao_kv_mounts:
@@ -38,6 +54,8 @@ openbao_policies:
     file: lightserp-service.hcl.j2
   - name: terraform-service
     file: terraform-service.hcl.j2
+  - name: openbao-service-read
+    file: openbao-service-read.hcl.j2
 
 # ── Service Token TTLs ────────────────────────────────────────────────────
 openbao_ig_token_ttl: "720h"     # 30 days — IaCGenie service
@@ -58,8 +76,8 @@ openbao_ig_minio_access_key: CHANGE_ME
 openbao_ig_minio_secret_key: CHANGE_ME
 
 # Keycloak
-openbao_ig_kc_admin_user: CHANGE_ME
-openbao_ig_kc_admin_password: CHANGE_ME
+openbao_ig_kc_admin_user: admin
+openbao_ig_kc_admin_password: hAaIa219fq5VzAP81SDyNuBV
 openbao_ig_kc_db_password: CHANGE_ME
 
 # Gitea

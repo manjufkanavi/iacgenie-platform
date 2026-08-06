@@ -21,6 +21,16 @@
   notify: Reload docker compose
 
 # ── Policy Management ─────────────────────────────────────────────────────
+# Ensure directory exists FIRST, then deploy files
+- name: "OpenBao | Ensure policies directory exists"
+  ansible.builtin.file:
+    path: "{{ openbao_raft_data_dir | default('/home/mkanavi/docker/iacgenie/openbao_raft') }}/policies"
+    state: directory
+    owner: mkanavi
+    group: mkanavi
+    mode: "0755"
+  when: openbao_bootstrap_policies | default(true) | bool
+
 - name: "OpenBao | Deploy policy files"
   ansible.builtin.template:
     src: "policies/{{ item.file }}"
@@ -34,31 +44,7 @@
   when: openbao_bootstrap_policies | default(true) | bool
   register: openbao_policy_deployed
 
-- name: "OpenBao | Ensure policies directory exists"
-  ansible.builtin.file:
-    path: "{{ openbao_raft_data_dir | default('/home/mkanavi/docker/iacgenie/openbao_raft') }}/policies"
-    state: directory
-    owner: mkanavi
-    group: mkanavi
-    mode: "0755"
-  when: openbao_bootstrap_policies | default(true) | bool
-
-# ── Policy Application (P1.1) ─────────────────────────────────────────────
-- name: "OpenBao | Import policy management tasks"
-  ansible.builtin.import_tasks: policies.yml
-  when: openbao_bootstrap_policies | default(true) | bool
-
-# ── KV Bootstrap (P2.1) ───────────────────────────────────────────────────
-- name: "OpenBao | Import KV bootstrap tasks"
-  ansible.builtin.import_tasks: kv_bootstrap.yml
-  when: openbao_bootstrap_kv | default(true) | bool
-
-# ── Service Token Generation (P1.2) ───────────────────────────────────────
-- name: "OpenBao | Import service token generation tasks"
-  ansible.builtin.import_tasks: service_tokens.yml
-  when: openbao_bootstrap_tokens | default(true) | bool
-# ── Permission Hardening (1.1.3) ─────────────────────────────────────────────
-
+# ── Raft Data Directory Permissions ───────────────────────────────────────
 - name: "OpenBao | Fix raft data directory permissions"
   ansible.builtin.file:
     path: "{{ openbao_raft_data_dir | default('/home/mkanavi/docker/iacgenie/data/openbao_raft') }}"
@@ -68,8 +54,7 @@
     mode: "0750"
     recurse: true
 
-# ── Init (if needed) ──────────────────────────────────────────────────────
-
+# ── Init / Bootstrap ──────────────────────────────────────────────────────
 - name: "OpenBao | Check if already initialized"
   ansible.builtin.uri:
     url: "http://127.0.0.1:8200/v1/sys/health"
@@ -87,11 +72,7 @@
     msg: "OpenBao initialized={{ openbao_health.json.initialized | default(false) }}, sealed={{ openbao_health.json.sealed | default(true) }}"
   when: openbao_health is succeeded
 
-# ── Bootstrap ──────────────────────────────────────────────────────────────
-
-# Bootstrap order: Unseal → Policies → KV → Tokens
-
-# We need the token for bootstrap; read from init_keys.json if available
+# Read root token from init_keys.json
 - name: "OpenBao | Read root token from init_keys.json (if available)"
   ansible.builtin.slurp:
     src: "{{ openbao_raft_data_dir | default('/home/mkanavi/docker/iacgenie/data/openbao_raft') }}/init_keys.json"
@@ -106,22 +87,22 @@
     - openbao_init_keys_raw.content | default('') | length > 0
     - openbao_bootstrap_policies | default(true) | bool
 
-# ── Policy Application (P1.1) ─────────────────────────────────────────────
+# ── Bootstrap: Policies ───────────────────────────────────────────────────
 - name: "OpenBao | Import policy management tasks"
   ansible.builtin.import_tasks: policies.yml
   when: openbao_bootstrap_policies | default(true) | bool
 
-# ── KV Bootstrap (P2.1) ───────────────────────────────────────────────────
+# ── Bootstrap: KV Engines ─────────────────────────────────────────────────
 - name: "OpenBao | Import KV bootstrap tasks"
   ansible.builtin.import_tasks: kv_bootstrap.yml
   when: openbao_bootstrap_kv | default(true) | bool
 
-# ── Service Token Generation (P1.2) ───────────────────────────────────────
+# ── Bootstrap: Service Tokens ─────────────────────────────────────────────
 - name: "OpenBao | Import service token generation tasks"
   ansible.builtin.import_tasks: service_tokens.yml
   when: openbao_bootstrap_tokens | default(true) | bool
 
-# ── Unseal ────────────────────────────────────────────────────────────────
+# ── Bootstrap: Unseal ─────────────────────────────────────────────────────
 - name: "OpenBao | Import unseal tasks"
   ansible.builtin.import_tasks: unseal.yml
   when: openbao_health.json.sealed | default(true) | bool

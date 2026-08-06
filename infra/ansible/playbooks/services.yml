@@ -66,6 +66,14 @@
       when:
         - keycloak_provision_realm | default(true) | bool
 
+    # Phase 10.3: OpenBao OIDC integration with Keycloak
+    - name: "Import OpenBao OIDC auth integration"
+      ansible.builtin.import_tasks:
+        file: ../roles/openbao/tasks/oidc_auth.yml
+      when:
+        - openbao_oidc_enabled | default(true) | bool
+        - openbao_bootstrap_policies | default(true) | bool
+
     # Phase 10.3: Project-based Gitea (10.12)
     - name: "Import Gitea org provisioning (10.12)"
       ansible.builtin.import_tasks:

@@ -1,13 +1,104 @@
 ---
 # Docker Compose Generator role - Main entry point
-- name: "Compose Gen | Generate Docker network"
-  ansible.builtin.import_tasks: network.yml
 
-- name: "Compose Gen | Generate docker-compose.yml"
-  ansible.builtin.import_tasks: compose.yml
+# ── Docker Network ──────────────────────────────────────────────────────
+- name: "Compose Gen | Check if Docker network exists"
+  ansible.builtin.command: docker network ls --filter name={{ docker_network_name }} --format "{{ '{{' }}.Name{{ '}}' }}"
+  register: docker_network_check
+  changed_when: false
+  check_mode: false
 
-- name: "Compose Gen | Merge .env.* service files"
-  ansible.builtin.import_tasks: env-merge.yml
+- name: "Compose Gen | Create Docker network"
+  ansible.builtin.command: docker network create {{ docker_network_name }}
+  when: docker_network_check.stdout != docker_network_name
 
-- name: "Compose Gen | Deploy compose file to target"
-  ansible.builtin.import_tasks: deploy.yml
+# ── Data Directories ────────────────────────────────────────────────────
+- name: "Compose Gen | Ensure base directory exists"
+  ansible.builtin.file:
+    path: "{{ openbao_data_dir | default('/home/mkanavi/docker/iacgenie') }}"
+    state: directory
+    owner: mkanavi
+    group: mkanavi
+    mode: "0755"
+
+- name: "Compose Gen | Ensure data directories exist"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: mkanavi
+    group: mkanavi
+    mode: "0750"
+  loop:
+    - "/home/mkanavi/docker/iacgenie/data/postgres"
+    - "/home/mkanavi/docker/iacgenie/data/redis"
+    - "/home/mkanavi/docker/iacgenie/data/minio"
+    - "/home/mkanavi/docker/iacgenie/data/openbao"
+    - "/home/mkanavi/docker/iacgenie/data/openbao_raft"
+    - "/home/mkanavi/docker/iacgenie/data/keycloak"
+    - "/home/mkanavi/docker/iacgenie/data/gitea"
+    - "/home/mkanavi/docker/iacgenie/data/nsqd"
+
+- name: "Compose Gen | Fix OpenBao raft data ownership"
+  ansible.builtin.file:
+    path: "{{ openbao_raft_data_dir | default('/home/mkanavi/docker/iacgenie/data/openbao_raft') }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+    recurse: true
+
+# ── Configuration Files ─────────────────────────────────────────────────
+- name: "Compose Gen | Deploy minio-nginx.conf"
+  ansible.builtin.copy:
+    src: minio-nginx.conf.j2
+    dest: "/home/mkanavi/docker/iacgenie/minio-nginx.conf"
+    owner: mkanavi
+    group: mkanavi
+    mode: "0644"
+
+# ── Docker Compose Generation ───────────────────────────────────────────
+- name: "Compose Gen | Render docker-compose template"
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "/home/mkanavi/docker/iacgenie/docker-compose.yml"
+    owner: mkanavi
+    group: mkanavi
+    mode: "0644"
+  register: compose_file_deployed
+
+- name: "Compose Gen | Verify compose file syntax"
+  ansible.builtin.command: docker compose config
+  args:
+    chdir: /home/mkanavi/docker/iacgenie
+  changed_when: false
+  when: compose_file_deployed.changed
+
+- name: "Compose Gen | Show compose file location"
+  ansible.builtin.debug:
+    msg: "docker-compose.yml deployed to /home/mkanavi/docker/iacgenie/"
+
+# ── Environment File Merge ──────────────────────────────────────────────
+- name: "Compose Gen | Merge .env.* files into unified .env"
+  ansible.builtin.command: bash -c "cd /home/mkanavi/docker/iacgenie && for f in .env.*; do grep -v '^#' \"$f\" 2>/dev/null; done | sort -u > .env"
+  changed_when: true
+  args:
+    creates: /home/mkanavi/docker/iacgenie/.env
+
+# ── Deployment ──────────────────────────────────────────────────────────
+- name: "Compose Gen | Check if containers are running"
+  ansible.builtin.command: docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.yml ps --format "{{ '{{' }}.Names{{ '}}' }} {{ '{{' }}.Status{{ '}}' }}"
+  register: compose_running
+  changed_when: false
+  check_mode: false
+
+- name: "Compose Gen | Deploy if compose file changed"
+  ansible.builtin.command: docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.yml up -d
+  args:
+    chdir: /home/mkanavi/docker/iacgenie
+  when: compose_file_deployed.changed
+  register: compose_deployed
+  changed_when: compose_deployed.rc == 0
+
+- name: "Compose Gen | Show deployment summary"
+  ansible.builtin.debug:
+    msg: "Docker compose deployment complete. Verify with: docker compose ps"

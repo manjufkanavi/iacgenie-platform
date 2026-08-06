@@ -18,8 +18,9 @@ All application and infrastructure secrets have been migrated from hardcoded `.e
 ### Architecture
 - **Endpoint:** https://vault.iacgenie.com (via Cloudflare Tunnel)
 - **Storage:** Raft (on VM 192.168.0.118)
-- **Authentication:** Token-based (admin/root)
+- **Authentication:** Token-based (admin/root) + **Keycloak OIDC** (service accounts)
 - **KV Version:** v2 (with versioning)
+- **OIDC Client:** `openbao-oidc` in Keycloak `lightserp` realm
 
 ### Admin Credentials
 ```bash
@@ -27,14 +28,23 @@ export OPENBAO_ADDR=https://vault.iacgenie.com
 export OPENBAO_TOKEN=<root-token-in-bash-profile>
 ```
 
+### OIDC Integration (Phase 10.3)
+- **Discovery URL:** `http://127.0.0.1:8083/realms/lightserp/.well-known/openid-configuration`
+- **Client ID:** `openbao-oidc`
+- **Client Secret:** `2AMmiNh62NQGzwmBiECfNWyIed1hbf04`
+- **Login URL:** `http://127.0.0.1:8200/v1/auth/oidc/login`
+
 ### Policy Structure
 
 | Policy | Path | Permission |
 |--------|------|------------|
-| `iacgenie-service` | `iacgenie/kv/data/*` | read |
-| `lightserp-service` | `lightserp/kv/data/*` | read |
-| `terraform-service` | `terraform/kv/data/*` | read |
-| `backup-read` | All KV paths + sys/raft/snapshot | read |
+| `iacgenie-service` | `iacgenie/kv/data/*` | read/write |
+| `lightserp-service` | `lightserp/kv/data/*` | read/write |
+| `terraform-service` | `terraform/kv/data/*` | read/write |
+| `openbao-service-read` | ALL KV engines | read-only |
+| `backup-read` | All KV paths + sys/raft/snapshot | read-only |
+| `admin` | ALL (including sys/) | full (sudo) |
+| `platform-admin` | ALL | full (no sudo) |
 
 ### Service Tokens
 
@@ -44,6 +54,17 @@ export OPENBAO_TOKEN=<root-token-in-bash-profile>
 | lightserp-service | lightserp-service | xzqbp4... | LightSerp backend |
 | terraform-service | terraform-service | rTVPC2... | TerraGenius |
 | backup-token | backup-read | WvuZbh... | Backup verification |
+
+### OIDC Role Bindings
+
+| Keycloak Role | OpenBao Policies | Vault Access |
+|---------------|-----------------|--------------|
+| `platform-admin` | `admin,platform-admin` | Full admin |
+| `openbao-admin` | `admin,platform-admin,openbao-admin` | Full admin |
+| `iacgenie-service` | `iacgenie-service` | iacgenie/kv r/w |
+| `lightserp-service` | `lightserp-service` | lightserp/kv r/w |
+| `openbao-service-read` | `openbao-service-read` | All KV read-only |
+| *(default)* | `openbao-service-read` | All KV read-only |
 
 ---
 

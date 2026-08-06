@@ -1,8 +1,50 @@
 keycloak_version: "26.0"
-keycloak_port: 8080
+keycloak_port: 8083
 keycloak_admin_user: admin
-keycloak_admin_password: CHANGE_ME_IN_VAULT
+keycloak_admin_password: hAaIa219fq5VzAP81SDyNuBV
 keycloak_realm: iacgenie
 keycloak_db_host: 127.0.0.1
 keycloak_db_port: 5432
 keycloak_db_name: keycloak
+keycloak_admin_url: "http://127.0.0.1:{{ keycloak_port }}"
+
+# LightSerp realm clients
+lightserp_realm_enabled: true
+lightserp_clients:
+  lightserp-webui:
+    secret: X3mPK9L3WNwU3F8iDBWxFp2VZLlwfbYZ
+    redirect_uris:
+      - "https://lightserp.iacgenie.com/*"
+      - "https://app.iacgenie.com/*"
+  lightserp-api:
+    secret: 4gDElECb74VEKbmKE6317Qg6UEZTa1hC
+    redirect_uris:
+      - "https://api.iacgenie.com/*"
+  openbao-oidc:
+    secret: 2AMmiNh62NQGzwmBiECfNWyIed1hbf04
+    redirect_uris:
+      - "https://vault.iacgenie.com/*"
+
+# iacGenie realm clients
+iacgenie_clients:
+  iacgenie-platform:
+    secret: fHjGjbMqf1xiJThpv1JftTjA79dvp01y
+    redirect_uris:
+      - "https://admin.iacgenie.com/*"
+      - "https://iacgenie.com/*"
+  gitea:
+    secret: DmDOIo0Cbw76jbr67BpRhmpERPb4PyZv
+    redirect_uris:
+      - "https://gitea.iacgenie.com/user/oauth2/gitea"
+  searxng:
+    secret: jvnJcywoiySjkDrgEhwjDSV9KBZb26Eu
+    redirect_uris:
+      - "https://search.iacgenie.com/*"
+
+# Keycloak roles
+keycloak_roles:
+  - platform-admin
+  - openbao-admin
+  - project-admin
+  - project-member
+  - openbao-service-read

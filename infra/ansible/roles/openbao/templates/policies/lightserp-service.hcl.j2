@@ -1,22 +1,8 @@
-# OpenBao LightSerp Service Policy — Read-only access to lightserp/* paths
-# Used by: LightSerp application services
-
-# Read access to all lightserp KV paths
-path "lightserp/kv/data/*" {
-  capabilities = ["read"]
+# LightSerp Service Policy — read/write lightserp KV
+path "lightserp/kv/*" {
+  capabilities = ["create", "read", "update", "delete", "list"]
 }
 
-# List access to lightserp KV paths
-path "lightserp/kv/metadata/*" {
+path "lightserp/kv" {
   capabilities = ["list"]
-}
-
-# Read access to lightserp KV secrets engine capabilities
-path "lightserp/kv/" {
-  capabilities = ["read"]
-}
-
-# Read service tokens stored under lightserp
-path "lightserp/kv/data/service_tokens/*" {
-  capabilities = ["read"]
 }

@@ -1,6 +1,5 @@
-# OpenBao Admin Policy — Full read+write access to all paths
-# Used by: platform administrators, backup scripts, bootstrap scripts
-
+# OpenBao Admin Policy
+# Grants full access to all paths — reserved for platform-admin role only
 path "*" {
   capabilities = ["create", "read", "update", "delete", "list", "sudo"]
 }

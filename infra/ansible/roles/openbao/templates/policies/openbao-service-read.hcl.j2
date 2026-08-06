@@ -1,0 +1,24 @@
+# OpenBao Service Read Policy — read-only access to all KV engines
+path "iacgenie/kv/*" {
+  capabilities = ["read", "list"]
+}
+
+path "iacgenie/kv" {
+  capabilities = ["list"]
+}
+
+path "lightserp/kv/*" {
+  capabilities = ["read", "list"]
+}
+
+path "lightserp/kv" {
+  capabilities = ["list"]
+}
+
+path "terraform/kv/*" {
+  capabilities = ["read", "list"]
+}
+
+path "terraform/kv" {
+  capabilities = ["list"]
+}

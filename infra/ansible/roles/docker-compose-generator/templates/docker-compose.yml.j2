@@ -90,6 +90,7 @@ services:
       - "127.0.0.1:9001:9001"
     networks:
       - iacgenie-frontend
+      - iacgenie-backend
     depends_on:
       - minio
     volumes:

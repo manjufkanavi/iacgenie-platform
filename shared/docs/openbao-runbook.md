@@ -183,6 +183,52 @@ curl -s http://127.0.0.1:8200/v1/auth/token/lookup \
 
 ---
 
+## Keycloak OIDC Authentication (Phase 10.3)
+
+### Configure OIDC Login
+
+```bash
+# Login to OpenBao via Keycloak OIDC
+TOKEN=$(curl -s -X POST http://127.0.0.1:8083/realms/lightserp/protocol/openid-connect/token \
+  -d "grant_type=client_credentials&client_id=openbao-oidc&client_secret=2AMmiNh62NQGzwmBiECfNWyIed1hbf04" \
+  | python3 -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
+
+curl -s -X POST http://127.0.0.1:8200/v1/auth/oidc/login \
+  -H "Content-Type: application/json" \
+  -d "{\"token\": \"$TOKEN\"}"
+```
+
+### Role Bindings
+
+| Keycloak Role | OpenBao Policies | Access |
+|--------------|-----------------|--------|
+| `platform-admin` | `admin,platform-admin` | Full admin |
+| `openbao-admin` | `admin,platform-admin,openbao-admin` | Full admin |
+| `iacgenie-service` | `iacgenie-service` | iacgenie/kv r/w |
+| `lightserp-service` | `lightserp-service` | lightserp/kv r/w |
+| `openbao-service-read` | `openbao-service-read` | All KV read-only |
+| *(default)* | `openbao-service-read` | All KV read-only |
+
+### OIDC Configuration
+
+```bash
+# Check OIDC auth method
+curl -s -H "X-Vault-Token: $ROOT" http://127.0.0.1:8200/v1/sys/auth/oidc | python3 -m json.tool
+
+# Configure OIDC settings
+curl -s -X POST http://127.0.0.1:8200/v1/oidc/config \
+  -H "X-Vault-Token: $ROOT" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "oidc_discovery_url": "http://127.0.0.1:8083/realms/lightserp/.well-known/openid-configuration",
+    "oidc_client_id": "openbao-oidc",
+    "oidc_client_secret": "2AMmiNh62NQGzwmBiECfNWyIed1hbf04",
+    "default_role": "user"
+  }'
+```
+
+---
+
 ## Policies
 
 | Policy | Scope | Used By |
