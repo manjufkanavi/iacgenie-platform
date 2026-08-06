@@ -320,6 +320,48 @@ chmod 750 /home/mkanavi/docker/iacgenie/data/openbao_raft/service_tokens/
 chown -R mkanavi:mkanavi /home/mkanavi/docker/iacgenie/data/openbao_raft/
 ```
 
+### vault.iacgenie.com "Too Many Redirects"
+
+**Symptom:** Browser shows "too many redirects" when accessing `vault.iacgenie.com`.
+
+**Root Cause:** Cloudflare tunnel routes `vault.iacgenie.com` → `http://127.0.0.1:8200` (direct to OpenBao).
+Without a matching nginx server block, traffic hits the default server → `return 301 https://$host$request_uri` → Cloudflare → loop.
+
+**Fix:** Add `vault.iacgenie.com` blocks to both HTTP (cloudflared passthrough) and HTTPS (TLS termination) sections in the nginx template, and route the tunnel through nginx:80 instead of directly to OpenBao.
+
+```bash
+# Ansible: Ensure roles are updated
+cd /Users/manjunathkanavi/iacgenie-platform/infra/ansible
+
+# Check current config has vault block
+grep -c "vault.iacgenie.com" roles/nginx/templates/reverse-proxy.conf.j2
+# Should return: 2 (one HTTP, one HTTPS block)
+
+# Check tunnel vars route through nginx
+grep "vault.iacgenie.com" -A1 roles/cloudflare_tunnel/vars/main.yml
+# service should be http://127.0.0.1:80 (NOT 127.0.0.1:8200)
+
+# Deploy
+ansible-playbook -i inventory/hosts.ini -b playbooks/services.yml
+
+# Verify
+ssh mkanavi@192.168.0.118
+curl -sI http://127.0.0.1/v1/sys/health | grep -E "HTTP|location:"
+# Should return 200 OK (not 301 redirect)
+```
+
+**Architecture:**
+```
+Browser → Cloudflare Proxy → nginx:443 (TLS terminate) → nginx:8080 → OpenBao:8200
+Browser → Cloudflare Tunnel → nginx:80 (passthrough) → OpenBao:8200
+```
+
+**Key changes:**
+1. HTTP block: `proxy_pass http://127.0.0.1:8200` with `X-Forwarded-Proto: $scheme` — no redirect
+2. HTTPS block: TLS terminated at nginx, proxies to OpenBao over HTTP with `X-Forwarded-Proto: https`
+3. Cloudflare Tunnel: `service: http://127.0.0.1:80` (through nginx, NOT direct OpenBao)
+4. TLS certs: `/etc/letsencrypt/live/vault.iacgenie.com/`
+
 ---
 
 ## Multi-Tenant KV Structure
