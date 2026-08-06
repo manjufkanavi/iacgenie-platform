@@ -1,0 +1,93 @@
+{
+  "timestamp": "2026-08-06T20:00:00",
+  "status": "verified",
+  "total_paths": 18,
+  "total_fields": 49,
+  "total_secrets": 17,
+  "paths": {
+    "iacgenie/kv/gitea": {
+      "fields": 1,
+      "secrets": 1
+    },
+    "iacgenie/kv/keycloak": {
+      "fields": 6,
+      "secrets": 2
+    },
+    "iacgenie/kv/lightserp": {
+      "fields": 2,
+      "secrets": 1
+    },
+    "iacgenie/kv/minio": {
+      "fields": 3,
+      "secrets": 2
+    },
+    "iacgenie/kv/nsqd": {
+      "fields": 3,
+      "secrets": 0
+    },
+    "iacgenie/kv/openbao": {
+      "fields": 4,
+      "secrets": 1
+    },
+    "iacgenie/kv/pagezen": {
+      "fields": 3,
+      "secrets": 1
+    },
+    "iacgenie/kv/postgres": {
+      "fields": 4,
+      "secrets": 1
+    },
+    "iacgenie/kv/redis": {
+      "fields": 3,
+      "secrets": 1
+    },
+    "iacgenie/kv/searxng": {
+      "fields": 2,
+      "secrets": 1
+    },
+    "iacgenie/kv/test1": {
+      "fields": 1,
+      "secrets": 1
+    },
+    "lightserp/kv/api": {
+      "fields": 2,
+      "secrets": 1
+    },
+    "lightserp/kv/minio": {
+      "fields": 3,
+      "secrets": 2
+    },
+    "lightserp/kv/postgres": {
+      "fields": 3,
+      "secrets": 0
+    },
+    "lightserp/kv/redis": {
+      "fields": 2,
+      "secrets": 0
+    },
+    "lightserp/kv/searxng": {
+      "fields": 2,
+      "secrets": 1
+    },
+    "terraform/kv/openbao": {
+      "fields": 1,
+      "secrets": 0
+    },
+    "terraform/kv/postgres": {
+      "fields": 4,
+      "secrets": 1
+    }
+  },
+  "service_tokens": {
+    "iacgenie-service": "s.z2t56MjGF1QpHm3tgYK3Dnp6kE2Msh7rBAovK10RmGUE",
+    "lightserp-service": "s.KwxmMrN4Pk5EfWCNdWluqqgY8bT3vFp6Dk0mH5RcEfYA",
+    "terraform-service": "s.j7hMhc7HSCPXf0syAj0t4z6I9mK1eR3wNuVbLcPqXyDO",
+    "backup-token": "s.9f5jaoE62P4ki5rNW8YZDXyi3mU7aFbQvRcLsHdGeN4o"
+  },
+  "policies": [
+    "iacgenie-service",
+    "lightserp-service",
+    "terraform-service",
+    "backup-read"
+  ]
+}
