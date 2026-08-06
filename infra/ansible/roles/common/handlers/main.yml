@@ -5,6 +5,12 @@
     name: sshd
     state: restarted
 
+- name: Reload systemd and restart sshd
+  ansible.builtin.systemd:
+    name: sshd
+    state: restarted
+    daemon_reload: yes
+
 - name: Restart fail2ban
   ansible.builtin.service:
     name: fail2ban
