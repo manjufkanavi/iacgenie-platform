@@ -58,6 +58,16 @@
   ansible.builtin.import_tasks: service_tokens.yml
   when: openbao_bootstrap_tokens | default(true) | bool
 
+# ── Permission Hardening (1.1.3) ─────────────────────────────────────────────
+- name: "OpenBao | Fix raft data directory permissions"
+  ansible.builtin.file:
+    path: "{{ openbao_raft_data_dir | default('/home/mkanavi/docker/iacgenie/data/openbao_raft') }}"
+    state: directory
+    owner: mkanavi
+    group: mkanavi
+    mode: "0750"
+    recurse: true
+
 # ── Unseal ────────────────────────────────────────────────────────────────
 - name: "OpenBao | Verify OpenBao container is running"
   ansible.builtin.command: docker ps -a --filter "name=iacgenie-openbao" --format "{{ '{{.Names}}' }}"

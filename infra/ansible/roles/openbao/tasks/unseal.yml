@@ -16,7 +16,7 @@
 
 - name: "OpenBao | Check if already unsealed"
   ansible.builtin.command: >
-    docker exec iacgenie_openbao bao operator list-seal-status
+    docker exec iacgenie_openbao bao operator list-seal-status -address=http://127.0.0.1:8200
   register: openbao_seal_status
   changed_when: false
   failed_when: false
@@ -39,7 +39,7 @@
 
 - name: "OpenBao | Unseal OpenBao"
   ansible.builtin.command: >
-    docker exec iacgenie_openbao bao operator unseal {{ item }}
+    docker exec iacgenie_openbao bao operator unseal -address=http://127.0.0.1:8200 {{ item }}
   loop: "{{ openbao_unseal_keys }}"
   when:
     - openbao_unseal_keys is defined

@@ -14,7 +14,7 @@
 
 - name: "OpenBao Bootstrap | Apply admin policy"
   ansible.builtin.uri:
-    url: "https://127.0.0.1:8200/v1/sys/policies/acl/admin"
+    url: "http://127.0.0.1:8200/v1/sys/policies/acl/admin"
     method: PUT
     headers:
       X-Vault-Token: "{{ openbao_root_token }}"
@@ -39,7 +39,7 @@
 
 - name: "OpenBao Bootstrap | Apply iacgenie-service policy"
   ansible.builtin.uri:
-    url: "https://127.0.0.1:8200/v1/sys/policies/acl/iacgenie-service"
+    url: "http://127.0.0.1:8200/v1/sys/policies/acl/iacgenie-service"
     method: PUT
     headers:
       X-Vault-Token: "{{ openbao_root_token }}"
@@ -65,7 +65,7 @@
 
 - name: "OpenBao Bootstrap | Apply lightserp-service policy"
   ansible.builtin.uri:
-    url: "https://127.0.0.1:8200/v1/sys/policies/acl/lightserp-service"
+    url: "http://127.0.0.1:8200/v1/sys/policies/acl/lightserp-service"
     method: PUT
     headers:
       X-Vault-Token: "{{ openbao_root_token }}"
@@ -91,7 +91,7 @@
 
 - name: "OpenBao Bootstrap | Apply terraform-service policy"
   ansible.builtin.uri:
-    url: "https://127.0.0.1:8200/v1/sys/policies/acl/terraform-service"
+    url: "http://127.0.0.1:8200/v1/sys/policies/acl/terraform-service"
     method: PUT
     headers:
       X-Vault-Token: "{{ openbao_root_token }}"

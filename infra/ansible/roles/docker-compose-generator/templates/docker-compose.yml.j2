@@ -121,7 +121,7 @@ services:
     networks:
       - iacgenie-backend
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8200/v1/sys/health 2>&1"]
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8200/v1/sys/health | grep -q '\"sealed\":false'"]
       interval: 30s
       timeout: 10s
       retries: 3

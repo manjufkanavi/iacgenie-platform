@@ -14,7 +14,7 @@
 # ── IaCGenie Service Token ────────────────────────────────────────────────
 - name: "OpenBao Bootstrap | Create IaCGenie service token"
   ansible.builtin.uri:
-    url: "https://127.0.0.1:8200/v1/auth/token/create"
+    url: "http://127.0.0.1:8200/v1/auth/token/create"
     method: POST
     headers:
       X-Vault-Token: "{{ openbao_root_token }}"
@@ -48,7 +48,7 @@
 # ── LightSerp Service Token ───────────────────────────────────────────────
 - name: "OpenBao Bootstrap | Create LightSerp service token"
   ansible.builtin.uri:
-    url: "https://127.0.0.1:8200/v1/auth/token/create"
+    url: "http://127.0.0.1:8200/v1/auth/token/create"
     method: POST
     headers:
       X-Vault-Token: "{{ openbao_root_token }}"
@@ -82,7 +82,7 @@
 # ── Terraform Service Token ───────────────────────────────────────────────
 - name: "OpenBao Bootstrap | Create Terraform service token"
   ansible.builtin.uri:
-    url: "https://127.0.0.1:8200/v1/auth/token/create"
+    url: "http://127.0.0.1:8200/v1/auth/token/create"
     method: POST
     headers:
       X-Vault-Token: "{{ openbao_root_token }}"
@@ -116,7 +116,7 @@
 # ── Backup Read Token (used by cron jobs) ─────────────────────────────────
 - name: "OpenBao Bootstrap | Create backup read token"
   ansible.builtin.uri:
-    url: "https://127.0.0.1:8200/v1/auth/token/create"
+    url: "http://127.0.0.1:8200/v1/auth/token/create"
     method: POST
     headers:
       X-Vault-Token: "{{ openbao_root_token }}"
