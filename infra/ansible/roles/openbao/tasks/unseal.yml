@@ -1,63 +1,107 @@
 ---
 # OpenBao auto-unseal task
-# Reads unseal keys from init_keys.json and unseals via HTTP API
+# Uses HTTP API (bao operator unseal removed in OpenBao 2.6.0)
 # Runs after docker-compose-generator starts the container
 
-- name: "OpenBao | Wait for container to be healthy"
+- name: "OpenBao | Wait for container to respond"
   ansible.builtin.command: >-
-    docker inspect --format='{{ "{{" }}.State.Health.Status{{ "}}" }}'
-    iacgenie_openbao
-  register: openbao_health
-  retries: 20
-  delay: 15
-  until: openbao_health.stdout == 'healthy'
+    docker exec iacgenie_openbao wget -q -O - http://127.0.0.1:8200/v1/sys/health
+  register: openbao_early_health
+  retries: 30
+  delay: 5
+  until: openbao_early_health.rc == 0
   changed_when: false
   failed_when: false
 
-- name: "OpenBao | Check if already unsealed"
-  ansible.builtin.command: >
-    docker exec iacgenie_openbao bao operator list-seal-status -address=http://127.0.0.1:8200
-  register: openbao_seal_status
+- name: "OpenBao | Check seal status via API"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/sys/health"
+    method: GET
+    validate_certs: false
+    status_code: [200]
+    timeout: 10
+  register: openbao_health_json
+  when: openbao_early_health is succeeded
   changed_when: false
   failed_when: false
-  ignore_errors: true
+
+- name: "OpenBao | Determine if unseal needed"
+  ansible.builtin.set_fact:
+    openbao_is_sealed: "{{ openbao_health_json.json.sealed | default(true) }}"
+  when: openbao_health_json is succeeded
+
+- name: "OpenBao | Skip unseal if already unsealed"
+  ansible.builtin.set_fact:
+    openbao_unseal_needed: false
+  when:
+    - openbao_is_sealed is defined
+    - not openbao_is_sealed
 
 - name: "OpenBao | Read unseal keys from init_keys.json"
   ansible.builtin.slurp:
     src: "{{ openbao_raft_data_dir | default('/home/mkanavi/docker/iacgenie/data/openbao_raft') }}/init_keys.json"
   register: openbao_keys_raw
   when:
-    - openbao_health.stdout != 'healthy'
-    - openbao_seal_status is failed
+    - openbao_health_json is succeeded
+    - openbao_is_sealed | default(true) | bool
 
-- name: "OpenBao | Parse unseal keys"
+- name: "OpenBao | Parse unseal keys (base64)"
   ansible.builtin.set_fact:
     openbao_unseal_keys: "{{ openbao_keys_raw.content | b64decode | from_json | json_query('unseal_keys_b64') }}"
   when:
-    - openbao_keys_raw.content | default('') != ''
-    - openbao_keys_raw.content is mapping
+    - openbao_keys_raw.content | default('') | length > 0
+    - openbao_keys_raw is succeeded
 
-- name: "OpenBao | Unseal OpenBao"
-  ansible.builtin.command: >
-    docker exec iacgenie_openbao bao operator unseal -address=http://127.0.0.1:8200 {{ item }}
-  loop: "{{ openbao_unseal_keys }}"
+- name: "OpenBao | Unseal via HTTP API (threshold 3/5)"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/sys/unseal"
+    method: PUT
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      key: "{{ item }}"
+    validate_certs: false
+    status_code: [200, 400]
+    timeout: 15
+  loop: "{{ openbao_unseal_keys | default([]) }}"
   when:
+    - openbao_unseal_needed | default(true) | bool
     - openbao_unseal_keys is defined
     - openbao_unseal_keys | length > 0
   register: openbao_unseal_result
-  changed_when: true
+  changed_when: openbao_unseal_result.status == 200
+  failed_when: false
 
-- name: "OpenBao | Final unseal check"
-  ansible.builtin.command: >-
-    docker inspect --format='{{ "{{" }}.State.Health.Status{{ "}}" }}'
-    iacgenie_openbao
+- name: "OpenBao | Wait for unseal to complete"
+  ansible.builtin.wait_for:
+    timeout: 10
+  when:
+    - openbao_unseal_needed | default(true) | bool
+    - (openbao_unseal_result | default([])) | length > 0
+
+- name: "OpenBao | Verify unsealed state"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/sys/health"
+    method: GET
+    validate_certs: false
+    status_code: [200]
+    timeout: 10
   register: openbao_final_health
+  when:
+    - openbao_unseal_needed | default(true) | bool
   changed_when: false
   failed_when: false
-  when: openbao_unseal_keys is defined
 
-- name: "OpenBao | Warn if unseal keys not found"
+- name: "OpenBao | Report seal status"
   ansible.builtin.debug:
-    msg: "OpenBao unseal skipped — init_keys.json may be missing or empty. Manual unseal required."
+    msg: "OpenBao sealed={{ openbao_final_health.json.sealed | default('unknown') }}"
+  when: openbao_final_health is succeeded
+
+- name: "OpenBao | Warn if unseal keys missing"
+  ansible.builtin.debug:
+    msg: "OpenBao unseal skipped — init_keys.json may be missing. Manual unseal required."
   when:
-    - openbao_keys_raw.content | default('') == ''
+    - openbao_keys_raw is failed
+    - openbao_keys_raw.content | default('') | length == 0

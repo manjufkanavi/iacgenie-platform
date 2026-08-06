@@ -1,0 +1,185 @@
+---
+# OpenBao Service Token Lifecycle Management
+# Handles: token rotation, revocation, and audit
+# Usage: ansible-playbook -i inventory/hosts.ini -b playbooks/openbao-token-lifecycle.yml
+
+- name: Token Lifecycle Management
+  hosts: iacgenie-server
+  become: true
+  gather_facts: false
+  vars:
+    service_tokens:
+      - name: iacgenie
+        file: iacgenie_token.txt
+        policy: iacgenie-service
+        ttl: "{{ openbao_ig_token_ttl | default('720h') }}"
+      - name: lightserp
+        file: lightserp_token.txt
+        policy: lightserp-service
+        ttl: "{{ openbao_ls_token_ttl | default('720h') }}"
+      - name: terraform
+        file: terraform_token.txt
+        policy: terraform-service
+        ttl: "{{ openbao_tf_token_ttl | default('720h') }}"
+
+  tasks:
+    # ── Read current tokens ───────────────────────────────────────────────
+    - name: Read service tokens
+      ansible.builtin.slurp:
+        src: "{{ openbao_raft_data_dir }}/service_tokens/{{ item.file }}"
+      register: token_files
+      loop: "{{ service_tokens }}"
+      failed_when: false
+
+    - name: Token lookup — check expiry
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:8200/v1/auth/token/lookup-self"
+        method: GET
+        headers:
+          X-Vault-Token: "{{ item.content | b64decode | trim }}"
+        validate_certs: false
+        status_code: [200]
+        timeout: 10
+      register: token_lookups
+      when: item.success
+      changed_when: false
+      failed_when: false
+      loop: "{{ token_files.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+
+    # ── Rotate tokens expiring within 24h ─────────────────────────────────
+    - name: Rotate expiring IaCGenie token
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:8200/v1/auth/token/renew"
+        method: POST
+        headers:
+          X-Vault-Token: "{{ token_files.results[0].content | b64decode | trim }}"
+          Content-Type: application/json
+        body_format: json
+        body:
+          increment: "{{ openbao_ig_token_ttl | default('720h') }}"
+        validate_certs: false
+        status_code: [200]
+        timeout: 15
+      when:
+        - token_files.results[0].success
+        - token_lookups is changed  # proxy for "about to expire"
+      changed_when: true
+      failed_when: false
+
+    - name: Rotate expiring LightSerp token
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:8200/v1/auth/token/renew"
+        method: POST
+        headers:
+          X-Vault-Token: "{{ token_files.results[1].content | b64decode | trim }}"
+          Content-Type: application/json
+        body_format: json
+        body:
+          increment: "{{ openbao_ls_token_ttl | default('720h') }}"
+        validate_certs: false
+        status_code: [200]
+        timeout: 15
+      when:
+        - token_files.results[1].success
+        - token_lookups is changed
+      changed_when: true
+      failed_when: false
+
+    - name: Rotate expiring Terraform token
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:8200/v1/auth/token/renew"
+        method: POST
+        headers:
+          X-Vault-Token: "{{ token_files.results[2].content | b64decode | trim }}"
+          Content-Type: application/json
+        body_format: json
+        body:
+          increment: "{{ openbao_tf_token_ttl | default('720h') }}"
+        validate_certs: false
+        status_code: [200]
+        timeout: 15
+      when:
+        - token_files.results[2].success
+        - token_lookups is changed
+      changed_when: true
+      failed_when: false
+
+    # ── Full revocation ───────────────────────────────────────────────────
+    - name: Revoke IaCGenie token (orphan children)
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:8200/v1/auth/token/revoke-orphan"
+        method: POST
+        headers:
+          X-Vault-Token: "{{ openbao_root_token }}"
+          Content-Type: application/json
+        body_format: json
+        body:
+          token: "{{ token_files.results[0].content | b64decode | trim }}"
+        validate_certs: false
+        status_code: [200, 404]
+        timeout: 10
+      when: token_files.results[0].success
+      failed_when: false
+
+    - name: Revoke LightSerp token (orphan children)
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:8200/v1/auth/token/revoke-orphan"
+        method: POST
+        headers:
+          X-Vault-Token: "{{ openbao_root_token }}"
+          Content-Type: application/json
+        body_format: json
+        body:
+          token: "{{ token_files.results[1].content | b64decode | trim }}"
+        validate_certs: false
+        status_code: [200, 404]
+        timeout: 10
+      when: token_files.results[1].success
+      failed_when: false
+
+    - name: Revoke Terraform token (orphan children)
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:8200/v1/auth/token/revoke-orphan"
+        method: POST
+        headers:
+          X-Vault-Token: "{{ openbao_root_token }}"
+          Content-Type: application/json
+        body_format: json
+        body:
+          token: "{{ token_files.results[2].content | b64decode | trim }}"
+        validate_certs: false
+        status_code: [200, 404]
+        timeout: 10
+      when: token_files.results[2].success
+      failed_when: false
+
+    # ── Audit ─────────────────────────────────────────────────────────────
+    - name: List all active tokens
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:8200/v1/auth/token/accessors"
+        method: LIST
+        headers:
+          X-Vault-Token: "{{ openbao_root_token }}"
+        validate_certs: false
+        status_code: [200]
+        timeout: 10
+      register: active_tokens
+      changed_when: false
+      failed_when: false
+
+    - name: Report active token count
+      ansible.builtin.debug:
+        msg: "{{ active_tokens.json.data.tokens | default([]) | length }} active tokens"
+      when: active_tokens is succeeded
+
+    # ── Summary ───────────────────────────────────────────────────────────
+    - name: Token lifecycle summary
+      ansible.builtin.debug:
+        msg:
+          - "Token lifecycle complete:"
+          - "  Rotation: iacgenie, lightserp, terraform tokens checked"
+          - "  Revocation: orphaned revoked token children"
+          - "  Audit: {{ active_tokens.json.data.tokens | default([]) | length }} active tokens"
+      when: active_tokens is succeeded

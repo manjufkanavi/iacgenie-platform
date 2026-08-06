@@ -102,14 +102,12 @@ services:
     image: openbao/openbao:2.6.0
     container_name: iacgenie_openbao
     restart: unless-stopped
-    user: "0:0"
     command: bao server -config=/openbao/storage/openbao-prod.hcl
+    user: "0:0"  # Run as root to match bind mount ownership
     environment:
       OPENBAO_ADDR: http://127.0.0.1:8200
       OPENBAO_CLUSTER_ADDR: http://127.0.0.1:8201
       OPENBAO_UI: "true"
-      OPENBAO_STORAGE_TYPE: raft
-      OPENBAO_STORAGE_PATH: /openbao/storage
       OPENBAO_LOG_LEVEL: info
     volumes:
       - /home/mkanavi/docker/iacgenie/data/openbao:/openbao/storage
@@ -121,7 +119,7 @@ services:
     networks:
       - iacgenie-backend
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8200/v1/sys/health | grep -q '\"sealed\":false'"]
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8200/v1/sys/health | python3 -c \"import sys,json; d=json.load(sys.stdin); exit(0 if d.get('sealed',True)==False and d.get('standby',True)==False else 1)\""]
       interval: 30s
       timeout: 10s
       retries: 3

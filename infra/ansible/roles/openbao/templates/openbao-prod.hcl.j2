@@ -1,0 +1,49 @@
+# OpenBao Production Configuration
+# Managed by Ansible — do not edit manually
+
+# ── Listener ──────────────────────────────────────────────────────────────
+# TLS enabled for external access via Cloudflare Tunnel.
+# Internal Docker networking uses http (tls_disable=1).
+# Set openbao_tls_enabled=true to enable TLS with certs mounted at /etc/letsencrypt
+
+{% if openbao_tls_enabled | default(false) | bool %}
+listener "tcp" {
+  address         = "0.0.0.0:8200"
+  tls_cert_file   = "/etc/letsencrypt/live/openbao.iacgenie.com/fullchain.pem"
+  tls_key_file    = "/etc/letsencrypt/live/openbao.iacgenie.com/privkey.pem"
+  tls_client_ca_file = "/etc/letsencrypt/live/openbao.iacgenie.com/chain.pem"
+}
+{% else %}
+listener "tcp" {
+  address       = "0.0.0.0:8200"
+  tls_disable   = 1
+}
+{% endif %}
+
+# ── Storage ───────────────────────────────────────────────────────────────
+storage "raft" {
+  path    = "/openbao/raft"
+  node_id = "node1"
+}
+
+# ── Networking ────────────────────────────────────────────────────────────
+{% if openbao_tls_enabled | default(false) | bool %}
+api_addr     = "https://127.0.0.1:8200"
+cluster_addr = "https://127.0.0.1:8201"
+{% else %}
+api_addr     = "http://127.0.0.1:8200"
+cluster_addr = "http://127.0.0.1:8201"
+{% endif %}
+
+# ── UI & TTL ──────────────────────────────────────────────────────────────
+ui = true
+default_lease_ttl = "768h"
+max_lease_ttl     = "768h"
+
+# ── Audit Log ─────────────────────────────────────────────────────────────
+audit "file" {
+  file_path = "/openbao/audit/audit.log"
+}
+
+# ── Logging ───────────────────────────────────────────────────────────────
+log_level = "{{ openbao_log_level | default('info') }}"

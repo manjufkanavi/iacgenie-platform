@@ -43,6 +43,27 @@
   failed_when: false
   changed_when: openbao_ls_kv_mount.status in [200, 201]
 
+# ── Step 1b: Enable Terraform KV Engine ───────────────────────────────────
+
+- name: "OpenBao KV Bootstrap | Enable terraform/kv engine"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/sys/mounts/terraform/kv"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      type: kv
+      options:
+        version: "2"
+    validate_certs: false
+    status_code: [200, 201, 409]
+    timeout: 10
+  register: openbao_tf_kv_mount
+  failed_when: false
+  changed_when: openbao_tf_kv_mount.status in [200, 201]
+
 # ── Step 2: Seed IaCGenie Secrets ─────────────────────────────────────────
 
 - name: "OpenBao KV Bootstrap | Seed postgres (iacgenie)"
@@ -159,8 +180,8 @@
       data:
         root_token: "{{ openbao_ig_openbao_root_token }}"
         addr: "http://127.0.0.1:8200"
-        data_dir: /var/lib/openbao
-        storage_type: file
+        data_dir: /home/mkanavi/docker/iacgenie/data/openbao_raft
+        storage_type: raft
     validate_certs: false
     status_code: [200, 201]
     timeout: 10
@@ -335,6 +356,47 @@
   register: openbao_ls_api
   failed_when: false
 
+# ── Step 3b: Seed Terraform Secrets ──────────────────────────────────────
+
+- name: "OpenBao KV Bootstrap | Seed postgres (terraform)"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/terraform/kv/data/postgres"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      data:
+        username: lightsrp
+        host: postgres
+        port: "5432"
+        password: "{{ openbao_ig_pg_password }}"
+    validate_certs: false
+    status_code: [200, 201]
+    timeout: 10
+  register: openbao_tf_postgres
+  failed_when: false
+
+- name: "OpenBao KV Bootstrap | Seed openbao (terraform)"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/terraform/kv/data/openbao"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      data:
+        addr: "http://127.0.0.1:8200"
+        data_dir: /home/mkanavi/docker/iacgenie/data/openbao_raft
+        storage_type: raft
+    validate_certs: false
+    status_code: [200, 201]
+    timeout: 10
+  register: openbao_tf_openbao
+  failed_when: false
+
 # ── Summary ───────────────────────────────────────────────────────────────
 
 - name: "OpenBao KV Bootstrap | Summary"
@@ -343,5 +405,7 @@
       - "KV v2 engines:"
       - "  iacgenie/kv     ({{ 'enabled' if openbao_ig_kv_mount.status in [200,201] else 'exists' }})"
       - "  lightserp/kv    ({{ 'enabled' if openbao_ls_kv_mount.status in [200,201] else 'exists' }})"
+      - "  terraform/kv    ({{ 'enabled' if openbao_tf_kv_mount.status in [200,201] else 'exists' }}"
       - "Secrets written to iacgenie/kv: postgres, redis, minio, keycloak, gitea, openbao, searxng, lightserp, pagezen, nsqd"
       - "Secrets written to lightserp/kv: postgres, redis, minio, searxng, api"
+      - "Secrets written to terraform/kv: postgres, openbao"

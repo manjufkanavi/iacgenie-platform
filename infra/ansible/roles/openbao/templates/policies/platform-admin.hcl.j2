@@ -1,0 +1,32 @@
+# OpenBao Platform Admin Policy — Full access to ALL paths and namespaces
+# Used by: platform administrators, bootstrap scripts, backup automation
+# Scope: wildcard — grants sudo-level access for infrastructure management
+
+# ── Root-level sys access ─────────────────────────────────────────────────
+path "sys/*" {
+  capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+}
+
+# ── All KV secret engines ────────────────────────────────────────────────
+path "iacgenie/*" {
+  capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+}
+path "lightserp/*" {
+  capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+}
+path "terraform/*" {
+  capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+}
+
+# ── Token management ─────────────────────────────────────────────────────
+path "auth/token/*" {
+  capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+}
+
+# ── Unseal & operator ────────────────────────────────────────────────────
+path "sys/unseal" {
+  capabilities = ["update", "sudo"]
+}
+path "sys/audit/*" {
+  capabilities = ["create", "read", "update", "delete", "list"]
+}

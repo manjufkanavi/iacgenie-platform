@@ -1,12 +1,12 @@
 openbao_version: "2.6.0"
 openbao_port: 8200
 openbao_data_dir: /var/lib/openbao
-openbao_storage_type: file
+openbao_storage_type: raft
 openbao_auto_unseal: false
 openbao_static_key: CHANGE_ME
 
 # ── Root token (from init_keys.json on VM) ────────────────────────────────
-openbao_root_token: s.FaJmh6ivmGw0rQWRNvem515M
+openbao_root_token: CHANGE_ME  # read from init_keys.json after bootstrap
 
 # ── Raft / data directory on host ─────────────────────────────────────────
 openbao_raft_data_dir: /home/mkanavi/docker/iacgenie/openbao_raft
@@ -30,6 +30,8 @@ openbao_kv_mounts:
 openbao_policies:
   - name: admin
     file: admin.hcl.j2
+  - name: platform-admin
+    file: platform-admin.hcl.j2
   - name: iacgenie-service
     file: iacgenie-service.hcl.j2
   - name: lightserp-service
@@ -46,31 +48,31 @@ openbao_backup_token_ttl: "168h" # 7 days — backup cron token
 # ── IaCGenie KV Secrets ───────────────────────────────────────────────────
 
 # PostgreSQL
-openbao_ig_pg_password: IsywG5y@ASmmElFSUEvInU9K
+openbao_ig_pg_password: CHANGE_ME
 
 # Redis
-openbao_ig_redis_password: OPuRwYP!JXyaKK9QKI#nLdfX
+openbao_ig_redis_password: CHANGE_ME
 
 # MinIO
-openbao_ig_minio_access_key: iacgenie
-openbao_ig_minio_secret_key: ELI9TBbFPc#SRkmKvebN#yG3
+openbao_ig_minio_access_key: CHANGE_ME
+openbao_ig_minio_secret_key: CHANGE_ME
 
 # Keycloak
-openbao_ig_kc_admin_user: admin
-openbao_ig_kc_admin_password: hAaIa219fq5VzAP81SDyNuBV
-openbao_ig_kc_db_password: CeeLLTVz@2I9O3NYGH!1CYN4
+openbao_ig_kc_admin_user: CHANGE_ME
+openbao_ig_kc_admin_password: CHANGE_ME
+openbao_ig_kc_db_password: CHANGE_ME
 
 # Gitea
-openbao_ig_gitea_db_password: GxKBj6PzM3KdF7qN
+openbao_ig_gitea_db_password: CHANGE_ME
 
 # OpenBao root token
-openbao_ig_openbao_root_token: lWc7LtdRXxXtSt0szYDY#JE9
+openbao_ig_openbao_root_token: CHANGE_ME
 
 # SearXNG
-openbao_ig_searxng_secret: k2x1wApzlXrmVSO6Q6w#SCGO
+openbao_ig_searxng_secret: CHANGE_ME
 
 # LightSerp
-openbao_ig_ls_api_secret: VLpShZuWVyJwyZG2LIK4qzQS
+openbao_ig_ls_api_secret: CHANGE_ME
 
 # PageZen
 openbao_ig_pagezen_port: "8081"
