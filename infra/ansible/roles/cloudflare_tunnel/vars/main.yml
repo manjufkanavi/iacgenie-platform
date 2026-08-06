@@ -23,7 +23,7 @@ tunnels:
         - hostname: "search.iacgenie.com"
           service: http://127.0.0.1:8080
         - hostname: "vault.iacgenie.com"
-          service: http://127.0.0.1:8200
+          service: http://127.0.0.1:80
         - hostname: "admin.iacgenie.com"
           service: http://127.0.0.1:9090
         - hostname: "infra.local"
@@ -46,7 +46,7 @@ tunnels:
         - hostname: "search.iacgenie.com"
           service: http://127.0.0.1:8080
         - hostname: "vault.iacgenie.com"
-          service: http://127.0.0.1:8200
+          service: http://127.0.0.1:80
         - hostname: "admin.iacgenie.com"
           service: http://127.0.0.1:9090
         - hostname: "infra.local"
