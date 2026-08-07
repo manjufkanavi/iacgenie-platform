@@ -25,8 +25,11 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
-*.secret
 .vault_key
+
+# git-secret (GPG-encrypted secrets — *.secret files ARE committed)
+# Only ignore the random seed, not the encrypted .secret files
+.gitsecret/keys/random_seed
 
 # Virtual envs
 .venv/

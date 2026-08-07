@@ -6,6 +6,7 @@
  */
 
 import { log } from './logger.js';
+import { secrets } from './lib/secrets-provider.js';
 
 const DEFAULTS = {
   SEARXNG_SECRET_KEY: 'benchmark-key',
@@ -17,9 +18,12 @@ const DEFAULTS = {
  * Called once at server startup. Throws if any secret equals a default.
  * JWT_SECRET is checked separately — it must be set, not just "not default".
  */
-export function enforceSecrets(): void {
+export async function enforceSecrets(): Promise<void> {
+  // Initialize OpenBao secrets provider (falls back to env vars if not configured)
+  await secrets.initialize();
+
   // JWT_SECRET must be present and non-empty (no default check needed)
-  const jwtSecret = process.env.JWT_SECRET;
+  const jwtSecret = await secrets.getJwtSecret();
   if (!jwtSecret || jwtSecret.length < 32) {
     log.error('❌ JWT_SECRET is missing or too short (< 32 characters). Set a cryptographically random value.');
     throw new Error(
@@ -27,10 +31,12 @@ export function enforceSecrets(): void {
     );
   }
 
+  const searxngConfig = await secrets.getSearxngConfig();
+
   const checks: { name: string; actual: string }[] = [
-    { name: 'SEARXNG_SECRET_KEY', actual: process.env.SEARXNG_SECRET || DEFAULTS.SEARXNG_SECRET_KEY },
+    { name: 'SEARXNG_SECRET_KEY', actual: searxngConfig.secret || DEFAULTS.SEARXNG_SECRET_KEY },
     { name: 'A12N_SECRET', actual: process.env.A12N_SECRET || DEFAULTS.A12N_SECRET },
-    { name: 'DOCKER_JWT_SECRET', actual: process.env.JWT_SECRET || DEFAULTS.COMPOSE_JWT },
+    { name: 'DOCKER_JWT_SECRET', actual: jwtSecret || DEFAULTS.COMPOSE_JWT },
   ];
 
   const violations: string[] = [];

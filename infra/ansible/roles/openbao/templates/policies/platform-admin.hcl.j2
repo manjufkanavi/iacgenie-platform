@@ -1,4 +1,5 @@
-# Platform Admin Policy — full access to all vault paths
+# Platform Admin Policy — read-only access to all vault paths
+# Full read/write access is reserved for the 'admin' policy only
 path "*" {
-  capabilities = ["create", "read", "update", "delete", "list"]
+  capabilities = ["read", "list"]
 }

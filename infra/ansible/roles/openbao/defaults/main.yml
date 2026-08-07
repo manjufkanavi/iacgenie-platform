@@ -3,19 +3,16 @@ openbao_port: 8200
 openbao_data_dir: /var/lib/openbao
 openbao_storage_type: raft
 openbao_auto_unseal: false
-openbao_static_key: CHANGE_ME
+openbao_static_key: "{{ vault_openbao_static_key }}"
 
 # ── OpenBao API URL (for internal container-to-container) ───────────────────
 openbao_api_url: "http://127.0.0.1:{{ openbao_port }}"
 
 # ── Root token (from init_keys.json on VM) ────────────────────────────────
-openbao_root_token: CHANGE_ME  # read from init_keys.json after bootstrap
+openbao_root_token: "{{ vault_openbao_root_token }}"  # read from init_keys.json after bootstrap
 
 # ── OpenBao unseal keys (Shamir 3/2) — generated on Aug 7 after raft recovery ──
-openbao_unseal_keys:
-  - "Ji1h/DZD3Ajxc8oEiWXt4+yZ+1EaQcxW86GkmcWK5up8"
-  - "6doiMVlSf2W/nDyuCyofXLDZLDXzv3rastZ8WiQhdW7/"
-  - "WZLIWXqkWJ7fAxiobyaQB5KHS3sf1gCAgCJJDIVL53n3"
+openbao_unseal_keys: "{{ vault_openbao_unseal_keys }}"
 
 # ── Raft / data directory on host ─────────────────────────────────────────
 openbao_raft_data_dir: /home/mkanavi/docker/iacgenie/data/openbao_raft
@@ -30,7 +27,7 @@ openbao_bootstrap_kv: true         # Enable KV engines and seed secrets
 openbao_oidc_enabled: true
 openbao_oidc_discovery_url: "http://127.0.0.1:8083/realms/lightserp/.well-known/openid-configuration"
 openbao_oidc_client_id: "openbao-oidc"
-openbao_oidc_client_secret: "2AMmiNh62NQGzwmBiECfNWyIed1hbf04"  # Keycloak openbao-oidc client secret (lightserp realm)
+openbao_oidc_client_secret: "{{ vault_openbao_oidc_client_secret }}"  # Keycloak openbao-oidc client secret (lightserp realm)
 openbao_oidc_redirect_uris:
   - "https://vault.iacgenie.com/oidc/callback"
   - "http://127.0.0.1:{{ openbao_port }}/oidc/callback"
@@ -72,31 +69,31 @@ openbao_backup_token_ttl: "168h" # 7 days — backup cron token
 # ── IaCGenie KV Secrets ───────────────────────────────────────────────────
 
 # PostgreSQL
-openbao_ig_pg_password: Pg5nX8qR3wY7tB2mV9cF4jHa6dGe8kLu
+openbao_ig_pg_password: "{{ vault_openbao_ig_pg_password }}"
 
 # Redis
-openbao_ig_redis_password: Rd9mK3xL7pN2qB5vW8jF4tY6hD1eGa
+openbao_ig_redis_password: "{{ vault_openbao_ig_redis_password }}"
 
 # MinIO
 openbao_ig_minio_access_key: iacgenie
-openbao_ig_minio_secret_key: Mn7bQ3xL9pN2wR5tY8jF4vH6dGe1kZu
+openbao_ig_minio_secret_key: "{{ vault_openbao_ig_minio_secret_key }}"
 
 # Keycloak
 openbao_ig_kc_admin_user: admin
-openbao_ig_kc_admin_password: Kc8xL2mNp9Qr4vWy7zBf3jHa5dGe6tRu
-openbao_ig_kc_db_password: Kd3nX7qR9wY2tB5mV8cF4jHa6dGe1uLp
+openbao_ig_kc_admin_password: "{{ vault_openbao_ig_kc_admin_password }}"
+openbao_ig_kc_db_password: "{{ vault_openbao_ig_kc_db_password }}"
 
 # Gitea
-openbao_ig_gitea_db_password: Gi6xL3mN8pQ2wR5tY7jF4vH9dGe1kZu
+openbao_ig_gitea_db_password: "{{ vault_openbao_ig_gitea_db_password }}"
 
 # OpenBao root token
-openbao_ig_openbao_root_token: s.VE9zM0CejxMCYgBap0lrwUpB
+openbao_ig_openbao_root_token: "{{ vault_openbao_ig_openbao_root_token }}"
 
 # SearXNG
-openbao_ig_searxng_secret: Sx9bL4mN7pQ2wR5tY8jF3vH6dGe1kZu
+openbao_ig_searxng_secret: "{{ vault_openbao_ig_searxng_secret }}"
 
 # LightSerp
-openbao_ig_ls_api_secret: Ls7nX3qR5wY9tB2mV8cF4jHa6dGe1uLp
+openbao_ig_ls_api_secret: "{{ vault_openbao_ig_ls_api_secret }}"
 
 # PageZen
 openbao_ig_pagezen_port: "8081"
