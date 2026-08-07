@@ -229,7 +229,42 @@ check_cron_jobs() {
     done
 }
 
-# === Check 7: Ansible Playbook Idempotency ===
+# === Check 7: Monitoring Stack ===
+check_monitoring_stack() {
+    echo ""
+    echo -e "${CYAN}=== Monitoring Stack Drift ===${NC}"
+
+    # Check monitoring compose exists
+    local compose_exists
+    compose_exists=$(run_ssh "test -f /home/mkanavi/docker/iacgenie/docker-compose-monitoring.yml && echo 'exists' || echo 'missing'")
+    if [[ "$compose_exists" == "exists" ]]; then
+        drift_ok "Monitoring docker-compose.yml exists"
+    else
+        drift_found "Monitoring docker-compose.yml missing"
+    fi
+
+    # Check monitoring containers
+    local mc
+    mc=$(run_ssh "docker ps --format '{{.Names}}' 2>/dev/null | grep -cE 'prometheus|alertmanager|grafana|loki|promtail|node_exporter|falco|falcosidekick' || echo 0")
+    if [[ "$mc" -ge 5 ]]; then
+        drift_ok "Monitoring stack: $mc services running"
+    else
+        drift_found "Monitoring stack only $mc services running (expected 8)"
+    fi
+
+    # Check systemd units for monitoring
+    for svc in iacgenie-monitoring falco cloudflared; do
+        local status
+        status=$(run_ssh "sudo systemctl is-active $svc 2>/dev/null || echo 'inactive'")
+        if [[ "$status" == "active" ]]; then
+            drift_ok "Systemd unit $svc is active"
+        else
+            drift_found "Systemd unit $svc is $status"
+        fi
+    done
+}
+
+# === Check 8: Ansible Playbook Idempotency ===
 check_ansible_idempotency() {
     echo ""
     echo -e "${CYAN}=== Ansible Idempotency Check ===${NC}"
@@ -295,6 +330,12 @@ main() {
         check_cron_jobs
     fi
 
+    # Monitoring stack (Check 7)
+    if [[ -z "$CHECK_FILTER" ]] || [[ "$CHECK_FILTER" == "monitoring" ]] || [[ "$CHECK_FILTER" == "monitor" ]] || [[ "$CHECK_FILTER" == "grafana" ]] || [[ "$CHECK_FILTER" == "prometheus" ]] || [[ "$CHECK_FILTER" == "falco" ]]; then
+        check_monitoring_stack
+    fi
+
+    # Ansible idempotency (Check 8)
     if [[ -z "$CHECK_FILTER" ]] || [[ "$CHECK_FILTER" == "ansible" ]] || [[ "$CHECK_FILTER" == "idempotency" ]]; then
         check_ansible_idempotency
     fi

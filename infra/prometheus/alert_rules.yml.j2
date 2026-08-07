@@ -57,25 +57,25 @@ groups:
 
       # Disk usage > 85%
       - alert: DiskSpaceHigh
-        expr: (1 - node_filesystem_avail_bytes / node_filesystem_size_bytes) > 0.85
+        expr: (1 - node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) > 0.85
         for: 5m
         labels:
           severity: warning
           category: resources
         annotations:
           summary: "Disk usage > 85%"
-          description: "Disk at {{ humanize ((1 - $value) * 100) | humanize 100 }}% on {{ $labels.mountpoint }}"
+          description: "Disk space critical — check immediately"
 
       # Disk usage > 95%
       - alert: DiskSpaceCritical
-        expr: (1 - node_filesystem_avail_bytes / node_filesystem_size_bytes) > 0.95
+        expr: (1 - node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) > 0.95
         for: 1m
         labels:
           severity: critical
           category: resources
         annotations:
           summary: "Disk usage > 95%"
-          description: "CRITICAL: Disk at {{ humanize ((1 - $value) * 100) | humanize 100 }}% on {{ $labels.mountpoint }}"
+          description: "CRITICAL — disk almost full"
 
   # =========================================================================
   # Database Alerts
@@ -134,11 +134,33 @@ groups:
           description: "P95 response time: {{ $value | humanize }}s"
 
   # =========================================================================
-  # Security Alerts
+  # Security Alerts (Falco + Auth)
   # =========================================================================
   - name: security_alerts
     interval: 30s
     rules:
+      # Falco events received (indicates Falco is alive + detecting)
+      - alert: FalcoEventReceived
+        expr: falco_event_total > 0
+        for: 10m
+        labels:
+          severity: info
+          category: security
+        annotations:
+          summary: "Falco security event detected: {{ $labels.rule }}"
+          description: "Rule {{ $labels.rule }} fired — check Falcosidekick UI at http://127.0.0.1:2800"
+
+      # Falco stopped sending events (Falco might be down)
+      - alert: FalcoSilent
+        expr: falco_event_total == 0
+        for: 15m
+        labels:
+          severity: critical
+          category: security
+        annotations:
+          summary: "Falco has stopped reporting events"
+          description: "No Falco events in 15 minutes — check falco container"
+
       # Failed auth attempts > 10/min
       - alert: BruteForceAttempt
         expr: rate(http_requests_total{status="401", handler="auth"}[5m]) > 10

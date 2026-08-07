@@ -1,9 +1,13 @@
-# =============================================================================
-# Alertmanager Configuration
-# =============================================================================
+# Alertmanager Configuration — IacGenie Platform
+# Routes: critical → webhook/Telegram, warning → batched, security (Falco) → immediate
+# Receivers: default webhook, critical webhook, warning webhook, security webhook
 
 global:
   resolve_timeout: 5m
+  smtp_smarthost: "${ALERTMANAGER_SMTP_HOST:-}"
+  smtp_from: "${ALERTMANAGER_SMTP_FROM:-}"
+  smtp_auth_username: "${ALERTMANAGER_SMTP_USER:-}"
+  smtp_auth_password: "${ALERTMANAGER_SMTP_PASS:-}"
 
 route:
   group_by: ["alertname", "severity", "category"]
@@ -13,6 +17,13 @@ route:
   receiver: "default"
 
   routes:
+    # Security alerts (Falco/Falcosidekick) → immediate + all receivers
+    - match:
+        category: security
+      receiver: "security-alerts"
+      repeat_interval: 5m
+      continue: true
+
     # Critical alerts → immediate notification
     - match:
         severity: critical
@@ -29,18 +40,32 @@ route:
 receivers:
   - name: "default"
     webhook_configs:
-      - url: "http://alertmanager-webhook:5001/webhook"
+      - url: "${ALERTMANAGER_WEBHOOK_URL:-http://localhost:5001/webhook}"
         send_resolved: true
 
   - name: "critical-alerts"
     webhook_configs:
-      - url: "http://alertmanager-webhook:5001/webhook"
+      - url: "${ALERTMANAGER_WEBHOOK_URL:-http://localhost:5001/webhook}"
         send_resolved: true
+    # Email fallback for critical alerts (uncomment when configured)
+    # email_configs:
+    #   - to: "admin@iacgenie.com"
+    #     send_resolved: true
 
   - name: "warning-alerts"
     webhook_configs:
-      - url: "http://alertmanager-webhook:5001/webhook"
+      - url: "${ALERTMANAGER_WEBHOOK_URL:-http://localhost:5001/webhook}"
         send_resolved: true
+
+  - name: "security-alerts"
+    webhook_configs:
+      - url: "${ALERTMANAGER_WEBHOOK_URL:-http://localhost:5001/webhook}"
+        send_resolved: true
+    # Telegram fallback for security alerts
+    # telegram_configs:
+    #   - bot_token: "${TELEGRAM_BOT_TOKEN:-}"
+    #     chat_id: "${TELEGRAM_CHAT_ID:-}"
+    #     send_resolved: true
 
 # Inhibit rules — suppress warnings when critical exists
 inhibit_rules:

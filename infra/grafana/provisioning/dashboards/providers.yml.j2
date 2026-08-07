@@ -1,16 +1,13 @@
-# =============================================================================
-# Grafana — Dashboard Provisioning
-# =============================================================================
-
 apiVersion: 1
 
 providers:
-  - name: "iacgenie-dashboards"
+  - name: "default"
     orgId: 1
-    folder: "IacGenie"
+    folder: ""
     type: file
     disableDeletion: false
-    updateIntervalSeconds: 30
+    updateIntervalSeconds: 10
     allowUiUpdates: true
     options:
-      path: /etc/grafana/provisioning/dashboards/json
+      path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: false

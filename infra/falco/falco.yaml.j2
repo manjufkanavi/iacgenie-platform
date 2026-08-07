@@ -32,9 +32,18 @@ max_supported_kernel_version: 6
 stdout_output:
   enabled: true
 
-# ── Output to Loki ──
-stdout_output:
+# ── Webhook Output (to Falcosidekick — Falco Web UI) ──
+webhook:
   enabled: true
+  url: "http://localhost:2800/falco-events"
+  timeout: 1s
+  response_headers:
+    - content-type: application/json
+  request_headers:
+    - X-Source: falco
+  forward:
+    enabled: true
+    format: json
 
 # ── Gelf Output (for syslog/Grafana) ──
 gelf_output:

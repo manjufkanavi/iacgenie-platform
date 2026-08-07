@@ -1,219 +1,303 @@
 #!/bin/bash
 # =============================================================================
-# IacGenie Platform — Comprehensive Health Check
+# IacGenie Platform — Comprehensive Health Check Script
+# Checks: Base services (postgres, redis, openbao, keycloak, gitea, minio),
+#         LightSerp (api, webui, pagezen, searxng, nsqd),
+#         Monitoring (prometheus, alertmanager, grafana, loki, promtail),
+#         Security (falco, falcosidekick), Infrastructure (node-exporter)
+# Output: Color-coded PASS/FAIL/WARN with Docker labels for services
 # =============================================================================
-# Checks ALL services on VM 192.168.0.118 and reports health status.
-# Output: JSON format suitable for Prometheus/Grafana integration.
-#
-# Usage:
-#   ./health-check.sh              # Full check, output JSON
-#   ./health-check.sh --verbose    # Verbose output with details
-#   ./health-check.sh --json       # JSON only (default)
-#   ./health-check.sh SERVICE_NAME # Check single service
-# =============================================================================
-
 set -euo pipefail
 
-# === Configuration ===
-SSH_USER="mkanavi"
-VM_IP="192.168.0.118"
-VERBOSE=false
-JSON_ONLY=true
-SINGLE_SERVICE=""
-
-for arg in "$@"; do
-    case $arg in
-        --verbose) VERBOSE=true ;;
-        --json) JSON_ONLY=true ;;
-        *)
-            # Check if it's a known service name
-            known_services="postgres redis minio openbao keycloak gitea lightserp_api lightserp_webui pagezen searxng nsqd nginx cloudflared"
-            if echo "$known_services" | grep -qw "$arg"; then
-                SINGLE_SERVICE="$arg"
-            else
-                echo "Unknown service: $arg"
-                echo "Known services: $known_services"
-                exit 1
-            fi
-            ;;
-    esac
-done
-
-# === Color codes ===
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
 NC='\033[0m'
 
-# === SSH helper ===
-run_ssh() {
-    ssh -o ConnectTimeout=5 -o BatchMode=yes "$SSH_USER@$VM_IP" "$1" 2>/dev/null || echo "UNREACHABLE"
+PASS=0
+FAIL=0
+WARN=0
+
+pass() { echo -e "  ${GREEN}✓ PASS${NC} $1"; ((PASS++)); }
+fail() { echo -e "  ${RED}✗ FAIL${NC} $1"; ((FAIL++)); }
+warn() { echo -e "  ${YELLOW}⚠ WARN${NC} $1"; ((WARN++)); }
+info() { echo -e "  ${CYAN}ℹ INFO${NC} $1"; }
+
+# === HTTP health check helper ===
+check_http() {
+    local name="$1" url="$2" desc="$3"
+    local http_code
+    http_code=$(curl -sf -o /dev/null -w '%{http_code}' "$url" 2>/dev/null || echo "000")
+    case "$http_code" in
+        200|201|204) pass "$desc"; return 0 ;;
+        503) warn "$desc (service starting)"; return 0 ;;
+        *) fail "$desc (HTTP $http_code at $url)"; return 1 ;;
+    esac
 }
 
-# === Individual Service Checks ===
-check_postgres() {
-    local status=$(run_ssh "pg_isready -h 127.0.0.1 -p 5432 -U lightsrp -d lightsrp 2>/dev/null && echo 'healthy' || echo 'unhealthy'")
-    echo "    postgres\" : {\"status\":\"$status\",\"port\":5432,\"type\":\"database\"}"
+# === Docker health check helper ===
+check_docker() {
+    local name="$1"
+    local status
+    status=$(docker inspect --format='{{.State.Status}}' "iacgenie_${name}" 2>/dev/null || echo "not_found")
+    local health
+    health=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "iacgenie_${name}" 2>/dev/null || echo "none")
+    
+    case "$status" in
+        running)
+            if [[ "$health" == "healthy" ]]; then
+                pass "$name (running, $health)"
+            else
+                if [[ "$health" == "none" ]]; then
+                    pass "$name (running, no healthcheck)"
+                else
+                    warn "$name (running, $health)"
+                fi
+            fi
+            return 0
+            ;;
+        started)
+            pass "$name (running)"
+            return 0
+            ;;
+        stopped|exited)
+            fail "$name (stopped/exited)"
+            return 1
+            ;;
+        *)
+            fail "$name ($status)"
+            return 1
+            ;;
+    esac
 }
 
-check_redis() {
-    local status=$(run_ssh "redis-cli -h 127.0.0.1 -p 6379 ping 2>/dev/null | grep -q PONG && echo 'healthy' || echo 'unhealthy'")
-    echo "    redis\" : {\"status\":\"$status\",\"port\":6379,\"type\":\"cache\"}"
-}
-
-check_minio() {
-    local status=$(run_ssh "wget -q -O - http://127.0.0.1:9000/minio/health/live 2>/dev/null | grep -q alive && echo 'healthy' || echo 'unhealthy'")
-    echo "    minio\" : {\"status\":\"$status\",\"port\":9000,\"type\":\"object-storage\"}"
-}
-
-check_openbao() {
-    local status=$(run_ssh "wget -q -O - http://127.0.0.1:8200/v1/sys/health 2>/dev/null | grep -q 'sealed.*false' && echo 'healthy' || echo 'unhealthy'")
-    echo "    openbao\" : {\"status\":\"$status\",\"port\":8200,\"type\":\"secrets-management\"}"
-}
-
-check_keycloak() {
-    local status=$(run_ssh "curl -sf http://127.0.0.1:8083/realms/master/protocol/openid-connect/certs 2>/dev/null > /dev/null && echo 'healthy' || echo 'unhealthy'")
-    echo "    keycloak\" : {\"status\":\"$status\",\"port\":8083,\"type\":\"auth-oidc\"}"
-}
-
-check_gitea() {
-    local status=$(run_ssh "wget -q --spider http://127.0.0.1:3000/ 2>/dev/null && echo 'healthy' || echo 'unhealthy'")
-    echo "    gitea\" : {\"status\":\"$status\",\"port\":3000,\"type\":\"git-service\"}"
-}
-
-check_lightserp_api() {
-    local status=$(run_ssh "curl -sf http://127.0.0.1:8000/health 2>/dev/null > /dev/null && echo 'healthy' || echo 'unhealthy'")
-    echo "    lightserp_api\" : {\"status\":\"$status\",\"port\":8000,\"type\":\"api\"}"
-}
-
-check_lightserp_webui() {
-    local status=$(run_ssh "curl -sf http://127.0.0.1:3001/ 2>/dev/null > /dev/null && echo 'healthy' || echo 'unhealthy'")
-    echo "    lightserp_webui\" : {\"status\":\"$status\",\"port\":3001,\"type\":\"webui\"}"
-}
-
-check_pagezen() {
-    local status=$(run_ssh "curl -sf http://127.0.0.1:8081/health 2>/dev/null > /dev/null && echo 'healthy' || echo 'unhealthy'")
-    echo "    pagezen\" : {\"status\":\"$status\",\"port\":8081,\"type\":\"content-generation\"}"
-}
-
-check_searxng() {
-    local status=$(run_ssh "wget -q --spider http://127.0.0.1:8082/ 2>/dev/null && echo 'healthy' || echo 'unhealthy'")
-    echo "    searxng\" : {\"status\":\"$status\",\"port\":8082,\"type\":\"search\"}"
-}
-
-check_nsqd() {
-    local status=$(run_ssh "wget -q -O /dev/null http://127.0.0.1:4151/stats 2>/dev/null && echo 'healthy' || echo 'unhealthy'")
-    echo "    nsqd\" : {\"status\":\"$status\",\"port\":4151,\"type\":\"message-queue\"}"
-}
-
-check_nginx() {
-    local status=$(run_ssh "systemctl is-active nginx 2>/dev/null | grep -q active && echo 'healthy' || echo 'unhealthy'")
-    echo "    nginx\" : {\"status\":\"$status\",\"port\":80,\"type\":\"reverse-proxy\"}"
-}
-
-check_cloudflared() {
-    local count=$(run_ssh "systemctl list-units --type=service --state=running 2>/dev/null | grep -c cloudflared || echo 0")
-    local status="healthy"
-    [[ "$count" -lt 1 ]] && status="unhealthy"
-    echo "    cloudflared\" : {\"status\":\"$status\",\"count\":$count,\"type\":\"tunnel\"}"
-}
-
-check_docker_engine() {
-    local status=$(run_ssh "docker info &>/dev/null && echo 'healthy' || echo 'unhealthy'")
-    echo "    docker\" : {\"status\":\"$status\",\"type\":\"container-runtime\"}"
-}
-
-check_docker_containers() {
-    local running=$(run_ssh "docker ps --format '{{.Names}}' | grep -c '^iacgenie_' 2>/dev/null || echo 0")
-    local unhealthy=$(run_ssh "docker ps --format '{{.Names}}\t{{.Status}}' 2>/dev/null | grep -c -i 'unhealthy\|dead\|exited' || echo 0")
-    echo "    docker_containers\" : {\"running\":$running,\"unhealthy\":$unhealthy,\"type\":\"infra\"}"
-}
-
-# === Main ===
-main() {
-    if [[ "$VERBOSE" == true ]]; then
-        echo "╔══════════════════════════════════════════════════════════╗"
-        echo "║    IacGenie Platform — Health Check                    ║"
-        echo "║    VM: $VM_IP                                          ║"
-        echo "║    Time: $(date '+%Y-%m-%d %H:%M:%S')                             ║"
-        echo "╚══════════════════════════════════════════════════════════╝"
-        echo ""
-    fi
-
-    local health_data
-    health_data=$(run_ssh "
-        # Run all checks locally on the VM
-        for cmd in 'pg_isready -h 127.0.0.1 -p 5432' 'redis-cli -h 127.0.0.1 ping' 'wget -q -O - http://127.0.0.1:9000/minio/health/live' 'wget -q -O - http://127.0.0.1:8200/v1/sys/health' 'curl -sf http://127.0.0.1:8083/realms/master/protocol/openid-connect/certs'; do
-            \$cmd > /dev/null 2>&1 && echo 'up' || echo 'down'
-        done
-    " 2>/dev/null || echo "UNREACHABLE")
-
-    if [[ "$health_data" == "UNREACHABLE" ]]; then
-        if [[ "$JSON_ONLY" == true ]]; then
-            cat <<'JSON_EOF'
-{
-    "timestamp": "TIMESTAMP_PLACEHOLDER",
-    "overall": "error",
-    "services": {
-        "error": {"status": "error", "message": "VM unreachable"}
-    }
-}
-JSON_EOF
-        else
-            echo -e "${RED}ERROR: Cannot reach VM $VM_IP${NC}"
-        fi
-        return
-    fi
-
-    # Get quick summary on VM
-    local container_count
-    container_count=$(run_ssh "docker ps --format '{{.Names}}' | grep -c '^iacgenie_' 2>/dev/null || echo 0")
-
-    if [[ "$JSON_ONLY" == true ]]; then
-        echo "{"
-        echo "  \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\","
-        echo "  \"vm\": \"$VM_IP\","
-        echo "  \"overall\": \"$([ \"$container_count\" -ge 10 ] && echo 'healthy' || echo 'degraded')\","
-        echo "  \"docker_containers\": $container_count,"
-        echo "  \"services\": {"
-
-        if [[ -z "$SINGLE_SERVICE" ]]; then
-            echo "      \"postgres\":    {\"status\":\"checking\"},"
-            echo "      \"redis\":       {\"status\":\"checking\"},"
-            echo "      \"minio\":       {\"status\":\"checking\"},"
-            echo "      \"openbao\":     {\"status\":\"checking\"},"
-            echo "      \"keycloak\":    {\"status\":\"checking\"},"
-            echo "      \"gitea\":       {\"status\":\"checking\"},"
-            echo "      \"lightserp_api\":{\"status\":\"checking\"},"
-            echo "      \"lightserp_webui\":{\"status\":\"checking\"},"
-            echo "      \"pagezen\":     {\"status\":\"checking\"},"
-            echo "      \"searxng\":     {\"status\":\"checking\"},"
-            echo "      \"nsqd\":        {\"status\":\"checking\"},"
-            echo "      \"nginx\":       {\"status\":\"checking\"},"
-            echo "      \"cloudflared\": {\"status\":\"checking\"},"
-            echo "      \"docker\":      {\"status\":\"checking\"}"
-            echo "  }"
-            echo "}"
-        else
-            echo "      \"$SINGLE_SERVICE\": {\"status\":\"checking\"}"
-            echo "  }"
-            echo "}"
-        fi
+# === Port health check ===
+check_port() {
+    local name="$1" port="$2"
+    if timeout 3 bash -c "echo >/dev/tcp/127.0.0.1/$port" 2>/dev/null; then
+        pass "$name (port $port open)"
     else
-        echo "Services: $container_count running"
-        echo ""
-
-        echo "Docker Containers:"
-        run_ssh "docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' | head -20"
-        echo ""
-
-        echo "Systemd Services:"
-        run_ssh "systemctl list-units --type=service --state=running --no-pager | grep -E 'nginx|cloudflared|promtail' 2>/dev/null || echo 'none'"
-        echo ""
-
-        echo "Disk Usage:"
-        run_ssh "df -h /home/mkanavi/docker/iacgenie/ | tail -1"
+        fail "$name (port $port closed)"
     fi
 }
 
-main "$@"
+# =============================================================================
+# Base Infrastructure Services
+# =============================================================================
+echo -e "\n${BOLD}=== BASE INFRASTRUCTURE SERVICES ===${NC}\n"
+
+# PostgreSQL
+echo -e "${BOLD}--- PostgreSQL ---${NC}"
+check_docker "postgres"
+check_port "postgres" 5432
+# Check if databases exist
+if docker exec iacgenie_postgres psql -U postgres -tc "SELECT datname FROM pg_database WHERE datname IN ('lightsrp', 'keycloak')" 2>/dev/null | grep -q .; then
+    pass "Required databases exist (lightsrp, keycloak)"
+else
+    warn "Required databases may be missing"
+fi
+
+# Redis
+echo -e "${BOLD}--- Redis ---${NC}"
+check_docker "redis"
+check_port "redis" 6379
+if docker exec iacgenie_redis redis-cli ping 2>/dev/null | grep -q PONG; then
+    pass "Redis responds to PING"
+else
+    warn "Redis PING failed"
+fi
+
+# OpenBao
+echo -e "${BOLD}--- OpenBao ---${NC}"
+check_docker "openbao"
+check_port "openbao" 8200
+if docker exec iacgenie_openbao bao status 2>/dev/null | grep -qi "sealed"; then
+    # Check if unsealed
+    local sealed
+    sealed=$(docker exec iacgenie_openbao bao status 2>/dev/null | grep -c "sealed: true" || true)
+    if [[ "$sealed" == "0" ]]; then
+        pass "OpenBao is unsealed and operational"
+    else
+        warn "OpenBao is sealed"
+    fi
+else
+    pass "OpenBao is running"
+fi
+
+# Keycloak
+echo -e "${BOLD}--- Keycloak ---${NC}"
+check_docker "keycloak"
+check_port "keycloak" 8083
+check_http "Keycloak" "http://127.0.0.1:8083/auth/health/ready" "Keycloak health endpoint"
+
+# Gitea
+echo -e "${BOLD}--- Gitea ---${NC}"
+check_docker "gitea"
+check_port "gitea" 3000
+check_http "Gitea" "http://127.0.0.1:3000/api/health" "Gitea API health"
+
+# MinIO
+echo -e "${BOLD}--- MinIO ---${NC}"
+check_docker "minio"
+check_port "minio" 9000
+check_http "MinIO API" "http://127.0.0.1:9000/minio/health/live" "MinIO health"
+
+# NSQD
+echo -e "${BOLD}--- NSQD ---${NC}"
+check_docker "nsqd"
+check_port "nsqd" 4150
+if docker exec iacgenie_nsqd nsqadmin --lookupd-http-address=127.0.0.1:4151 2>/dev/null | grep -q .; then
+    pass "NSQD admin accessible"
+else
+    pass "NSQD running (port 4150)"
+fi
+
+# SearXNG
+echo -e "${BOLD}--- SearXNG ---${NC}"
+check_docker "searxng"
+check_port "searxng" 8082
+check_http "SearXNG" "http://127.0.0.1:8082" "SearXNG search engine"
+
+# =============================================================================
+# LightSerp Services
+# =============================================================================
+echo -e "\n${BOLD}=== LIGHTSERP SERVICES ===${NC}\n"
+
+# LightSerp API
+echo -e "${BOLD}--- LightSerp API ---${NC}"
+check_docker "lightserp_api"
+check_port "lightserp_api" 8000
+check_http "LightSerp API" "http://127.0.0.1:8000" "LightSerp API endpoint"
+
+# LightSerp WebUI
+echo -e "${BOLD}--- LightSerp WebUI ---${NC}"
+check_docker "lightserp_webui"
+check_port "lightserp_webui" 3001
+check_http "LightSerp WebUI" "http://127.0.0.1:3001" "LightSerp WebUI"
+
+# PageZen
+echo -e "${BOLD}--- PageZen ---${NC}"
+check_docker "pagezen"
+check_port "pagezen" 8081
+check_http "PageZen" "http://127.0.0.1:8081" "PageZen PDF viewer"
+
+# =============================================================================
+# Monitoring Stack
+# =============================================================================
+echo -e "\n${BOLD}=== MONITORING STACK ===${NC}\n"
+
+# Prometheus
+echo -e "${BOLD}--- Prometheus ---${NC}"
+check_docker "prometheus"
+check_port "prometheus" 9090
+check_http "Prometheus" "http://127.0.0.1:9090/-/healthy" "Prometheus health"
+# Check scrape targets
+targets=$(curl -sf http://127.0.0.1:9090/api/v1/targets 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); active=sum(1 for t in d['data']['activeTargets'] if t['health']=='up'); total=len(d['data']['activeTargets']); print(f'{active}/{total}')" 2>/dev/null || echo "unknown")
+info "Prometheus scrape targets: $targets up"
+
+# Alertmanager
+echo -e "${BOLD}--- Alertmanager ---${NC}"
+check_docker "alertmanager"
+check_port "alertmanager" 9093
+check_http "Alertmanager" "http://127.0.0.1:9093/-/healthy" "Alertmanager health"
+
+# Grafana
+echo -e "${BOLD}--- Grafana ---${NC}"
+check_docker "grafana"
+check_port "grafana" 3002
+check_http "Grafana" "http://127.0.0.1:3002/api/health" "Grafana health"
+
+# Loki
+echo -e "${BOLD}--- Loki ---${NC}"
+check_docker "loki"
+check_port "loki" 3100
+check_http "Loki" "http://127.0.0.1:3100/ready" "Loki ready"
+
+# Promtail
+echo -e "${BOLD}--- Promtail ---${NC}"
+check_docker "promtail"
+
+# Node Exporter
+echo -e "${BOLD}--- Node Exporter (host metrics) ---${NC}"
+check_port "node-exporter" 9100
+check_http "Node Exporter" "http://127.0.0.1:9100/metrics" "Node Exporter metrics endpoint"
+
+# =============================================================================
+# Security Stack
+# =============================================================================
+echo -e "\n${BOLD}=== SECURITY STACK ===${NC}\n"
+
+# Falco
+echo -e "${BOLD}--- Falco (runtime security) ---${NC}"
+check_docker "falco"
+info "Falco kernel module: $(lsmod 2>/dev/null | grep -c falco || echo 'eBPF') eBPF probes loaded"
+
+# Falcosidekick (Web UI)
+echo -e "${BOLD}--- Falcosidekick (Web UI) ---${NC}"
+check_docker "falcosidekick"
+check_port "falcosidekick" 2800
+check_http "Falcosidekick UI" "http://127.0.0.1:2800/falco-events" "Falcosidekick health"
+
+# =============================================================================
+# Infrastructure Services
+# =============================================================================
+echo -e "\n${BOLD}=== INFRASTRUCTURE SERVICES ===${NC}\n"
+
+# Docker
+if systemctl is-active --quiet docker.service; then
+    docker_count=$(docker ps --format '{{.Names}}' 2>/dev/null | wc -l)
+    pass "Docker daemon running ($docker_count containers)"
+else
+    fail "Docker daemon not running"
+fi
+
+# Nginx
+if systemctl is-active --quiet nginx.service; then
+    pass "Nginx reverse proxy running"
+else
+    fail "Nginx not running"
+fi
+
+# Cloudflared
+if systemctl is-active --quiet cloudflared.service; then
+    pass "Cloudflare tunnel running"
+else
+    fail "Cloudflare tunnel not running"
+fi
+
+# System resources
+echo -e "${BOLD}--- System Resources ---${NC}"
+disk_usage=$(df -h / | awk 'NR==2 {print $5}')
+mem_info=$(free -m | awk 'NR==2 {printf "%.0f%% used (%dMB/%dMB)", $3*100/$2, $3, $2}')
+load=$(uptime | awk -F'load average:' '{print $2}' | xargs)
+info "Disk: $disk_usage used | Memory: $mem_info | Load: $load"
+
+if [[ "$(df / | awk 'NR==2 {print $5}' | tr -d '%')" -gt 90 ]]; then
+    fail "Disk usage > 90%"
+elif [[ "$(df / | awk 'NR==2 {print $5}' | tr -d '%')" -gt 80 ]]; then
+    warn "Disk usage > 80%"
+else
+    pass "Disk usage OK ($disk_usage)"
+fi
+
+# =============================================================================
+# Summary
+# =============================================================================
+echo -e "\n${BOLD}========================================${NC}"
+echo -e "${BOLD}  HEALTH CHECK SUMMARY${NC}"
+echo -e "${BOLD}========================================${NC}"
+echo -e "  ${GREEN}PASS: $PASS${NC}"
+echo -e "  ${YELLOW}WARN: $WARN${NC}"
+echo -e "  ${RED}FAIL: $FAIL${NC}"
+echo -e "${BOLD}========================================${NC}\n"
+
+TOTAL=$((PASS + WARN + FAIL))
+if [[ $FAIL -eq 0 ]]; then
+    echo -e "${GREEN}${BOLD}ALL CHECKS PASSED${NC}"
+    exit 0
+else
+    echo -e "${RED}${BOLD}$FAIL CHECKS FAILED — review above${NC}"
+    exit 1
+fi

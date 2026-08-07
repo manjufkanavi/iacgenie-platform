@@ -1,0 +1,61 @@
+# =============================================================================
+# Ansible Site Playbook — IacGenie Platform Infrastructure
+# Installs & configures ALL services: Docker, nginx, cloudflared,
+# OpenBao, Gitea, Keycloak, Postgres, Redis, MinIO, NSQD, SearXNG,
+# LightSerp, Monitoring stack (Prometheus, Loki, Grafana, Falco, Falcosidekick)
+# =============================================================================
+
+- name: Bootstrap base system
+  hosts: iacgenie-vm
+  become: true
+  roles:
+    - bootstrap
+
+- name: Install base infrastructure services
+  hosts: iacgenie-vm
+  become: true
+  roles:
+    - nginx
+    - cloudflare_tunnel
+    - docker
+    - nginx-config
+
+- name: Deploy unified infrastructure services
+  hosts: iacgenie-vm
+  become: true
+  roles:
+    - postgres
+    - redis
+    - minio
+    - openbao
+    - keycloak
+    - keycloak_realm
+    - nsqd
+    - searxng
+    - lightserp
+    - gitea
+
+- name: Deploy monitoring stack
+  hosts: iacgenie-vm
+  become: true
+  roles:
+    - monitoring
+
+- name: Deploy security stack
+  hosts: iacgenie-vm
+  become: true
+  roles:
+    - falco
+    - falcosidekick
+
+- name: Configure auto-start services
+  hosts: iacgenie-vm
+  become: true
+  roles:
+    - auto-start
+
+- name: Configure backup & restore
+  hosts: iacgenie-vm
+  become: true
+  roles:
+    - backup

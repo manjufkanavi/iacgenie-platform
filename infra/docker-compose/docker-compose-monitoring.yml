@@ -1,8 +1,9 @@
 version: "3.8"
 # =============================================================================
 # IacGenie Platform — Monitoring Stack
-# Services: Prometheus, Alertmanager, Grafana, Loki, Promtail
-# Data Retention: 30 days
+# Services: Prometheus, Alertmanager, Grafana, Loki, Promtail, Node Exporter,
+#           Falco (runtime security), Falcosidekick (Falco Web UI)
+# Data Retention: 30 days (Prometheus + Loki compactor)
 # =============================================================================
 
 networks:
@@ -46,7 +47,7 @@ services:
       timeout: 5s
       retries: 3
 
-  # ── Alertmanager — Alert routing ──
+  # ── Alertmanager — Alert routing (security, critical, warning) ──
   alertmanager:
     image: prom/alertmanager:v0.27.0
     container_name: iacgenie_alertmanager

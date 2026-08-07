@@ -1,0 +1,73 @@
+# =============================================================================
+# Falcosidekick Configuration
+# Web UI / Event Forwarder for Falco Runtime Security
+# =============================================================================
+# Connects Falco events to Grafana, Alertmanager, and other backends.
+# Usage: run via docker-compose (Falco sends webhooks here).
+# =============================================================================
+
+listenport: 2800
+
+log:
+  level: info
+
+logformat: json
+
+# ── Loki Output (centralized Falco logging) ──
+loki:
+  enabled: true
+  url: "http://loki:3100/loki/api/v1/push"
+  extrafields:
+    service: falco
+    environment: production
+  realtime: false
+
+# ── Alertmanager Output (alerting) ──
+alertmanager:
+  enabled: true
+  url: "http://alertmanager:9093"
+
+# ── Grafana Output (visualize in Grafana) ──
+grafana:
+  enabled: true
+  url: "http://grafana:3000"
+  datasource: "Loki"
+
+# ── Prometheus Metrics (metrics endpoint) ──
+prometheus:
+  enabled: true
+  listenport: 2810
+  url: ":2810/metrics"
+
+# ── Events count (track event distribution) ──
+stdout:
+  enabled: true
+  jsonformat: true
+
+# ── Additional Backends (uncomment as needed) ──
+# telegram:
+#   enabled: true
+#   token: "YOUR_TELEGRAM_BOT_TOKEN"
+#   chatid: "YOUR_CHAT_ID"
+#   reverselabels: false
+#
+# slack:
+#   enabled: true
+#   webhookurl: "YOUR_SLACK_WEBHOOK_URL"
+
+# ── TLS ──
+tlscert: ""
+tlsprivatekey: ""
+tlsca: ""
+
+# ── Events filtering ──
+eventoutput:
+  stdout:
+    enabled: true
+    counter: false
+    label: ""
+
+count:
+  eventoutput:
+    stdout:
+      enabled: false
