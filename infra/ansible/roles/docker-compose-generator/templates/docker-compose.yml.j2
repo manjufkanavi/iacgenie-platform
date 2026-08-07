@@ -165,7 +165,7 @@ services:
     depends_on:
       - postgres
     healthcheck:
-      test: ["CMD-SHELL", "exec 6<>/dev/tcp/127.0.0.1/8080 && exec 6>&-"]
+      test: ["CMD-SHELL", "bash -c 'exec 6<>/dev/tcp/127.0.0.1/8080 && exec 6>&-']
       interval: 30s
       timeout: 10s
       retries: 3
@@ -221,7 +221,7 @@ services:
     depends_on:
       - postgres
     healthcheck:
-      test: ["CMD-SHELL", "exec 6<>/dev/tcp/127.0.0.1/3000 && exec 6>&-"]
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/ || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -325,7 +325,7 @@ services:
     networks:
       - iacgenie-messaging
     healthcheck:
-      test: ["CMD-SHELL", "exec 6<>/dev/tcp/127.0.0.1/4150 && exec 6>&-"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:4151/stats 2>/dev/null || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
