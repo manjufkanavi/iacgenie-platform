@@ -1,4 +1,4 @@
-name: Deploy & Verify All Services
+name: Deploy Platform
 
 on:
   workflow_dispatch:

@@ -1,4 +1,4 @@
-name: Destroy Services (Keep Nginx + Tunnel)
+name: Destroy Platform
 
 on:
   workflow_dispatch:

@@ -1,4 +1,4 @@
-name: Backup All Services
+name: Backup Platform
 
 on:
   workflow_dispatch:
