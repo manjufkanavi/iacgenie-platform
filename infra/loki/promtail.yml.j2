@@ -1,0 +1,62 @@
+# =============================================================================
+# Promtail Configuration — Ship all container logs to Loki
+# =============================================================================
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # ── Docker container logs (all iacgenie containers) ──
+  - job_name: docker-containers
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      # Only capture iacgenie containers
+      - source_labels: ["__meta_docker_container_name"]
+        regex: "/(iacgenie_.*)"
+        target_label: "container"
+        replacement: "$1"
+      - source_labels: ["__meta_docker_container_log_stream"]
+        target_label: "logstream"
+      - source_labels: ["__meta_docker_container_label_com_docker_compose_service"]
+        target_label: "service"
+      - source_labels: ["__meta_docker_container_create_timestamp"]
+        target_label: "created_at"
+
+  # ── Systemd journal logs ──
+  - job_name: systemd
+    journal:
+      max_back_entries: 500
+      filters:
+        - "SYSTEMD_UNIT=nginx.service"
+        - "SYSTEMD_UNIT=cloudflared.service"
+        - "SYSTEMD_UNIT=iаcgenie-platform.service"
+    relabel_configs:
+      - source_labels: ["__journal__systemd_unit"]
+        target_label: "unit"
+
+  # ── Nginx access & error logs ──
+  - job_name: nginx-logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx-logs
+          __path__: /var/log/nginx/*.log
+
+  # ── Docker daemon logs ──
+  - job_name: docker-daemon
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: docker-daemon
+          __path__: /var/log/docker.log

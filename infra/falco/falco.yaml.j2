@@ -1,0 +1,65 @@
+# =============================================================================
+# Falco Configuration — Runtime Security Monitoring
+# =============================================================================
+# Falco monitors system calls in real-time using eBPF and alerts on
+# suspicious activity. This config runs Falco on the VM and exports
+# events to Loki for centralized log analysis.
+# =============================================================================
+
+service:
+  spawn_children: false
+  system_exit_on_fail: false
+
+# ── System Call Filtering ──
+slice_output_to_children: true
+
+# ── Kurtosis Detection ──
+kurtosis_mode: false
+
+# ── Output Configuration ──
+priority: notice
+buffered: true
+buffer_size: 10000
+buffer_keep_all_events: false
+buffer_empty_time_window: 30
+
+# ── System Info Check ──
+check_rlimit: true
+max_cpu_usage: 10
+max_supported_kernel_version: 6
+
+# ── Output to stdout ──
+stdout_output:
+  enabled: true
+
+# ── Output to Loki ──
+stdout_output:
+  enabled: true
+
+# ── Gelf Output (for syslog/Grafana) ──
+gelf_output:
+  enabled: false
+
+# ── Syslog Output ──
+syslog:
+  enabled: true
+  facility: local7
+  log_name: falco
+
+# ── Webhook Output ──
+webhook:
+  enabled: false
+  url: "http://localhost:5001/falco-events"
+
+# ── System Monitoring ──
+system_monitor:
+  enabled: true
+
+# ── Metrics ──
+metrics:
+  enabled: true
+  rule_count: true
+  list_of_rules: true
+  interval: 60
+  output: stdout
+  log stderr: false

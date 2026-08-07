@@ -1,0 +1,22 @@
+[Unit]
+Description=Falco Runtime Security Monitor
+Documentation=https://falco.org/docs
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+ExecStartPre=/usr/bin/mkdir -p /var/log/falco
+ExecStart=/usr/bin/falco \
+    --config /etc/falco/falco.yaml \
+    --rules /etc/falco/falco_rules.yaml \
+    --pidfile /run/falco.pid
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=falco
+
+[Install]
+WantedBy=multi-user.target

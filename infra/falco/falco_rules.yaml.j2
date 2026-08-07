@@ -1,0 +1,160 @@
+# =============================================================================
+# Falco Rules — IacGenie Platform Security Monitoring
+# =============================================================================
+# Custom rules for runtime security on VM 192.168.0.118
+# =============================================================================
+
+# ── Critical: Privilege Escalation ──
+- rule: PrivilegeEscalation
+  desc: "Detect privilege escalation via setuid/setgid or new privileges"
+  condition: >
+    (setuid or setgid or setgroups) and
+    (not user_shell_exec) and
+    (not container_openbao) and
+    (not container_keycloak)
+  output: "Privilege escalation detected (uid=%user.uid gid=%user.gid exe=%proc.exe args=%proc.args)"
+  priority: CRITICAL
+  tags: [privilege_escalation, container]
+
+# ── Critical: New User Created ──
+- rule: NewUserCreated
+  desc: "Detect creation of new system users"
+  condition: >
+    (spawned_process and (useradd or groupadd or usermod)) or
+    (open and (name /etc/passwd or name /etc/group or name /etc/shadow))
+  output: "New user/group created: exe=%proc.exe args=%proc.args"
+  priority: CRITICAL
+  tags: [user_management, system]
+
+# ── Critical: SSH Key Modified ──
+- rule: SSHKeyChanged
+  desc: "Detect modification of SSH authorized keys"
+  condition: >
+    (open_write or file_mkdir) and
+    (name /home/*/.ssh/authorized_keys or name /root/.ssh/authorized_keys)
+  output: "SSH key modified: exe=%proc.exe file=%fd.name"
+  priority: CRITICAL
+  tags: [ssh, authentication]
+
+# ── Critical: Cron Job Modified ──
+- rule: CronJobModified
+  desc: "Detect modification of cron jobs"
+  condition: >
+    (open_write or file_mkdir or file_rename) and
+    (name /etc/crontab or name /etc/cron.* or name /var/spool/cron/* or name /etc/cron.d/*)
+  output: "Cron job modified: exe=%proc.exe file=%fd.name"
+  priority: CRITICAL
+  tags: [cron, persistence]
+
+# ── Critical: Sensitive File Access ──
+- rule: SensitiveFileAccess
+  desc: "Detect access to sensitive files"
+  condition: >
+    (open_read or open_write) and
+    (name /etc/shadow or name /etc/sudoers or name /home/mkanavi/.ssh/* or name /home/mkanavi/.gnupg/* or name /home/mkanavi/.config/secrets/*)
+  output: "Sensitive file accessed: exe=%proc.exe file=%fd.name user=%user.name"
+  priority: WARNING
+  tags: [sensitive_files, system]
+
+# ── Critical: OpenBao Container Changes ──
+- rule: OpenbaoContainerChange
+  desc: "Detect changes inside OpenBao container"
+  condition: >
+    container_openbao and
+    (not (process.name=curl or process.name=wget or process.name=bao))
+  output: "Unexpected activity in OpenBao container: exe=%proc.exe file=%fd.name"
+  priority: WARNING
+  tags: [openbao, container]
+
+# ── Critical: Keycloak Container Changes ──
+- rule: KeycloakContainerChange
+  desc: "Detect unexpected changes in Keycloak container"
+  condition: >
+    container_keycloak and
+    (not (process.name=java or process.name=node))
+  output: "Unexpected activity in Keycloak container: exe=%proc.exe file=%fd.name"
+  priority: WARNING
+  tags: [keycloak, container]
+
+# ── Warning: Unexpected Network Connection ──
+- rule: UnexpectedNetworkConnection
+  desc: "Detect outbound connections from services"
+  condition: >
+    (container_outbound or (connect and not container)) and
+    (not (evt.rawres=0 and (target_port=443 or target_port=80 or target_port=8200))) and
+    (not fd.sip=127.0.0.1)
+  output: "Unexpected outbound connection from %proc.name to %fd.rip:%fd.rport"
+  priority: WARNING
+  tags: [network, outbound]
+
+# ── Warning: Root Process Spawned from Non-Root ──
+- rule: NonRootExecRootProcess
+  desc: "Detect non-root user executing privileged process"
+  condition: >
+    spawned_process and
+    (not user_root) and
+    (root_euid) and
+    (not (user_shell_exec or proc.name=chmod or proc.name=chown))
+  output: "Non-root user executed privileged process: exe=%proc.exe user=%user.name"
+  priority: WARNING
+  tags: [privilege, system]
+
+# ── Warning: Docker Socket Access ──
+- rule: DockerSocketAccess
+  desc: "Detect access to Docker socket"
+  condition: >
+    open and (name /var/run/docker.sock) and
+    (not (proc.name=docker or proc.name=crictl or proc.name=bao or proc.name=kubectl))
+  output: "Docker socket accessed by unexpected process: exe=%proc.exe user=%user.name"
+  priority: WARNING
+  tags: [docker, security]
+
+# ── Warning: New Container Created ──
+- rule: NewContainerCreated
+  desc: "Detect creation of new Docker containers"
+  condition: >
+    container and
+    container_image changes and
+    (proc.name=docker or proc.name=cri-containerd)
+  output: "New container created: image=%container.image name=%container.name id=%container.id"
+  priority: INFO
+  tags: [container, lifecycle]
+
+# ── Warning: Systemd Service Modified ──
+- rule: SystemdServiceModified
+  desc: "Detect modification of systemd services"
+  condition: >
+    (open_write or file_rename) and
+    (name /etc/systemd/system/* or name /lib/systemd/system/* or name /usr/lib/systemd/system/*)
+  output: "Systemd service modified: exe=%proc.exe file=%fd.name"
+  priority: WARNING
+  tags: [systemd, persistence]
+
+# ── Warning: Cloudflared Config Changed ──
+- rule: CloudflaredConfigChanged
+  desc: "Detect changes to Cloudflare tunnel configuration"
+  condition: >
+    (open_write or file_rename) and
+    (name /home/mkanavi/.cloudflared/*.yml or name /home/mkanavi/.cloudflared/*.yaml)
+  output: "Cloudflare config modified: exe=%proc.exe file=%fd.name"
+  priority: WARNING
+  tags: [network, tunnel]
+
+# ── Info: Service Restart ──
+- rule: ServiceRestarted
+  desc: "Detect service restart (for audit)"
+  condition: >
+    (proc.name=docker and (proc.name containing restart or proc.name containing up)) or
+    (proc.name=systemctl and proc.name containing restart)
+  output: "Service restarted: exe=%proc.exe args=%proc.args"
+  priority: INFO
+  tags: [lifecycle, audit]
+
+# ── Info: Nginx Config Reload ──
+- rule: NginxConfigReload
+  desc: "Detect nginx config reload"
+  condition: >
+    proc.name=nginx and (proc.args containing reload or proc.args containing -s)
+  output: "Nginx config reloaded: args=%proc.args"
+  priority: INFO
+  tags: [nginx, web]
