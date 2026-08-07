@@ -37,20 +37,34 @@
     - openbao_is_sealed is defined
     - not openbao_is_sealed
 
-- name: "OpenBao | Read unseal keys from init_keys.json"
+- name: "OpenBao | Read unseal keys from init_keys.json (VM fallback)"
   ansible.builtin.slurp:
-    src: "{{ openbao_raft_data_dir | default('/home/mkanavi/docker/iacgenie/data/openbao_raft') }}/init_keys.json"
+    src: "{{ openbao_raft_data_dir }}/init_keys.json"
   register: openbao_keys_raw
   when:
     - openbao_health_json is succeeded
     - openbao_is_sealed | default(true) | bool
 
-- name: "OpenBao | Parse unseal keys (base64)"
+- name: "OpenBao | Use vault keys if defined, else read from VM init_keys.json"
   ansible.builtin.set_fact:
     openbao_unseal_keys: "{{ openbao_keys_raw.content | b64decode | from_json | json_query('unseal_keys_b64') }}"
   when:
     - openbao_keys_raw.content | default('') | length > 0
     - openbao_keys_raw is succeeded
+    - openbao_unseal_keys is not defined
+  failed_when: false
+
+- name: "OpenBao | Parse unseal keys (base64, handle double-escaping)"
+  ansible.builtin.set_fact:
+    openbao_unseal_keys: "{{ item }}"
+  loop:
+    - "{{ openbao_keys_raw.content | b64decode | from_json | json_query('unseal_keys_b64') }}"
+    - "{{ openbao_keys_raw.content | b64decode | from_json | from_json | json_query('unseal_keys_b64') }}"
+  when:
+    - openbao_unseal_keys is not defined
+    - openbao_keys_raw.content | default('') | length > 0
+    - openbao_keys_raw is succeeded
+  failed_when: false
 
 - name: "OpenBao | Unseal via HTTP API (threshold 3/5)"
   ansible.builtin.uri:

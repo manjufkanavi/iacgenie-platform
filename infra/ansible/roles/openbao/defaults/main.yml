@@ -11,8 +11,14 @@ openbao_api_url: "http://127.0.0.1:{{ openbao_port }}"
 # ── Root token (from init_keys.json on VM) ────────────────────────────────
 openbao_root_token: CHANGE_ME  # read from init_keys.json after bootstrap
 
+# ── OpenBao unseal keys (Shamir 3/3) ──────────────────────────────────────
+openbao_unseal_keys:
+  - "Brhd6g5HkeG+ZY3O0vJfy4vy07HhRgW6BT/QUS2NZrvv"
+  - "uV94h8WMGamlUhXk98llc+j4TcsR5O5FVush25G+duHx"
+  - "AUSygv1g5VQnzTpgnib0lLmEaNdVko4tHyf5k4sSHFhc"
+
 # ── Raft / data directory on host ─────────────────────────────────────────
-openbao_raft_data_dir: /home/mkanavi/docker/iacgenie/openbao_raft
+openbao_raft_data_dir: /home/mkanavi/docker/iacgenie/data/openbao_raft
 openbao_compose_dir: /home/mkanavi/docker/iacgenie
 
 # ── Bootstrap toggles ─────────────────────────────────────────────────────

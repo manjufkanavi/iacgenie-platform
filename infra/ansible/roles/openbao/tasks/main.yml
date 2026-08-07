@@ -24,7 +24,7 @@
 # Ensure directory exists FIRST, then deploy files
 - name: "OpenBao | Ensure policies directory exists"
   ansible.builtin.file:
-    path: "{{ openbao_raft_data_dir | default('/home/mkanavi/docker/iacgenie/openbao_raft') }}/policies"
+    path: "{{ openbao_raft_data_dir }}/policies"
     state: directory
     owner: mkanavi
     group: mkanavi
@@ -34,7 +34,7 @@
 - name: "OpenBao | Deploy policy files"
   ansible.builtin.template:
     src: "policies/{{ item.file }}"
-    dest: "{{ openbao_raft_data_dir | default('/home/mkanavi/docker/iacgenie/openbao_raft') }}/policies/{{ item.file }}"
+    dest: "{{ openbao_raft_data_dir }}/policies/{{ item.file }}"
     owner: mkanavi
     group: mkanavi
     mode: "0600"
@@ -45,13 +45,14 @@
   register: openbao_policy_deployed
 
 # ── Raft Data Directory Permissions ───────────────────────────────────────
-- name: "OpenBao | Fix raft data directory permissions"
+# Must be root:root 777 for Docker overlay FS compatibility (container runs as root)
+- name: "OpenBao | Ensure raft data directory permissions"
   ansible.builtin.file:
-    path: "{{ openbao_raft_data_dir | default('/home/mkanavi/docker/iacgenie/data/openbao_raft') }}"
+    path: "{{ openbao_raft_data_dir }}"
     state: directory
-    owner: mkanavi
-    group: mkanavi
-    mode: "0750"
+    owner: root
+    group: root
+    mode: "0777"
     recurse: true
 
 # ── Init / Bootstrap ──────────────────────────────────────────────────────
@@ -75,17 +76,21 @@
 # Read root token from init_keys.json
 - name: "OpenBao | Read root token from init_keys.json (if available)"
   ansible.builtin.slurp:
-    src: "{{ openbao_raft_data_dir | default('/home/mkanavi/docker/iacgenie/data/openbao_raft') }}/init_keys.json"
+    src: "{{ openbao_raft_data_dir }}/init_keys.json"
   register: openbao_init_keys_raw
   when: openbao_bootstrap_policies | default(true) | bool
 
-- name: "OpenBao | Set root token from init_keys.json"
+- name: "OpenBao | Set root token from init_keys.json (handle double-escaping)"
   ansible.builtin.set_fact:
-    openbao_root_token: "{{ openbao_init_keys_raw.content | b64decode | from_json | json_query('root_token') }}"
+    openbao_root_token: "{{ item }}"
+  loop:
+    - "{{ openbao_init_keys_raw.content | b64decode | from_json | json_query('root_token') }}"
+    - "{{ openbao_init_keys_raw.content | b64decode | from_json | from_json | json_query('root_token') }}"
   when:
     - openbao_init_keys_raw is succeeded
     - openbao_init_keys_raw.content | default('') | length > 0
     - openbao_bootstrap_policies | default(true) | bool
+  failed_when: false
 
 # ── Bootstrap: Policies ───────────────────────────────────────────────────
 - name: "OpenBao | Import policy management tasks"

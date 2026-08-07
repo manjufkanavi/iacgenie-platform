@@ -50,7 +50,7 @@
 # ── Configuration Files ─────────────────────────────────────────────────
 - name: "Compose Gen | Deploy minio-nginx.conf"
   ansible.builtin.copy:
-    src: minio-nginx.conf.j2
+    src: minio-nginx.conf
     dest: "/home/mkanavi/docker/iacgenie/minio-nginx.conf"
     owner: mkanavi
     group: mkanavi

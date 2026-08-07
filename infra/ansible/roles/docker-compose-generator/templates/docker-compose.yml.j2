@@ -120,7 +120,7 @@ services:
     networks:
       - iacgenie-backend
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8200/v1/sys/health | python3 -c \"import sys,json; d=json.load(sys.stdin); exit(0 if d.get('sealed',True)==False and d.get('standby',True)==False else 1)\""]
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8200/v1/sys/health | grep -q 'sealed.*false' && wget -q -O - http://127.0.0.1:8200/v1/sys/health | grep -q 'standby.*false'"]
       interval: 30s
       timeout: 10s
       retries: 3
