@@ -6,3 +6,5 @@
 6. drift detection from ansible scripts
 
 7. end to end documentation in infra directory (for all users)
+
+8. deploy falco grafana prometheus
