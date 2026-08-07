@@ -146,7 +146,9 @@ Keycloak (OIDC) → OpenBao (reads KV secrets)
 
 | Tool | Port | Purpose |
 |------|------|---------|
-| Prometheus | 9090 | Metrics collection |
+| Prometheus | 9090 | Metrics collection (30-day retention) |
+| Alertmanager | 9093 | Alert routing (email + Telegram) |
 | Grafana | 3001 | Dashboards & alerts |
-| Loki | — | Log aggregation (30-day retention) |
-| Promtail | — | Log shipper |
+| Loki | 3100 | Log aggregation (30-day retention) |
+| Promtail | — | Log shipper (Docker + systemd) |
+| Falco | — | Runtime security monitoring |
