@@ -11,11 +11,11 @@ openbao_api_url: "http://127.0.0.1:{{ openbao_port }}"
 # ── Root token (from init_keys.json on VM) ────────────────────────────────
 openbao_root_token: CHANGE_ME  # read from init_keys.json after bootstrap
 
-# ── OpenBao unseal keys (Shamir 3/3) ──────────────────────────────────────
+# ── OpenBao unseal keys (Shamir 3/2) — generated on Aug 7 after raft recovery ──
 openbao_unseal_keys:
-  - "Brhd6g5HkeG+ZY3O0vJfy4vy07HhRgW6BT/QUS2NZrvv"
-  - "uV94h8WMGamlUhXk98llc+j4TcsR5O5FVush25G+duHx"
-  - "AUSygv1g5VQnzTpgnib0lLmEaNdVko4tHyf5k4sSHFhc"
+  - "Ji1h/DZD3Ajxc8oEiWXt4+yZ+1EaQcxW86GkmcWK5up8"
+  - "6doiMVlSf2W/nDyuCyofXLDZLDXzv3rastZ8WiQhdW7/"
+  - "WZLIWXqkWJ7fAxiobyaQB5KHS3sf1gCAgCJJDIVL53n3"
 
 # ── Raft / data directory on host ─────────────────────────────────────────
 openbao_raft_data_dir: /home/mkanavi/docker/iacgenie/data/openbao_raft
@@ -72,31 +72,31 @@ openbao_backup_token_ttl: "168h" # 7 days — backup cron token
 # ── IaCGenie KV Secrets ───────────────────────────────────────────────────
 
 # PostgreSQL
-openbao_ig_pg_password: CHANGE_ME
+openbao_ig_pg_password: Pg5nX8qR3wY7tB2mV9cF4jHa6dGe8kLu
 
 # Redis
-openbao_ig_redis_password: CHANGE_ME
+openbao_ig_redis_password: Rd9mK3xL7pN2qB5vW8jF4tY6hD1eGa
 
 # MinIO
-openbao_ig_minio_access_key: CHANGE_ME
-openbao_ig_minio_secret_key: CHANGE_ME
+openbao_ig_minio_access_key: iacgenie
+openbao_ig_minio_secret_key: Mn7bQ3xL9pN2wR5tY8jF4vH6dGe1kZu
 
 # Keycloak
 openbao_ig_kc_admin_user: admin
-openbao_ig_kc_admin_password: hAaIa219fq5VzAP81SDyNuBV
-openbao_ig_kc_db_password: CHANGE_ME
+openbao_ig_kc_admin_password: Kc8xL2mNp9Qr4vWy7zBf3jHa5dGe6tRu
+openbao_ig_kc_db_password: Kd3nX7qR9wY2tB5mV8cF4jHa6dGe1uLp
 
 # Gitea
-openbao_ig_gitea_db_password: CHANGE_ME
+openbao_ig_gitea_db_password: Gi6xL3mN8pQ2wR5tY7jF4vH9dGe1kZu
 
 # OpenBao root token
-openbao_ig_openbao_root_token: CHANGE_ME
+openbao_ig_openbao_root_token: s.VE9zM0CejxMCYgBap0lrwUpB
 
 # SearXNG
-openbao_ig_searxng_secret: CHANGE_ME
+openbao_ig_searxng_secret: Sx9bL4mN7pQ2wR5tY8jF3vH6dGe1kZu
 
 # LightSerp
-openbao_ig_ls_api_secret: CHANGE_ME
+openbao_ig_ls_api_secret: Ls7nX3qR5wY9tB2mV8cF4jHa6dGe1uLp
 
 # PageZen
 openbao_ig_pagezen_port: "8081"

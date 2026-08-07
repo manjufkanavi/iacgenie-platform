@@ -140,11 +140,8 @@ services:
       - start
       - --http-enabled=true
       - --http-port=8080
-      - --db-url-host=postgres
-      - --db-url-port=5432
-      - --db-url-database=keycloak
-      - --db-username=keycloak
-      - --db-password=${KC_DB_PASSWORD}
+      - --db=postgres
+      - --import-realm
       - --hostname=https://auth.iacgenie.com
       - --hostname-admin=https://auth.iacgenie.com
     environment:
@@ -153,11 +150,9 @@ services:
       KEYCLOAK_ADMIN: "${KEYCLOAK_ADMIN_USER}"
       KEYCLOAK_ADMIN_PASSWORD: "${KEYCLOAK_ADMIN_PASSWORD}"
       KC_DB_PASSWORD: "${KC_DB_PASSWORD}"
-      KC_DB_HOST: "${KC_DB_HOST}"
-      KC_DB_PORT: "${KC_DB_PORT}"
-      KC_DB_NAME: "${KC_DB_NAME}"
     volumes:
       - /home/mkanavi/docker/iacgenie/data/keycloak:/opt/keycloak/data
+      - ./keycloak.conf:/opt/keycloak/conf/keycloak.conf:ro
     ports:
       - "127.0.0.1:8083:8080"
     networks:

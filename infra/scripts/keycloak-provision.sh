@@ -6,7 +6,7 @@ set -euo pipefail
 
 KC_URL="http://127.0.0.1:8083"
 KC_ADMIN_USER="admin"
-KC_ADMIN_PASS="hAaIa219fq5VzAP81SDyNuBV"
+KC_ADMIN_PASS="${KEYCLOAK_ADMIN_PASSWORD:-$(bao kv get -field=admin_password iacgenie/kv/keycloak 2>/dev/null || echo 'CHANGE_ME_IN_VAULT')}"
 MASTER_REALM="master"
 IACGENIE_REALM="iacgenie"
 LIGHTSERP_REALM="lightserp"
@@ -199,7 +199,7 @@ ADMIN_CREATED=$(curl -s -X POST "http://${KC_URL}/admin/realms/lightserp/users" 
         "firstName": "Platform",
         "lastName": "Admin",
         "credentials": [
-            {"type": "password", "value": "hAaIa219fq5VzAP81SDyNuBV", "temporary": false}
+            {"type": "password", "value": "${KC_ADMIN_PASS}", "temporary": false}
         ],
         "realmRoles": ["platform-admin", "openbao-admin"]
     }' 2>&1)

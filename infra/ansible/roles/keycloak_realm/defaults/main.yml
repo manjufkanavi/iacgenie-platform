@@ -3,7 +3,7 @@
 # Admin connection
 keycloak_admin_url: "http://127.0.0.1:8080"
 keycloak_admin_user: admin
-keycloak_admin_password: "CHANGE_ME_IN_VAULT"
+keycloak_admin_password: "{{ keycloak_admin_password | default('CHANGE_ME_IN_VAULT') }}"
 keycloak_provision_realm: true
 keycloak_wait_retries: 30
 keycloak_wait_delay: 5

@@ -1,7 +1,7 @@
 keycloak_version: "26.0"
 keycloak_port: 8083
 keycloak_admin_user: admin
-keycloak_admin_password: hAaIa219fq5VzAP81SDyNuBV
+keycloak_admin_password: "{{ lookup('env', 'KEYCLOAK_ADMIN_PASSWORD') | default('CHANGE_ME_IN_VAULT') }}"
 keycloak_realm: iacgenie
 keycloak_db_host: 127.0.0.1
 keycloak_db_port: 5432
