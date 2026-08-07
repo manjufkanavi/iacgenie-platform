@@ -19,7 +19,7 @@ on:
     - cron: '0 2 * * *'  # Daily at 2am UTC
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: iacgenie-platform-lifecycle
   cancel-in-progress: false
 
 jobs:
@@ -127,15 +127,27 @@ jobs:
 
           # ---- OpenBao Backup ----
           echo ""
-          echo "[2/5] Backing up OpenBao..."
+          echo "[2/5] Backing up OpenBao (atomic snapshot)..."
           OB_RESULT=$(run_remote '
             set -e
             BACKUP_DIR="/home/mkanavi/backups"
             TIMESTAMP="'"$TIMESTAMP"'"
-            # Copy raft data directly from host mount (snapshot API requires complex auth)
-            RAFT_PATH="/home/mkanavi/docker/iacgenie/data/openbao_raft/raft"
+            CONTAINER="iacgenie_openbao"
             mkdir -p "$BACKUP_DIR"
             
+            # Attempt atomic Raft snapshot via bao CLI inside container
+            if docker ps --format "{{.Names}}" | grep -q "^${CONTAINER}$"; then
+              if docker exec "$CONTAINER" bao operator raft snapshot save "/tmp/openbao-${TIMESTAMP}.snap" 2>/dev/null; then
+                docker cp "$CONTAINER:/tmp/openbao-${TIMESTAMP}.snap" "$BACKUP_DIR/openbao-snapshot-${TIMESTAMP}.snap" 2>&1
+                docker exec "$CONTAINER" rm -f "/tmp/openbao-${TIMESTAMP}.snap" 2>/dev/null || true
+                SIZE=$(stat -c%s "$BACKUP_DIR/openbao-snapshot-${TIMESTAMP}.snap" 2>/dev/null || echo "0")
+                echo "OK:${SIZE}"
+                exit 0
+              fi
+            fi
+            
+            # Fallback to direct Raft store copy if snapshot save API is unauthenticated
+            RAFT_PATH="/home/mkanavi/docker/iacgenie/data/openbao_raft/raft"
             if [ -d "$RAFT_PATH" ] && [ -f "$RAFT_PATH/raft.db" ]; then
               cp -r "$RAFT_PATH" "$BACKUP_DIR/openbao-raft-${TIMESTAMP}" 2>&1
               SIZE=$(du -sb "$BACKUP_DIR/openbao-raft-${TIMESTAMP}" 2>/dev/null | cut -f1 || echo "0")
@@ -380,27 +392,54 @@ jobs:
 
           # Close JSON array
           RESULTS_JSON="${RESULTS_JSON}]"
-          echo "BACKUP_RESULTS=$RESULTS_JSON" >> $GITHUB_ENV
-
-          BACKUP_END=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
-          BACKUP_DURATION="$(( $(date +%s) - $(date -d "$START_TIME" +%s) ))s"
-          echo "BACKUP_STATUS=success" >> $GITHUB_ENV
-          echo "BACKUP_END=$BACKUP_END" >> $GITHUB_ENV
-          echo "BACKUP_DURATION=$BACKUP_DURATION" >> $GITHUB_ENV
-          echo "BACKUP_SUCCESS_COUNT=$BACKUP_SUCCESS" >> $GITHUB_ENV
-          echo "BACKUP_ERROR_COUNT=$BACKUP_ERRORS" >> $GITHUB_ENV
+          # ---- Asymmetric GPG Encryption & Google Drive Upload ----
+          echo ""
+          echo "[7/7] Encrypting backups with OpenBao GPG key & syncing to Google Drive..."
+          GDRIVE_RESULT=$(run_remote '
+            if [ -f ~/iacgenie-platform/infra/scripts/backup-to-gdrive.sh ]; then
+              bash ~/iacgenie-platform/infra/scripts/backup-to-gdrive.sh /home/mkanavi/backups 2>&1
+            else
+              echo "Script backup-to-gdrive.sh not found on remote"
+            fi
+          ' 2>&1) || true
+          echo "$GDRIVE_RESULT"
 
           echo ""
           echo "  ✅ Backup complete: $BACKUP_SUCCESS succeeded, $BACKUP_ERRORS errors"
           echo "  Duration: $BACKUP_DURATION"
 
-      - name: Generate report
+      - name: Send email notification
+        if: always()
+        uses: alekkor/action-send-email@v1
+        with:
+          to: ${{ secrets.EMAIL_TO || 'manjufkanavi@gmail.com' }}
+          from: IacGenie CI <iacgenie-ci@iacgenie.com>
+          subject: "[${{ env.BACKUP_ERROR_COUNT == '0' && '✅ BACKUP SUCCESS' || '⚠️ BACKUP COMPLETED WITH ERRORS' }}] IacGenie Platform Backup — ${{ github.ref_name }}"
+          body: |
+            IacGenie Platform Backup Job Summary:
+            ------------------------------------
+            Status: ${{ env.BACKUP_STATUS }}
+            Start Time: ${{ env.BACKUP_START }}
+            End Time: ${{ env.BACKUP_END }}
+            Duration: ${{ env.BACKUP_DURATION }}
+            Successful Backups: ${{ env.BACKUP_SUCCESS_COUNT }}
+            Backup Errors: ${{ env.BACKUP_ERROR_COUNT }}
+
+            Details:
+            ${{ env.BACKUP_RESULTS }}
+          smtp_host: ${{ secrets.SMTP_HOST }}
+          smtp_port: ${{ secrets.SMTP_PORT || '587' }}
+          username: ${{ secrets.SMTP_USER }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+
+      - name: Summary
+        if: always()
         run: |
-          echo "=== Backup Summary ==="
+          echo "=============================="
+          echo "  BACKUP PIPELINE COMPLETE"
+          echo "=============================="
           echo "Status: ${{ env.BACKUP_STATUS }}"
           echo "Duration: ${{ env.BACKUP_DURATION }}"
           echo "Success: ${{ env.BACKUP_SUCCESS_COUNT }}"
           echo "Errors: ${{ env.BACKUP_ERROR_COUNT }}"
-          echo "Results: ${{ env.BACKUP_RESULTS }}"
-          echo ""
-          echo "✅ Backup pipeline complete"
+          echo "=============================="

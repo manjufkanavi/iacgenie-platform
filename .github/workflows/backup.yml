@@ -1,22 +1,10 @@
-name: Backup All Services
-
-on:
-  workflow_dispatch:
-    inputs:
-      backup_type:
-        description: 'Type of backup'
-        required: false
-        default: 'full'
-        type: choice
-        options:
-          - full
-          - selective
-      services:
-        description: 'Services to backup (comma-separated, only if selective)'
-        required: false
-        default: 'postgres,openbao,gitea,keycloak'
-  schedule:
-    - cron: '0 2 * * *'  # Daily at 2am UTC
+# DISABLED IN GITHUB ACTIONS — Gitea Actions is the primary runner for iacgenie-platform.
+# To re-enable in GitHub, uncomment the 'on' block below.
+on: []
+# on:
+#   workflow_dispatch:
+#   schedule:
+#     - cron: '0 2 * * *'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

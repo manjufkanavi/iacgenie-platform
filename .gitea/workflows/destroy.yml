@@ -4,13 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: 'Type "yes" to confirm destruction'
+        description: 'Type "yes" or "DESTROY" to confirm destruction'
         required: true
-  push:
-    branches: [main]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: iacgenie-platform-lifecycle
   cancel-in-progress: false
 
 jobs:
@@ -21,6 +19,15 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Verify confirmation input
+        run: |
+          CONFIRM_VAL="${{ github.event.inputs.confirm }}"
+          if [ "$CONFIRM_VAL" != "yes" ] && [ "$CONFIRM_VAL" != "DESTROY" ]; then
+            echo "❌ Destruction aborted: confirm parameter must be 'yes' or 'DESTROY'. Received: '$CONFIRM_VAL'"
+            exit 1
+          fi
+          echo "✅ Destruction confirmed ($CONFIRM_VAL)"
 
       - name: Set up Python
         uses: actions/setup-python@v5

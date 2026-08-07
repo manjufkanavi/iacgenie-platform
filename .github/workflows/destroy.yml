@@ -1,9 +1,10 @@
-name: Destroy Services (Keep Nginx + Tunnel)
-
-on:
-  push:
-    branches: [main]
-  workflow_dispatch:
+# DISABLED IN GITHUB ACTIONS — Gitea Actions is the primary runner for iacgenie-platform.
+# To re-enable in GitHub, uncomment the 'on' block below.
+on: []
+# on:
+#   push:
+#     branches: [main]
+#   workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

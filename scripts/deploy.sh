@@ -71,13 +71,25 @@ case "$ACTION" in
   backup)
     echo "=== Running Backups ==="
     cd "$REPO_ROOT"
-    ansible-playbook "$REPO_ROOT/infra/ansible/playbooks/backup.yml"
+    VAULT_ARG=""
+    if [ -n "${ANSIBLE_VAULT_PASSWORD:-}" ]; then
+      VAULT_ARG="--vault-id <(echo \"$ANSIBLE_VAULT_PASSWORD\")"
+    elif [ -f "$REPO_ROOT/infra/ansible/.vault_key" ]; then
+      VAULT_ARG="--vault-password-file $REPO_ROOT/infra/ansible/.vault_key"
+    fi
+    ansible-playbook $VAULT_ARG "$REPO_ROOT/infra/ansible/playbooks/backup.yml"
     ;;
 
   validate)
     echo "=== Validating Deployment ==="
     cd "$REPO_ROOT"
-    ansible-playbook "$REPO_ROOT/infra/ansible/playbooks/validate.yml"
+    VAULT_ARG=""
+    if [ -n "${ANSIBLE_VAULT_PASSWORD:-}" ]; then
+      VAULT_ARG="--vault-id <(echo \"$ANSIBLE_VAULT_PASSWORD\")"
+    elif [ -f "$REPO_ROOT/infra/ansible/.vault_key" ]; then
+      VAULT_ARG="--vault-password-file $REPO_ROOT/infra/ansible/.vault_key"
+    fi
+    ansible-playbook $VAULT_ARG "$REPO_ROOT/infra/ansible/playbooks/validate.yml"
     ;;
 
   *)
