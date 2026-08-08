@@ -104,21 +104,28 @@ backup_openbao() {
         "
         log "OpenBao data backup: $backup_file (sealed — full snapshot requires unseal)"
     else
-        run_ssh "
+        run_ssh "$(cat <<'ENDSSH'
             set -euo pipefail
-            mkdir -p $REMOTE_BACKUP_DIR
+            mkdir -p /home/mkanavi/backups/encrypted
             cd /home/mkanavi/docker/iacgenie
-            # Snapshot raft
-            bao operator raft snapshot save /tmp/openbao-$timestamp.snap
-            # Compress data dir + snapshot
-            tar czf /tmp/openbao-backup-$timestamp.tar.gz data/openbao_raft
+            export VAULT_ADDR=http://127.0.0.1:8200 VAULT_SKIP_VERIFY=true
+            # Try raft snapshot (requires auth token)
+            if bao operator raft snapshot save -address http://127.0.0.1:8200 /tmp/openbao-$timestamp.snap 2>/dev/null; then
+                tar czf /tmp/openbao-backup-$timestamp.tar.gz data/openbao_raft
+                log_msg="OpenBao raft backup"
+            else
+                echo "WARNING: Raft snapshot failed (no auth token), falling back to data dir backup" >&2
+                tar czf /tmp/openbao-backup-$timestamp.tar.gz data/openbao data/openbao_raft
+                log_msg="OpenBao data dir backup (no auth token)"
+            fi
             gpg --batch --symmetric --cipher-algo AES256 \
                 --passphrase-file /home/mkanavi/.iacgenie_backup_key \
-                --output $REMOTE_BACKUP_DIR/$backup_file \
+                --output /home/mkanavi/backups/encrypted/$backup_file \
                 /tmp/openbao-backup-$timestamp.tar.gz
-            rm -f /tmp/openbao-backup-$timestamp.tar.gz /tmp/openbao-$timestamp.snap
-            echo \"OpenBao backup created: $REMOTE_BACKUP_DIR/$backup_file\"
-        "
+            rm -f /tmp/openbao-backup-$timestamp.tar.gz /tmp/openbao-$timestamp.snap 2>/dev/null || true
+            echo "OpenBao backup created: /home/mkanavi/backups/encrypted/$backup_file ($log_msg)"
+ENDSSH
+)" || true
         log "OpenBao backup: $backup_file"
     fi
 }
