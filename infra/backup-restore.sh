@@ -83,20 +83,44 @@ backup_openbao() {
     local timestamp=$(date +%Y%m%d-%H%M%S)
     local backup_file="openbao-$timestamp.tar.gz.gpg"
     
-    run_ssh "
-        set -euo pipefail
-        mkdir -p $REMOTE_BACKUP_DIR
-        # Snapshot raft
-        bao operator raft snapshot save /tmp/openbao-$timestamp.snap 2>/dev/null
-        # Compress data dir + snapshot
-        tar czf - /home/mkanavi/docker/iacgenie/data/openbao_raft /tmp/openbao-$timestamp.snap | \
-        gpg --batch --symmetric --cipher-algo AES256 \
-            --passphrase-file $ENCRYPTION_KEY_FILE \
-            --output $REMOTE_BACKUP_DIR/$backup_file
-        rm -f /tmp/openbao-$timestamp.snap
-        echo \"OpenBao backup created: $REMOTE_BACKUP_DIR/$backup_file\"
-    "
-    log "OpenBao backup: $backup_file"
+    # Check OpenBao health first
+    local health=$(run_ssh "curl -sf http://127.0.0.1:8200/v1/sys/health" 2>/dev/null || echo '{"sealed":true}')
+    local sealed=$(echo "$health" | python3 -c "import sys,json; print(str(json.load(sys.stdin).get('sealed',True)).lower())" 2>/dev/null || echo "true")
+    
+    if [ "$sealed" = "true" ]; then
+        warn "OpenBao is sealed — skipping raft snapshot (backup of data dir only)"
+        # Backup data directory to remote temp file, then encrypt
+        run_ssh "
+            set -euo pipefail
+            mkdir -p $REMOTE_BACKUP_DIR
+            cd /home/mkanavi/docker/iacgenie
+            tar czf /tmp/openbao-backup-$timestamp.tar.gz data/openbao data/openbao_raft
+            gpg --batch --symmetric --cipher-algo AES256 \
+                --passphrase-file /home/mkanavi/.iacgenie_backup_key \
+                --output $REMOTE_BACKUP_DIR/$backup_file \
+                /tmp/openbao-backup-$timestamp.tar.gz
+            rm -f /tmp/openbao-backup-$timestamp.tar.gz
+            echo \"OpenBao data backup created: $REMOTE_BACKUP_DIR/$backup_file (sealed state)\"
+        "
+        log "OpenBao data backup: $backup_file (sealed — full snapshot requires unseal)"
+    else
+        run_ssh "
+            set -euo pipefail
+            mkdir -p $REMOTE_BACKUP_DIR
+            cd /home/mkanavi/docker/iacgenie
+            # Snapshot raft
+            bao operator raft snapshot save /tmp/openbao-$timestamp.snap
+            # Compress data dir + snapshot
+            tar czf /tmp/openbao-backup-$timestamp.tar.gz data/openbao_raft
+            gpg --batch --symmetric --cipher-algo AES256 \
+                --passphrase-file /home/mkanavi/.iacgenie_backup_key \
+                --output $REMOTE_BACKUP_DIR/$backup_file \
+                /tmp/openbao-backup-$timestamp.tar.gz
+            rm -f /tmp/openbao-backup-$timestamp.tar.gz /tmp/openbao-$timestamp.snap
+            echo \"OpenBao backup created: $REMOTE_BACKUP_DIR/$backup_file\"
+        "
+        log "OpenBao backup: $backup_file"
+    fi
 }
 
 # === Backup Gitea ===

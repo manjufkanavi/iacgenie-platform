@@ -1,0 +1,56 @@
+---
+# CrowdSec Nginx Bouncer installation playbook
+# This must be run interactively (registration requires user input)
+
+- hosts: all
+  become: true
+  become_method: sudo
+
+  tasks:
+    - name: "CrowdSec | Install CrowdSec package"
+      ansible.builtin.apt:
+        name: crowdsec
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: "CrowdSec | Install Nginx bouncer"
+      ansible.builtin.apt:
+        name: cs-nginx-bouncer
+        state: present
+
+    - name: "CrowdSec | Configure Nginx log acquisition"
+      ansible.builtin.copy:
+        content: |
+          filenames:
+            - /var/log/nginx/access.log
+            - /var/log/nginx/error.log
+          type: File
+        dest: /etc/crowdsec/acquis.yaml
+        mode: "0644"
+      notify:
+        - "Restart crowdsec"
+
+    - name: "CrowdSec | Ensure services are running"
+      ansible.builtin.service:
+        name: "{{ item }}"
+        state: started
+        enabled: true
+      loop:
+        - crowdsec
+        - cs-nginx-bouncer
+
+    - name: "CrowdSec | Display next steps"
+      ansible.builtin.debug:
+        msg:
+          - "CrowdSec installed on host."
+          - "Run: sudo cscli registrations (interactive)"
+          - "Run: sudo cscli collections install crowdsecurity/nginx crowdsecurity/http-cve"
+          - "Run: sudo cscli bouncers add nginx-bouncer"
+          - "Restart: sudo systemctl restart crowdsec"
+
+  handlers:
+    - name: "Restart crowdsec"
+      ansible.builtin.systemd:
+        name: crowdsec
+        state: restarted

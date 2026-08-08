@@ -20,10 +20,12 @@ services:
     restart: unless-stopped
     environment:
       GF_SECURITY_ADMIN_PASSWORD: *** grafana_admin_password | default('CHANGE_ME_IN_VAULT') }}
+      GF_SERVER_ROOT_URL: "{{ grafana_root_url | default('http://localhost:3000') }}"
+      GF_AUTH_ANONYMOUS_ENABLED: {{ 'true' if grafana_allow_anon | default(false) else 'false' }}
     volumes:
       - grafana_data:/var/lib/grafana
     ports:
-      - "127.0.0.1:3001:3000"
+      - "127.0.0.1:3000:3000"
     networks:
       - monitoring
 

@@ -1,0 +1,116 @@
+---
+# Install and configure security services (ClamAV + CrowdSec)
+# CrowdSec Nginx bouncer installation may require user interaction
+
+- name: "Security | Create security service directory"
+  ansible.builtin.file:
+    path: "/home/mkanavi/docker/iacgenie/security"
+    state: directory
+    mode: "0755"
+
+- name: "Security | Create nginx-logs symlink directory"
+  ansible.builtin.file:
+    path: "/home/mkanavi/docker/iacgenie/nginx-logs"
+    state: directory
+    mode: "0755"
+
+- name: "Security | Create symlink for nginx access.log"
+  ansible.builtin.file:
+    src: "/var/log/nginx/access.log"
+    dest: "/home/mkanavi/docker/iacgenie/nginx-logs/access.log"
+    state: link
+    force: true
+    mode: "0644"
+
+- name: "Security | Create symlink for nginx error.log"
+  ansible.builtin.file:
+    src: "/var/log/nginx/error.log"
+    dest: "/home/mkanavi/docker/iacgenie/nginx-logs/error.log"
+    state: link
+    force: true
+    mode: "0644"
+
+- name: "Security | Copy docker-compose.security.yml"
+  ansible.builtin.template:
+    src: "docker-compose.security.yml.j2"
+    dest: "/home/mkanavi/docker/iacgenie/docker-compose.security.yml"
+    mode: "0644"
+
+- name: "Security | Deploy security services"
+  ansible.builtin.command:
+    cmd: >
+      docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.security.yml up -d
+    creates: "/home/mkanavi/docker/iacgenie/data/security_clamav_db"
+  notify:
+    - "Health check security services"
+
+- name: "Security | Deploy CrowdSec bouncer on host"
+  when: install_crowdsec_bouncer | default(true) | bool
+  block:
+    - name: "Security | Install CrowdSec bouncer packages"
+      ansible.builtin.apt:
+        name:
+          - crowdsec
+          - cs-nginx-bouncer
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: "Security | Configure Nginx log acquisition"
+      ansible.builtin.copy:
+        content: |
+          filenames:
+            - /var/log/nginx/access.log
+            - /var/log/nginx/error.log
+          type: File
+        dest: /etc/crowdsec/acquis.yaml
+        mode: "0644"
+      notify:
+        - "Restart crowdsec"
+
+    - name: "Security | Install CrowdSec collections"
+      ansible.builtin.command:
+        cmd: "cscli collections install {{ item }}"
+        chdir: /etc/crowdsec
+      loop:
+        - crowdsecurity/nginx
+        - crowdsecurity/http-cve
+        - crowdsecurity/whitelist-good-actors
+        - crowdsecurity/scrapy
+      changed_when: false
+      ignore_errors: true
+
+    - name: "Security | Ensure CrowdSec is running"
+      ansible.builtin.service:
+        name: crowdsec
+        state: started
+        enabled: true
+
+    - name: "Security | Ensure Nginx bouncer is running"
+      ansible.builtin.service:
+        name: cs-nginx-bouncer
+        state: started
+        enabled: true
+
+    - name: "Security | Display bouncer status"
+      ansible.builtin.debug:
+        msg:
+          - "CrowdSec bouncer installed on host."
+          - "Check status: sudo systemctl status crowdsec"
+          - "View decisions: sudo cscli decisions list"
+          - "If key needed: sudo cscli bouncers add nginx-bouncer"
+
+  rescue:
+    - name: "Security | Bouncer installation failed - note for manual setup"
+      ansible.builtin.debug:
+        msg:
+          - "CrowdSec bouncer installation had issues."
+          - "Please ensure you have registered with CrowdSec Cloud (cscli registrations)"
+          - "Run: sudo cscli registrations"
+          - "Then run the service playbook again."
+
+  handlers:
+    - name: "Restart crowdsec"
+      ansible.builtin.systemd:
+        name: crowdsec
+        state: restarted

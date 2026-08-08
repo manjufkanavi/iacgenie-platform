@@ -1,0 +1,22 @@
+# CrowdSec API key (must be set before deploying)
+crowdsec_api_key: "changeme"
+
+# ClamAV scanner host
+clamav_host: "clamav"
+clamav_port: 3310
+
+# ClamAV Web Client port (exposed to host)
+clamav_web_port: 9090
+
+# CrowdSec Web UI port (exposed to host)
+crowdsec_web_port: 3030
+
+# Docker network for security services
+security_network: "iacgenie-backend"
+
+# Security services port mappings
+clamav_port_binding: "127.0.0.1:3310:3310"
+crowdsec_port_binding: "127.0.0.1:8080:8080"
+
+# Should we install CrowdSec bouncer on the host?
+install_crowdsec_bouncer: true

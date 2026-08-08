@@ -1,0 +1,3 @@
+# CrowdSec LAPI auth credentials
+crowdsec_lapi_username: "changeme"
+crowdsec_lapi_password: "changeme"

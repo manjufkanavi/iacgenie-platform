@@ -42,6 +42,19 @@
       register: openbao_health
       retries: 5
       delay: 10
+      ignore_errors: true
+
+    - name: "Validate | Parse OpenBao health response"
+      ansible.builtin.set_fact:
+        openbao_health_data: "{{ openbao_health.json | default({}) }}"
+
+    - name: "Validate | OpenBao status summary"
+      ansible.builtin.debug:
+        msg: >-
+          OpenBao {{ openbao_health_data.version | default('unknown') }} |
+          Init: {{ openbao_health_data.initialized | default(false) }} |
+          Sealed: {{ openbao_health_data.sealed | default('unknown') }} |
+          Standby: {{ openbao_health_data.standby | default(false) }}
 
     - name: "Validate | Check Keycloak health"
       ansible.builtin.uri:
@@ -57,7 +70,7 @@
           PostgreSQL: {{ pg_health.stdout_lines | last if pg_health.stdout_lines else 'N/A' }}
           Redis: {{ redis_health.stdout_lines | last if redis_health.stdout_lines else 'N/A' }}
           MinIO: {{ minio_health.stdout_lines | last if minio_health.stdout_lines else 'N/A' }}
-          OpenBao: {{ openbao_health.status }}
+          OpenBao: {{ openbao_health_data | to_json | default('unknown') }}
           Keycloak: {{ keycloak_health.status }}
 
     - name: "Validate | Fail if core services are unhealthy"
