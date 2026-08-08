@@ -1,0 +1,60 @@
+# Cloudflare Tunnel configuration
+# Managed by Ansible — Version 4.0 (2026-08-08)
+# Base domain iacgenie.com now explicitly routed
+metrics: 0.0.0.0:12345
+no-autoupdate: true
+
+tunnel: iacgenie-tunnel
+credentials-file: /etc/cloudflared/iacgenie-tunnel.json
+grace-period: 30s
+origincert: /home/mkanavi/.cloudflared/cert.pem
+
+# Ingress rules: explicit routing for all services
+# Base domain serves landing page; subdomains route through nginx
+ingress:
+  # Base domain — IacGenie landing page
+  - hostname: iacgenie.com
+    service: http://127.0.0.1:80
+  - hostname: www.iacgenie.com
+    service: http://127.0.0.1:80
+
+  # Authentication
+  - hostname: auth.iacgenie.com
+    service: http://127.0.0.1:80
+
+  # Search
+  - hostname: search.iacgenie.com
+    service: http://127.0.0.1:80
+
+  # Git
+  - hostname: gitea.iacgenie.com
+    service: http://127.0.0.1:80
+
+  # PageZen Docs
+  - hostname: page.iacgenie.com
+    service: http://127.0.0.1:80
+
+  # IacGenie Platform
+  - hostname: platform.iacgenie.com
+    service: http://127.0.0.1:80
+
+  # Vault/OpenBao
+  - hostname: vault.iacgenie.com
+    service: http://127.0.0.1:80
+
+  # Monitoring
+  - hostname: grafana.iacgenie.com
+    service: http://127.0.0.1:80
+
+  # Security
+  - hostname: clamav.iacgenie.com
+    service: http://127.0.0.1:80
+  - hostname: crowdsec.iacgenie.com
+    service: http://127.0.0.1:80
+
+  # Catch-all: any other *.iacgenie.com subdomain → 404 via nginx
+  - hostname: '*.iacgenie.com'
+    service: http://127.0.0.1:80
+
+  # Status check
+  - service: http://status.tcp:8080

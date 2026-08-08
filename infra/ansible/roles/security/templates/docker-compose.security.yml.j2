@@ -1,11 +1,15 @@
 # =============================================================================
-# Security Services — ClamAV + ClamAV Web Client + CrowdSec + CrowdSec Web UI
+# Security Services — ClamAV + ShieldVault Web UI + CrowdSec LAPI Dashboard
 # =============================================================================
+# Version: 4.0 (2026-08-08)
 # Services:
 #   - clamav/clamav:latest → Antivirus engine (port 3310)
-#   - rguziy/clamav-web-client:latest → ClamAV Web UI (port 8080)
+#   - shield-vault (Pradeepkumar160/shield-vault) → ClamAV Web UI with JWT auth (port 5000 → 9091)
 #   - crowdsecurity/crowdsec:latest → WAF/IDS engine (port 8080)
-#   - rguziy/crowdsec-web-ui:latest → CrowdSec Web Dashboard (port 3000)
+#   - crowdsec-lapi-dashboard → CrowdSec LAPI Dashboard (port 8080 → 3030)
+# Notes:
+#   - CrowdSec Console (app.crowdsec.net) is cloud-only; self-hosted option is LAPI dashboard
+#   - ClamAV ShieldVault provides JWT-authenticated web UI for scan management
 # =============================================================================
 ---
 name: iacgenie
@@ -32,9 +36,9 @@ services:
         limits:
           memory: 1G
 
-  # ─── ClamAV Web Client (Web UI) ───
+  # ─── ClamAV ShieldVault Web UI (port 5000 → 9091) ───
   clamav-web:
-    image: rguziy/clamav-web-client:latest
+    image: pradeepkumar160/shield-vault:latest
     container_name: security_clamav_web
     restart: unless-stopped
     depends_on:
@@ -43,7 +47,7 @@ services:
       - CLAMAV_HOST=clamav
       - CLAMAV_PORT=3310
     ports:
-      - "127.0.0.1:9091:8080"
+      - "127.0.0.1:9091:5000"
     networks:
       - iacgenie_backend
     deploy:
@@ -52,7 +56,7 @@ services:
           memory: 256M
           cpus: "0.25"
 
-  # ─── CrowdSec — Core Engine ───
+  # ─── CrowdSec — Core Engine (LAPI) ───
   crowdsec:
     image: crowdsecurity/crowdsec:latest
     container_name: security_crowdsec
@@ -76,7 +80,8 @@ services:
           memory: 512M
           cpus: "0.5"
 
-  # ─── CrowdSec Web UI (Dashboard) ───
+  # ─── CrowdSec LAPI Dashboard (port 8080 → 3030) ───
+  # Uses CrowdSec LAPI (Local API) — no self-hosted Console available
   crowdsec-web:
     image: ghcr.io/theduffman85/crowdsec-web-ui:latest
     container_name: security_crowdsec_web
@@ -87,7 +92,7 @@ services:
     environment:
       - CONFIG_INSTANCE_LAPI_URL=http://crowdsec:8080
       - CONFIG_INSTANCE_LAPI_AUTH_USERNAME=crowdsec-web-ui
-      - CONFIG_INSTANCE_LAPI_AUTH_PASSWORD=crowdsec-web-password
+      - CONFIG_INSTANCE_LAPI_AUTH_PASSWORD={{ CROWDSEC_WEB_UI_PASSWORD | default('crowdsec-web-password') }}
       - CONFIG_SERVER_PORT=3000
       - CONFIG_PERSIST_OVERRIDES=false
     ports:
