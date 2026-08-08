@@ -5,7 +5,7 @@
 #   - clamav/clamav:latest → Antivirus engine (port 3310)
 #   - rguziy/clamav-web-client:latest → ClamAV Web UI (port 8080)
 #   - crowdsecurity/crowdsec:latest → WAF/IDS engine (port 8080)
-#   - danielberteaud/crowdsec-web-ui:latest → CrowdSec Web Dashboard (port 3000)
+#   - rguziy/crowdsec-web-ui:latest → CrowdSec Web Dashboard (port 3000)
 # =============================================================================
 ---
 name: iacgenie
@@ -43,7 +43,7 @@ services:
       - CLAMAV_HOST=clamav
       - CLAMAV_PORT=3310
     ports:
-      - "127.0.0.1:9090:8080"
+      - "127.0.0.1:9091:8080"
     networks:
       - iacgenie_backend
     deploy:
@@ -78,8 +78,9 @@ services:
 
   # ─── CrowdSec Web UI (Dashboard) ───
   crowdsec-web:
-    image: danielberteaud/crowdsec-web-ui:latest
+    image: ghcr.io/theduffman85/crowdsec-web-ui:latest
     container_name: security_crowdsec_web
+    user: "1000:1000"
     restart: unless-stopped
     depends_on:
       - crowdsec
@@ -88,6 +89,7 @@ services:
       - CONFIG_INSTANCE_LAPI_AUTH_USERNAME=crowdsec-web-ui
       - CONFIG_INSTANCE_LAPI_AUTH_PASSWORD=crowdsec-web-password
       - CONFIG_SERVER_PORT=3000
+      - CONFIG_PERSIST_OVERRIDES=false
     ports:
       - "127.0.0.1:3030:3000"
     networks:
