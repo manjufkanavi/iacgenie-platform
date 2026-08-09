@@ -1,75 +1,79 @@
 # Cloudflare Tunnel configuration
-# Managed by Ansible — Version 4.0 (2026-08-08)
+# Managed by Ansible — Version 4.0 (2026-08-09)
 # CRITICAL: The origin cert at /home/mkanavi/.cloudflared/cert.pem is REQUIRED.
 #   Without it, the tunnel cannot connect to Cloudflare edge.
 #   If missing: ssh vm && cloudflared tunnel login
 #   The tunnel identity (argotunnel.json) is separate from the origin cert.
 #
-# IMPORTANT: We proxy to port 80 (not 443) because:
-# - Nginx has a dedicated vHost passthrough block on port 80
+# NOTE: We proxy to port 80 (nginx vHost passthrough) because:
+# - Nginx has HTTP vHost blocks (port 80) without HTTPS redirect
 # - cloudflared sends the Host header (e.g. auth.iacgenie.com)
 # - Nginx routes by server_name to the correct vHost
 # - No redirect loop (vHost passthrough skips HTTP→HTTPS redirect)
-#
-# NOTE: cloudflared runs as a host-level systemd service.
-# All services must be reachable via 127.0.0.1:<host_published_port>
-# Docker container hostnames are NOT resolvable from the host.
+# - Single point of TLS termination at Cloudflare edge
 
 metrics: 0.0.0.0:{{ cloudflared_metrics_port | default(12345) }}
 no-autoupdate: true
 
-tunnel: {{ cloudflared_tunnel_name | default('iacgenie-tunnel') }}
-credentials-file: /etc/cloudflared/{{ cloudflared_tunnel_name | default('iacgenie-tunnel') }}.json
+tunnel: {{ cloudflared_tunnel_name | default('iacgenie-pi') }}
+credentials-file: /etc/cloudflared/{{ cloudflared_tunnel_name | default('iacgenie-pi') }}.json
 grace-period: 30s
 
 # Explicit ingress rules — each service gets its own hostname mapping
-# This prevents catch-all wildcard routing and ensures proper vHost selection
 ingress:
-  # Base domain — IacGenie landing page (NEW in v4.0)
+  # Base domain — IacGenie landing page
   - hostname: iacgenie.com
-    service: http://127.0.0.1:{{ cloudflare_origin_port | default(80) }}
+    service: http://127.0.0.1:80
   - hostname: www.iacgenie.com
-    service: http://127.0.0.1:{{ cloudflare_origin_port | default(80) }}
+    service: http://127.0.0.1:80
 
   # Authentication — Keycloak
   - hostname: auth.iacgenie.com
-    service: http://127.0.0.1:8083
+    service: http://127.0.0.1:80
 
   # Search — SearXNG
   - hostname: search.iacgenie.com
-    service: http://127.0.0.1:8082
+    service: http://127.0.0.1:80
 
   # Git — Gitea
   - hostname: gitea.iacgenie.com
-    service: http://127.0.0.1:3000
+    service: http://127.0.0.1:80
 
   # PageZen Docs — static auth + docs UI
   - hostname: page.iacgenie.com
-    service: http://127.0.0.1:{{ cloudflare_origin_port | default(80) }}
+    service: http://127.0.0.1:80
 
-  # IacGenie Platform — frontend UI
+  # IacGenie Platform — frontend + backend (nginx handles routing)
   - hostname: platform.iacgenie.com
-    service: http://127.0.0.1:3001
+    service: http://127.0.0.1:80
+
+  # LightSerp — frontend + backend (nginx handles routing)
+  - hostname: lightserp.iacgenie.com
+    service: http://127.0.0.1:80
+
+  # LightSerp App — UI + API (nginx handles routing)
+  - hostname: app.iacgenie.com
+    service: http://127.0.0.1:80
 
   # Vault/OpenBao
   - hostname: vault.iacgenie.com
-    service: http://127.0.0.1:8200
+    service: http://127.0.0.1:80
 
   # Monitoring — Grafana
   - hostname: grafana.iacgenie.com
-    service: http://127.0.0.1:3002
+    service: http://127.0.0.1:80
 
   # Security — ClamAV ShieldVault
   - hostname: clamav.iacgenie.com
-    service: http://127.0.0.1:9091
+    service: http://127.0.0.1:80
 
   # Security — CrowdSec LAPI Dashboard
   - hostname: crowdsec.iacgenie.com
-    service: http://127.0.0.1:3030
+    service: http://127.0.0.1:80
 
   # Catch-all: any unknown *.iacgenie.com → 404 via nginx
   - hostname: '*.iacgenie.com'
-    service: http://127.0.0.1:{{ cloudflare_origin_port | default(80) }}
+    service: http://127.0.0.1:80
 
   # Status check
   - service: http://status.tcp:8080

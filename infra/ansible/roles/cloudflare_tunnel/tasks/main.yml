@@ -77,14 +77,14 @@
 
 - name: "Cloudflare | Copy legacy argotunnel.json to system credentials"
   ansible.builtin.command:
-    cmd: "cp /home/mkanavi/.cloudflared/argotunnel.json /etc/cloudflared/iacgenie-tunnel.json && chown root:root /etc/cloudflared/iacgenie-tunnel.json && chmod 600 /etc/cloudflared/iacgenie-tunnel.json"
+    cmd: "cp /home/mkanavi/.cloudflared/argotunnel.json /etc/cloudflared/iacgenie-pi.json && chown root:root /etc/cloudflared/iacgenie-pi.json && chmod 600 /etc/cloudflared/iacgenie-pi.json"
   when:
     - legacy_argotunnel.stat.exists
     - not cloudflared_cert.stat.exists
   changed_when: true
 
 # ========================
-# Tunnel login (requires Cloudflare API Token)
+# Tunnel login (requires Cloudflare API Token or Tunnel credentials)
 # ========================
 # cloudflared tunnel login generates:
 #   1. ~/.cloudflared/cert.pem (origin certificate)
@@ -92,20 +92,34 @@
 #
 # API Token required at: https://dash.cloudflare.com/profile/api-tokens
 # Permissions needed: Zone.Zone > Read, Cloudflare Tunnel > Manage
+# If you only have a Universal API Key (cfk_*), create an API Token instead.
+#
+# The existing tunnel credentials are at:
+#   ~/.cloudflared/argotunnel.json (user dir)
+#   /etc/cloudflared/iacgenie-tunnel.json (system dir)
+# The origin cert cert.pem was deleted — it must be regenerated.
 
-- name: "Cloudflare | Tunnel login via API token"
+- name: "Cloudflare | Check for missing cert.pem and attempt login"
   ansible.builtin.shell: |
     set -euo pipefail
-    echo "CfApiToken={{ cloudflared_api_token }}" | cloudflared tunnel login
+    # Try Cloudflare API Token first (preferred)
+    if [ -n "{{ cloudflared_api_token | default('') }}" ] && [ "{{ cloudflared_api_token | default('') }}" != "CHANGE_ME_IN_VAULT" ]; then
+      echo "CfApiToken={{ cloudflared_api_token }}" | cloudflared tunnel login
+    # Fall back to CF_API_KEY environment variable
+    elif [ -n "{{ cloudflared_cf_api_key | default('') }}" ]; then
+      CF_API_KEY="{{ cloudflared_cf_api_key }}" cloudflared tunnel login
+    else
+      echo "NO_API_TOKEN: No API token available — interactive login required"
+      exit 1
+    fi
   environment:
     CF_ACCOUNT_TAG: "{{ cloudflared_account_tag | default('') }}"
   args:
     creates: /home/mkanavi/.cloudflared/cert.pem
   when:
-    - cloudflared_api_token is defined
-    - cloudflared_api_token != 'CHANGE_ME_IN_VAULT'
     - not cloudflared_cert.stat.exists
   failed_when: false
+  changed_when: false
 
 - name: "Cloudflare | Tunnel login — interactive (manual step required)"
   ansible.builtin.debug:

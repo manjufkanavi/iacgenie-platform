@@ -73,7 +73,7 @@ services:
     restart: unless-stopped
     user: "472"
     ports:
-      - "127.0.0.1:3002:3000"
+      - "127.0.0.1:3004:3000"
     environment:
       GF_SERVER_ROOT_URL: https://grafana.iacgenie.com
       GF_SERVER_DOMAIN: grafana.iacgenie.com

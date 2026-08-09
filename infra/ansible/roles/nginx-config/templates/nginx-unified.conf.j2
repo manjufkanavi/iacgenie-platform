@@ -125,9 +125,9 @@ server {
     add_header X-XSS-Protection "1; mode=block" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
-    # API proxy — forward API requests to backend
+    # LightSerp backend API
     location /api/ {
-        proxy_pass http://127.0.0.1:8002;
+        proxy_pass http://127.0.0.1:8000;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -139,6 +139,7 @@ server {
         proxy_hide_header X-Powered-By;
     }
 
+    # LightSerp WebUI
     location / {
         proxy_pass http://127.0.0.1:3001;
         proxy_set_header Host $host;
@@ -203,7 +204,7 @@ server {
     }
 }
 
-# IacGenie Platform (platform) — UI proxy only, backend via api.iacgenie.com
+# IacGenie Platform (platform) — UI proxy only, backend via port 3003
 server {
     listen 80;
     server_name platform.iacgenie.com;
@@ -214,9 +215,9 @@ server {
     add_header X-XSS-Protection "1; mode=block" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
-    # API proxy — forward API requests to backend
+    # API proxy — forward API requests to iacgenie-backend
     location /api/ {
-        proxy_pass http://127.0.0.1:8002;
+        proxy_pass http://127.0.0.1:3003;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -228,8 +229,9 @@ server {
         proxy_hide_header X-Powered-By;
     }
 
+    # IacGenie Platform UI
     location / {
-        proxy_pass http://127.0.0.1:3001;
+        proxy_pass http://127.0.0.1:3002;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -242,7 +244,7 @@ server {
     }
 }
 
-# LightSerp (lightserp) — UI proxy only, backend via api.iacgenie.com
+# LightSerp (lightserp) — HTTP vHost
 server {
     listen 80;
     server_name lightserp.iacgenie.com;
@@ -253,6 +255,21 @@ server {
     add_header X-XSS-Protection "1; mode=block" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
+    # LightSerp backend API
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_read_timeout 300;
+        proxy_redirect off;
+        proxy_hide_header X-Powered-By;
+    }
+
+    # LightSerp WebUI
     location / {
         proxy_pass http://127.0.0.1:3001;
         proxy_set_header Host $host;
@@ -262,7 +279,6 @@ server {
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
         proxy_read_timeout 300;
-        proxy_redirect off;
         proxy_hide_header X-Powered-By;
     }
 }
@@ -417,7 +433,7 @@ server {
     }
 }
 
-# LightSerp WebUI (app)
+# LightSerp WebUI (app) — HTTPS
 server {
     listen 443 ssl http2;
     server_name app.iacgenie.com;
@@ -437,15 +453,15 @@ server {
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-XSS-Protection "1; mode=block" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' 'unsafe-eval'; img-src 'self' data: https:; connect-src 'self' api.iacgenie.com; frame-ancestors 'none';" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' 'unsafe-eval'; img-src 'self' data: https:; connect-src 'self' http://127.0.0.1:8000; frame-ancestors 'none';" always;
     add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
     add_header X-Permitted-Cross-Domain-Policies "none" always;
 
     limit_req zone=general burst=20 nodelay;
 
-    # API proxy — forward API requests to backend
+    # LightSerp backend API
     location /api/ {
-        proxy_pass http://127.0.0.1:8002;
+        proxy_pass http://127.0.0.1:8000;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -457,6 +473,7 @@ server {
         proxy_hide_header X-Powered-By;
     }
 
+    # LightSerp WebUI
     location / {
         proxy_pass http://127.0.0.1:3001;
         proxy_set_header Host $host;
@@ -568,15 +585,15 @@ server {
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-XSS-Protection "1; mode=block" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' api.iacgenie.com; frame-ancestors 'none';" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://platform.iacgenie.com; frame-ancestors 'none';" always;
     add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
     add_header X-Permitted-Cross-Domain-Policies "none" always;
 
     limit_req zone=general burst=20 nodelay;
 
-    # API proxy — forward API requests to backend
+    # API proxy — forward API requests to iacgenie-backend
     location /api/ {
-        proxy_pass http://127.0.0.1:8002;
+        proxy_pass http://127.0.0.1:3003;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -588,8 +605,9 @@ server {
         proxy_hide_header X-Powered-By;
     }
 
+    # IacGenie Platform UI
     location / {
-        proxy_pass http://127.0.0.1:3001;
+        proxy_pass http://127.0.0.1:3002;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -597,11 +615,12 @@ server {
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
         proxy_read_timeout 300;
+        proxy_redirect off;
         proxy_hide_header X-Powered-By;
     }
 }
 
-# Vault/OpenBao (vault) — HTTP passthrough for Cloudflare Tunnel + HTTPS proxy
+# Vault/OpenBao (vault) — HTTP passthrough for Cloudflare Tunnel
 server {
     listen 80;
     server_name vault.iacgenie.com;
@@ -673,7 +692,7 @@ server {
     }
 }
 
-# LightSerp (lightserp)
+# LightSerp (lightserp) — HTTPS
 server {
     listen 443 ssl http2;
     server_name lightserp.iacgenie.com;
@@ -693,15 +712,15 @@ server {
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-XSS-Protection "1; mode=block" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' 'unsafe-eval'; img-src 'self' data: https:; connect-src 'self' api.iacgenie.com; frame-ancestors 'none';" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' 'unsafe-eval'; img-src 'self' data: https:; connect-src 'self' http://127.0.0.1:8000; frame-ancestors 'none';" always;
     add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
     add_header X-Permitted-Cross-Domain-Policies "none" always;
 
     limit_req zone=general burst=20 nodelay;
 
-    # API proxy — forward API requests to backend
+    # LightSerp backend API
     location /api/ {
-        proxy_pass http://127.0.0.1:8002;
+        proxy_pass http://127.0.0.1:8000;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -713,6 +732,7 @@ server {
         proxy_hide_header X-Powered-By;
     }
 
+    # LightSerp WebUI
     location / {
         proxy_pass http://127.0.0.1:3001;
         proxy_set_header Host $host;

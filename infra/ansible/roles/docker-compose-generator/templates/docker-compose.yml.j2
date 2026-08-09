@@ -350,6 +350,63 @@ services:
         limits:
           memory: "{{ service_memory_defaults.pagezen }}"
 
+  # =====================
+  # IacGenie Platform Backend (API)
+  # =====================
+  iacgenie-backend:
+    image: iacgenie-backend:latest
+    container_name: iacgenie_backend
+    restart: unless-stopped
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: "${KEYCLOAK_ADMIN_USER}"
+      KC_BOOTSTRAP_ADMIN_PASSWORD: "${KEYCLOAK_ADMIN_PASSWORD}"
+      DATABASE_URL: "postgresql://lightsrp:${PG_ROOT_PASSWORD}@postgres:5432/iacgenie"
+      REDIS_URL: "redis://:${REDIS_PASSWORD}@redis:6379/0"
+      MINIO_ENDPOINT: "minio:9000"
+      MINIO_ACCESS_KEY: "${MINIO_ROOT_USER}"
+      MINIO_SECRET_KEY: "${MINIO_ROOT_PASSWORD}"
+      NSQD_ADDR: "nsqd:4150"
+      OPENBAO_ADDR: "http://openbao:8200"
+      KEYCLOAK_URL: "http://keycloak:8080"
+      KEYCLOAK_REALM: "iacgenie"
+      KEYCLOAK_CLIENT_ID: "iacgenie-platform"
+      JWT_SECRET: "${IACGENIE_JWT_SECRET}"
+      APP_ENV: "production"
+    ports:
+      - "127.0.0.1:3003:8000"
+    networks:
+      - iacgenie-backend
+    depends_on:
+      - postgres
+      - minio
+      - redis
+      - nsqd
+      - openbao
+      - keycloak
+    deploy:
+      resources:
+        limits:
+          memory: "{{ service_memory_defaults.lightserp }}"
+
+  # =====================
+  # IacGenie Platform Frontend (UI)
+  # =====================
+  iacgenie-frontend:
+    image: iacgenie-frontend:latest
+    container_name: iacgenie_frontend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: "http://127.0.0.1:3003"
+      NEXT_PUBLIC_PLATFORM_URL: "https://platform.iacgenie.com"
+    ports:
+      - "127.0.0.1:3002:80"
+    networks:
+      - iacgenie-frontend
+    deploy:
+      resources:
+        limits:
+          memory: "{{ service_memory_defaults.lightserp }}"
+
 # =====================
 # Docker Network Segmentation (Phase 10.7)
 # =====================

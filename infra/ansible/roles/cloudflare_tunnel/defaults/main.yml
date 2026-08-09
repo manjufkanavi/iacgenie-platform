@@ -1,3 +1,6 @@
 cloudflared_version: "2025.6.0"
 cloudflared_metrics_port: 12345
-cloudflared_tunnel_name: iacgenie-tunnel
+cloudflared_tunnel_name: iacgenie-pi
+cloudflared_api_token: "CHANGE_ME_IN_VAULT"
+cloudflared_cf_api_key: "CHANGE_ME_IN_VAULT"
+cloudflared_account_tag: "01fe2e25b0787e3ab8bef4f9fdfc1820"
