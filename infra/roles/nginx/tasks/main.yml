@@ -1,0 +1,44 @@
+---
+# nginx role - handles nginx configuration for iacgenie platform
+# Deploys /etc/nginx/conf.d/iacgenie.conf with all domain vHosts
+
+- name: Install nginx
+  ansible.builtin.apt:
+    name: nginx
+    state: present
+    update_cache: yes
+
+- name: Ensure nginx is running
+  ansible.builtin.systemd:
+    name: nginx
+    state: started
+    enabled: yes
+
+- name: Create nginx conf.d directory
+  ansible.builtin.file:
+    path: /etc/nginx/conf.d
+    state: directory
+    mode: '0755'
+
+- name: Deploy iacgenie nginx configuration
+  ansible.builtin.template:
+    src: iacgenie.conf.j2
+    dest: /etc/nginx/conf.d/iacgenie.conf
+    mode: '0644'
+    backup: yes
+  notify: Reload nginx
+
+- name: Test nginx configuration
+  ansible.builtin.command: nginx -t
+  register: nginx_test
+  changed_when: false
+
+- name: Ensure nginx config test passed
+  ansible.builtin.assert:
+    that:
+      - nginx_test.rc == 0
+    fail_msg: "Nginx configuration test failed!"
+
+- name: Verify nginx config
+  ansible.builtin.debug:
+    msg: "{{ nginx_test.stdout }}"

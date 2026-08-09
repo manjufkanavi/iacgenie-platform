@@ -30,6 +30,8 @@
     - role: docker-compose-generator
     - role: docker-compose-service
     - role: nginx
+    - role: grafana
+    - role: openbao
     - role: cloudflare_tunnel
 
     # Phase 5: Secrets & Security
@@ -43,6 +45,9 @@
 
     # Phase 8: Security (ClamAV + CrowdSec)
     - role: security
+
+    # Phase 8: Shared Auth Wrapper for ClamAV/CrowdSec/PageGen (Phase 10.5)
+    - role: docker-services
 
     # Phase 8: Multi-Tenant & RBAC (Phase 10.3)
     - role: keycloak_realm

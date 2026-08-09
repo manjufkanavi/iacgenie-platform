@@ -1,0 +1,115 @@
+---
+# Docker services role - manages all docker containers
+# Adds new: auth_wrapper, clamav, crowdsec, pagegen
+
+- name: Create shared-auth-wrapper directory
+  ansible.builtin.file:
+    path: "{{ iacgenie_docker_path | default('/home/mkanavi/docker/iacgenie') }}/shared-auth-wrapper"
+    state: directory
+    mode: '0755'
+
+- name: Deploy auth_wrapper app
+  ansible.builtin.copy:
+    src: auth_wrapper/
+    dest: "{{ iacgenie_docker_path | default('/home/mkanavi/docker/iacgenie') }}/shared-auth-wrapper/auth_wrapper/"
+    mode: '0644'
+
+- name: Deploy dashboard app
+  ansible.builtin.copy:
+    src: dashboard/
+    dest: "{{ iacgenie_docker_path | default('/home/mkanavi/docker/iacgenie') }}/shared-auth-wrapper/dashboard/"
+    mode: '0644'
+
+- name: Build auth-wrapper Docker image
+  community.docker.docker_image:
+    name: auth-wrapper:latest
+    source: build
+    build:
+      path: "{{ iacgenie_docker_path | default('/home/mkanavi/docker/iacgenie') }}/shared-auth-wrapper/auth_wrapper"
+    state: present
+
+- name: Build service-dashboard Docker image
+  community.docker.docker_image:
+    name: service-dashboard:latest
+    source: build
+    build:
+      path: "{{ iacgenie_docker_path | default('/home/mkanavi/docker/iacgenie') }}/shared-auth-wrapper/dashboard"
+    state: present
+
+- name: Deploy auth_wrapper container
+  community.docker.docker_container:
+    name: iacgenie_auth_wrapper
+    image: auth-wrapper:latest
+    state: started
+    restart_policy: unless-stopped
+    ports:
+      - "127.0.0.1:9095:9090"
+    env:
+      KEYCLOAK_URL: "http://127.0.0.1:8083"
+      KEYCLOAK_REALM: "iacgenie"
+      KEYCLOAK_CLIENT_ID: "auth-wrapper"
+      KEYCLOAK_CLIENT_SECRET: "{{ keycloak_auth_wrapper_secret | default('CHANGE_ME') }}"
+      SESSION_SECRET: "iacgen-platform-session"
+      PORT: "9090"
+      DASHBOARD_URL_BASE: "https://auth.iacgenie.com"
+      SERVICE_NAME: "Auth-Wrapper"
+
+- name: Deploy ClamAV dashboard container
+  community.docker.docker_container:
+    name: iacgenie_clamav
+    image: service-dashboard:latest
+    state: started
+    restart_policy: unless-stopped
+    ports:
+      - "127.0.0.1:9091:9091"
+    env:
+      KEYCLOAK_URL: "http://127.0.0.1:8083"
+      KEYCLOAK_REALM: "iacgenie"
+      KEYCLOAK_CLIENT_ID: "auth-wrapper"
+      KEYCLOAK_CLIENT_SECRET: "{{ keycloak_auth_wrapper_secret | default('CHANGE_ME') }}"
+      SERVICE_NAME: "ClamAV"
+      DASHBOARD_URL_BASE: "https://clamav.iacgenie.com"
+      SERVICE_TITLE: "ClamAV Dashboard"
+      SERVICE_DESCRIPTION: "ClamAV Anti-Virus Security Dashboard"
+      SERVICE_LINKS: "https://docs.clamav.net,https://www.clamav.net"
+      SESSION_SECRET: "dashboard-session-secret"
+
+- name: Deploy CrowdSec dashboard container
+  community.docker.docker_container:
+    name: iacgenie_crowdsec
+    image: service-dashboard:latest
+    state: started
+    restart_policy: unless-stopped
+    ports:
+      - "127.0.0.1:3030:9091"
+    env:
+      KEYCLOAK_URL: "http://127.0.0.1:8083"
+      KEYCLOAK_REALM: "iacgenie"
+      KEYCLOAK_CLIENT_ID: "auth-wrapper"
+      KEYCLOAK_CLIENT_SECRET: "{{ keycloak_auth_wrapper_secret | default('CHANGE_ME') }}"
+      SERVICE_NAME: "CrowdSec"
+      DASHBOARD_URL_BASE: "https://crowdsec.iacgenie.com"
+      SERVICE_TITLE: "CrowdSec Dashboard"
+      SERVICE_DESCRIPTION: "CrowdSec Next-Gen IPS Firewall"
+      SERVICE_LINKS: "https://docs.crowdsec.net,https://app.crowdsec.net"
+      SESSION_SECRET: "dashboard-session-secret"
+
+- name: Deploy PageGen container
+  community.docker.docker_container:
+    name: iacgenie_pagegen
+    image: service-dashboard:latest
+    state: started
+    restart_policy: unless-stopped
+    ports:
+      - "127.0.0.1:3031:9091"
+    env:
+      KEYCLOAK_URL: "http://127.0.0.1:8083"
+      KEYCLOAK_REALM: "iacgenie"
+      KEYCLOAK_CLIENT_ID: "auth-wrapper"
+      KEYCLOAK_CLIENT_SECRET: "{{ keycloak_auth_wrapper_secret | default('CHANGE_ME') }}"
+      SERVICE_NAME: "PageGen"
+      DASHBOARD_URL_BASE: "https://pagegen.iacgenie.com"
+      SERVICE_TITLE: "PageGen Status"
+      SERVICE_DESCRIPTION: "PageGen Content Generation Service Status and API Usage"
+      SERVICE_LINKS: "https://docs.pagegen.local"
+      SESSION_SECRET: "dashboard-session-secret"
