@@ -407,6 +407,100 @@ services:
         limits:
           memory: "{{ service_memory_defaults.lightserp }}"
 
+  # =====================
+  # ClamAV Backend (port-shifted for auth-wrapper)
+  # =====================
+  clamav-backend:
+    image: clamav/clamav:latest
+    container_name: iacgenie_clamav
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9092:80"
+    networks:
+      - iacgenie-frontend
+    deploy:
+      resources:
+        limits:
+          memory: "512m"
+
+  # =====================
+  # CrowdSec Backend (port-shifted for auth-wrapper)
+  # =====================
+  crowdsec-backend:
+    image: crowdsecurity/crowdsec:latest
+    container_name: iacgenie_crowdsec
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3033:8080"
+    networks:
+      - iacgenie-frontend
+    deploy:
+      resources:
+        limits:
+          memory: "512m"
+
+  # =====================
+  # PageGen Backend (port-shifted for auth-wrapper)
+  # =====================
+  pagegen-backend:
+    image: lightserp-pagegen:latest
+    container_name: iacgenie_pagegen
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3032:8082"
+    networks:
+      - iacgenie-frontend
+    deploy:
+      resources:
+        limits:
+          memory: "512m"
+
+  # =====================
+  # SearXNG Backend (port-shifted for auth-wrapper)
+  # =====================
+  searxng-backend:
+    image: searxng/searxng:latest
+    container_name: iacgenie_searxng
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8084:8080"
+    networks:
+      - iacgenie-frontend
+    deploy:
+      resources:
+        limits:
+          memory: "512m"
+
+  # =====================
+  # Auth Wrapper — Shared OIDC gateway for clamav, pagegen, crowdsec, searxng
+  # Routes to backend based on Host header via DOMAIN_BACKEND_MAP
+  # =====================
+  auth-wrapper:
+    build:
+      context: ../shared-auth-wrapper/auth_wrapper2
+      dockerfile: Dockerfile
+    image: iacgenie/auth-wrapper:latest
+    container_name: iacgenie_auth_wrapper
+    restart: unless-stopped
+    environment:
+      PORT: "9090"
+      KEYCLOAK_URL: "{{ keycloak_url }}"
+      KEYCLOAK_REALM: "iacgenie"
+      KEYCLOAK_CLIENT_ID: "auth-wrapper"
+      KEYCLOAK_CLIENT_SECRET: "${AUTH_WRAPPER_KC_SECRET}"
+      SESSION_SECRET: "${AUTH_WRAPPER_SESSION_SECRET}"
+      SERVICE_NAME: "Auth-Wrapper"
+      SERVICE_TITLE: "IaCGenie Services"
+      SERVICE_BACKENDS: "clamav:9092,pagegen:3032,crowdsec:3033,searxng:8084,default:9090"
+    ports:
+      - "{{ auth_wrapper_host_port }}:9090"
+    networks:
+      - iacgenie-frontend
+    deploy:
+      resources:
+        limits:
+          memory: "256m"
+
 # =====================
 # Docker Network Segmentation (Phase 10.7)
 # =====================

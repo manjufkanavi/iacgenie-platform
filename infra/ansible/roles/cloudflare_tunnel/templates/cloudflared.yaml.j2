@@ -71,6 +71,10 @@ ingress:
   - hostname: crowdsec.iacgenie.com
     service: http://127.0.0.1:80
 
+  # PageGen — auth-gated via shared auth-wrapper
+  - hostname: pagegen.iacgenie.com
+    service: http://127.0.0.1:80
+
   # Catch-all: any unknown *.iacgenie.com → 404 via nginx
   - hostname: '*.iacgenie.com'
     service: http://127.0.0.1:80

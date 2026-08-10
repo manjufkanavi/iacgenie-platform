@@ -80,3 +80,15 @@ certbot_domains:
 certbot_challenge: dns
 certbot_auto_renew_hour: "3"
 certbot_auto_renew_minute: "30"
+
+# Auth wrapper — shared OIDC gateway for clamav, pagegen, crowdsec, searxng
+auth_wrapper_host_port: 9090
+keycloak_url: "https://auth.iacgenie.com"
+
+# Auth wrapper service memory
+service_memory_defaults:
+  auth_wrapper: "256m"
+  clamav: "512m"
+  crowdsec: "512m"
+  pagegen: "512m"
+  searxng: "512m"
