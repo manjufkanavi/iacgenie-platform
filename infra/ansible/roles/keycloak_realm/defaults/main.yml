@@ -211,3 +211,31 @@ keycloak_clients:
     defaultClientScopes:
       - web-origins
       - role_list
+
+  - client_id: auth-wrapper
+    name: "Auth Wrapper (Dashboards)"
+    enabled: true
+    clientAuthenticatorType: client-secret
+    redirectUris:
+      - "https://clamav.iacgenie.com/callback"
+      - "https://clamav.iacgenie.com/*"
+      - "https://pagegen.iacgenie.com/callback"
+      - "https://pagegen.iacgenie.com/*"
+      - "https://crowdsec.iacgenie.com/callback"
+      - "https://crowdsec.iacgenie.com/*"
+      - "https://auth.iacgenie.com/*"
+    webOrigins:
+      - "https://clamav.iacgenie.com"
+      - "https://pagegen.iacgenie.com"
+      - "https://crowdsec.iacgenie.com"
+      - "https://auth.iacgenie.com"
+    standardFlowEnabled: true
+    directAccessGrantsEnabled: false
+    serviceAccountsEnabled: false
+    consentRequired: false
+    protocol: openid-connect
+    defaultClientScopes:
+      - web-origins
+      - role_list
+      - profile
+      - email
