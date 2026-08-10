@@ -1,0 +1,15 @@
+[Unit]
+Description=OpenBao Auto-Unseal Service
+After=docker.service
+Requires=docker.service
+Documentation=https://www.openbao.org
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/home/mkanavi/docker/iacgenie/scripts/auto-unseal.sh
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

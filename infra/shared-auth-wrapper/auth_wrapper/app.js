@@ -6,7 +6,7 @@ const fetch = require('node-fetch');
 
 const app = express();
 const PORT = process.env.PORT || 9090;
-const KC_URL = process.env.KEYCLOAK_URL || 'http://127.0.0.1:8083';
+const KC_URL = process.env.KEYCLOAK_URL || 'https://auth.iacgenie.com';
 const KC_REALM = process.env.KEYCLOAK_REALM || 'iacgenie';
 const KC_CLIENT_ID = process.env.KEYCLOAK_CLIENT_ID || 'auth-wrapper';
 const KC_CLIENT_SECRET = process.env.KEYCLOAK_CLIENT_SECRET || '';
