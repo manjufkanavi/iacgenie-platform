@@ -33,31 +33,17 @@
 # ========================
 
 - name: "Gitea Mirror | Deploy pull mirrors"
-  ansible.builtin.command: >
+  ansible.builtin.command: >-
     docker exec iacgenie_postgres psql -U gitea -d gitea
-    -c "
-    INSERT INTO mirror (repo_id, interval, enable_prune, updated_unix, next_update_unix, lfs_enabled, lfs_endpoint, remote_address)
-    SELECT
-      r.id,
-      {{ gitea_mirror_interval | default(3600) }},
-      {{ gitea_mirror_enable_prune | default(true) | lower }},
-      EXTRACT(EPOCH FROM NOW())::BIGINT,
-      0,
-      false,
-      '',
-      'https://{{ gitea_github_pat }}@github.com/{{ gitea_github_owner }}/{{ r.name }}.git'
-    FROM repository r
-    WHERE r.owner_id = 1
-      AND r.name = '{{ item }}'
-      AND NOT EXISTS (SELECT 1 FROM mirror m WHERE m.repo_id = r.id)
-    ;
-    "
-  loop: "{{ gitea_mirror_repos }}"
-  register: mirror_create_result
-  changed_when: true
-  failed_when: false
+    -c "INSERT INTO mirror (repo_id, interval, enable_prune, updated_unix, next_update_unix, lfs_enabled, lfs_endpoint, remote_address)
+    SELECT r.id, {{ gitea_mirror_interval | default(3600) }}, {{ gitea_mirror_enable_prune | default(true) | lower }}, EXTRACT(EPOCH FROM NOW())::BIGINT, 0, false, '', 'https://{{ gitea_github_pat }}@github.com/{{ gitea_github_owner }}/{{ item }}.git' FROM repository r WHERE r.name = '{{ item }}' ON CONFLICT DO NOTHING"
+  loop: "{{ gitea_mirror_repos | default([]) }}"
   loop_control:
     label: "{{ item }}"
+  when:
+    - gitea_mirror_repos | default([]) | length > 0
+    - gitea_github_pat | default('') | length > 0
+    - gitea_github_owner | default('') | length > 0
 
 - name: "Gitea Mirror | Mark repos as mirrors"
   ansible.builtin.command: >

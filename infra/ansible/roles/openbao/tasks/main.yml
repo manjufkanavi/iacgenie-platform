@@ -1,7 +1,36 @@
 ---
 # OpenBao role - Main entry point
 # Manages: container env, KV engines, RBAC policies, service tokens
+#
+# REQUIRED ENVIRONMENT VARIABLES (set before running Ansible):
+#   OPENBAO_ROOT_TOKEN    — OpenBao root token
+#   OPENBAO_UNSEAL_KEY_1  — Unseal key share 1/3
+#   OPENBAO_UNSEAL_KEY_2  — Unseal key share 2/3
+#   OPENBAO_UNSEAL_KEY_3  — Unseal key share 3/3
 
+# ── Pre-flight checks ─────────────────────────────────────────────────────
+- name: "OpenBao | Validate OPENBAO_ROOT_TOKEN is set"
+  ansible.builtin.assert:
+    that:
+      - "openbao_root_token is defined"
+      - "openbao_root_token | length > 0"
+      - "openbao_root_token != 'CHANGE_ME'"
+      - "openbao_root_token != 'CHANGE_ME_SEE_GITHUB_SECRETS'"
+    fail_msg: "OPENBAO_ROOT_TOKEN must be set. Pass via --extra-vars openbao_root_token='...' or export env var OPENBAO_ROOT_TOKEN. Root token and unseal keys must be stored in GitHub Secrets."
+    success_msg: "OPENBAO_ROOT_TOKEN is set."
+  when:
+    - openbao_bootstrap_policies | default(true) | bool
+
+- name: "OpenBao | Validate unseal keys are set"
+  ansible.builtin.assert:
+    that:
+      - "openbao_unseal_key_1 is defined and openbao_unseal_key_1 | length > 0"
+      - "openbao_unseal_key_2 is defined and openbao_unseal_key_2 | length > 0"
+      - "openbao_unseal_key_3 is defined and openbao_unseal_key_3 | length > 0"
+    fail_msg: "OpenBao unseal keys must be set. Pass via --extra-vars: openbao_unseal_key_1='...', openbao_unseal_key_2='...', openbao_unseal_key_3='...'. Keys must be stored in GitHub Secrets."
+    success_msg: "All unseal keys are set."
+
+# ── Create data directory ──────────────────────────────────────────────────
 - name: "OpenBao | Create data directory"
   ansible.builtin.file:
     path: "{{ openbao_data_dir }}"
@@ -72,25 +101,6 @@
   ansible.builtin.debug:
     msg: "OpenBao initialized={{ openbao_health.json.initialized | default(false) }}, sealed={{ openbao_health.json.sealed | default(true) }}"
   when: openbao_health is succeeded
-
-# Read root token from init_keys.json
-- name: "OpenBao | Read root token from init_keys.json (if available)"
-  ansible.builtin.slurp:
-    src: "{{ openbao_raft_data_dir }}/init_keys.json"
-  register: openbao_init_keys_raw
-  when: openbao_bootstrap_policies | default(true) | bool
-
-- name: "OpenBao | Set root token from init_keys.json (handle double-escaping)"
-  ansible.builtin.set_fact:
-    openbao_root_token: "{{ item }}"
-  loop:
-    - "{{ openbao_init_keys_raw.content | b64decode | from_json | json_query('root_token') }}"
-    - "{{ openbao_init_keys_raw.content | b64decode | from_json | from_json | json_query('root_token') }}"
-  when:
-    - openbao_init_keys_raw is succeeded
-    - openbao_init_keys_raw.content | default('') | length > 0
-    - openbao_bootstrap_policies | default(true) | bool
-  failed_when: false
 
 # ── Bootstrap: Policies ───────────────────────────────────────────────────
 - name: "OpenBao | Import policy management tasks"

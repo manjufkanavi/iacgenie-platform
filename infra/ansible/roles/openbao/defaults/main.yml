@@ -3,16 +3,24 @@ openbao_port: 8200
 openbao_data_dir: /var/lib/openbao
 openbao_storage_type: raft
 openbao_auto_unseal: false
-openbao_static_key: "{{ vault_openbao_static_key }}"
+openbao_static_key: "{{ openbao_root_token }}"
 
 # ── OpenBao API URL (for internal container-to-container) ───────────────────
 openbao_api_url: "http://127.0.0.1:{{ openbao_port }}"
 
-# ── Root token (from init_keys.json on VM) ────────────────────────────────
-openbao_root_token: "{{ vault_openbao_root_token }}"  # read from init_keys.json after bootstrap
+# ── Root token — set via --extra-vars or GitHub Secrets (NOT from env vars) ──
+# Usage: ansible-playbook ... -e openbao_root_token='<actual_root_token>'
+openbao_root_token: "{{ openbao_root_token | default('CHANGE_ME_SEE_GITHUB_SECRETS') }}"
 
-# ── OpenBao unseal keys (Shamir 3/2) — generated on Aug 7 after raft recovery ──
-openbao_unseal_keys: "{{ vault_openbao_unseal_keys }}"
+# ── OpenBao unseal keys (Shamir 3/3) — set via --extra-vars or GitHub Secrets ──
+# Usage: ansible-playbook ... -e openbao_unseal_key_1='...' -e openbao_unseal_key_2='...' -e openbao_unseal_key_3='...'
+openbao_unseal_key_1: "{{ openbao_unseal_key_1 | default('') }}"
+openbao_unseal_key_2: "{{ openbao_unseal_key_2 | default('') }}"
+openbao_unseal_key_3: "{{ openbao_unseal_key_3 | default('') }}"
+openbao_unseal_keys:
+  - "{{ openbao_unseal_key_1 }}"
+  - "{{ openbao_unseal_key_2 }}"
+  - "{{ openbao_unseal_key_3 }}"
 
 # ── Raft / data directory on host ─────────────────────────────────────────
 openbao_raft_data_dir: /home/mkanavi/docker/iacgenie/data/openbao_raft
@@ -27,7 +35,7 @@ openbao_bootstrap_kv: true         # Enable KV engines and seed secrets
 openbao_oidc_enabled: true
 openbao_oidc_discovery_url: "http://127.0.0.1:8083/realms/lightserp/.well-known/openid-configuration"
 openbao_oidc_client_id: "openbao-oidc"
-openbao_oidc_client_secret: "{{ vault_openbao_oidc_client_secret }}"  # Keycloak openbao-oidc client secret (lightserp realm)
+openbao_oidc_client_secret: "{{ keycloak_openbao_oidc_secret }}"  # Keycloak openbao-oidc client secret (lightserp realm)
 openbao_oidc_redirect_uris:
   - "https://vault.iacgenie.com/oidc/callback"
   - "http://127.0.0.1:{{ openbao_port }}/oidc/callback"
@@ -66,34 +74,21 @@ openbao_ls_token_ttl: "720h"     # 30 days — LightSerp service
 openbao_tf_token_ttl: "720h"     # 30 days — Terraform service
 openbao_backup_token_ttl: "168h" # 7 days — backup cron token
 
-# ── IaCGenie KV Secrets ───────────────────────────────────────────────────
-
-# PostgreSQL
-openbao_ig_pg_password: "{{ vault_openbao_ig_pg_password }}"
-
-# Redis
-openbao_ig_redis_password: "{{ vault_openbao_ig_redis_password }}"
-
-# MinIO
+# ── IaCGenie KV Secrets (from encrypted group_vars) ──────────────────────
+openbao_ig_pg_password: "{{ pg_root_password }}"
+openbao_ig_redis_password: "{{ redis_password }}"
 openbao_ig_minio_access_key: iacgenie
-openbao_ig_minio_secret_key: "{{ vault_openbao_ig_minio_secret_key }}"
-
-# Keycloak
+openbao_ig_minio_secret_key: "{{ minio_root_password }}"
 openbao_ig_kc_admin_user: admin
-openbao_ig_kc_admin_password: "{{ vault_openbao_ig_kc_admin_password }}"
-openbao_ig_kc_db_password: "{{ vault_openbao_ig_kc_db_password }}"
+openbao_ig_kc_admin_password: "{{ keycloak_admin_password }}"
+openbao_ig_kc_db_password: "{{ keycloak_db_password }}"
+openbao_ig_gitea_db_password: "{{ gitea_db_password }}"
+openbao_ig_openbao_root_token: "{{ openbao_root_token }}"
+openbao_ig_searxng_secret: "{{ searxng_secret_key }}"
+openbao_ig_ls_api_secret: "{{ lightsrp_api_secret }}"
 
-# Gitea
-openbao_ig_gitea_db_password: "{{ vault_openbao_ig_gitea_db_password }}"
-
-# OpenBao root token
-openbao_ig_openbao_root_token: "{{ vault_openbao_ig_openbao_root_token }}"
-
-# SearXNG
-openbao_ig_searxng_secret: "{{ vault_openbao_ig_searxng_secret }}"
-
-# LightSerp
-openbao_ig_ls_api_secret: "{{ vault_openbao_ig_ls_api_secret }}"
+# ── OIDC client secret (lightserp realm openbao-oidc client) ──
+keycloak_openbao_oidc_secret: "{{ openbao_oidc_secret }}"
 
 # PageZen
 openbao_ig_pagezen_port: "8081"

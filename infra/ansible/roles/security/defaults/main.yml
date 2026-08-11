@@ -1,5 +1,5 @@
 # CrowdSec API key (must be set before deploying)
-crowdsec_api_key: "changeme"
+crowdsec_api_key: "{{ lookup('env', 'CROWDSEC_API_KEY') | default(vault.crowdsec_api_key, true) }}"
 
 # ClamAV scanner host
 clamav_host: "clamav"

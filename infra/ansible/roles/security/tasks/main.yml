@@ -108,9 +108,3 @@
           - "Please ensure you have registered with CrowdSec Cloud (cscli registrations)"
           - "Run: sudo cscli registrations"
           - "Then run the service playbook again."
-
-  handlers:
-    - name: "Restart crowdsec"
-      ansible.builtin.systemd:
-        name: crowdsec
-        state: restarted

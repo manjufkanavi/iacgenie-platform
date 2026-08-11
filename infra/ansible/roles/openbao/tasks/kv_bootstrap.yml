@@ -22,7 +22,7 @@
     timeout: 10
   register: openbao_ig_kv_mount
   failed_when: false
-  changed_when: openbao_ig_kv_mount.status in [200, 201]
+  changed_when: openbao_ig_kv_mount['status'] | default(409) in [200, 201]
 
 - name: "OpenBao KV Bootstrap | Enable lightserp/kv engine"
   ansible.builtin.uri:
@@ -41,7 +41,7 @@
     timeout: 10
   register: openbao_ls_kv_mount
   failed_when: false
-  changed_when: openbao_ls_kv_mount.status in [200, 201]
+  changed_when: openbao_ls_kv_mount['status'] | default(409) in [200, 201]
 
 # ── Step 1b: Enable Terraform KV Engine ───────────────────────────────────
 
@@ -62,7 +62,7 @@
     timeout: 10
   register: openbao_tf_kv_mount
   failed_when: false
-  changed_when: openbao_tf_kv_mount.status in [200, 201]
+  changed_when: openbao_tf_kv_mount['status'] | default(409) in [200, 201]
 
 # ── Step 2: Seed IaCGenie Secrets ─────────────────────────────────────────
 
@@ -557,9 +557,9 @@
   ansible.builtin.debug:
     msg:
       - "KV v2 engines:"
-      - "  iacgenie/kv     ({{ 'enabled' if openbao_ig_kv_mount.status in [200,201] else 'exists' }})"
-      - "  lightserp/kv    ({{ 'enabled' if openbao_ls_kv_mount.status in [200,201] else 'exists' }})"
-      - "  terraform/kv    ({{ 'enabled' if openbao_tf_kv_mount.status in [200,201] else 'exists' }}"
+      - "  iacgenie/kv     ({{ 'enabled' if openbao_ig_kv_mount['status'] | default(409) in [200,201] else 'exists' }})"
+      - "  lightserp/kv    ({{ 'enabled' if openbao_ls_kv_mount['status'] | default(409) in [200,201] else 'exists' }})"
+      - "  terraform/kv    ({{ 'enabled' if openbao_tf_kv_mount['status'] | default(409) in [200,201] else 'exists' }}"
       - "Secrets written to iacgenie/kv: postgres, redis, minio, keycloak, gitea, openbao, searxng, lightserp, pagezen, nsqd, smtp, llm, jwt, cloudflare"
       - "Secrets written to lightserp/kv: postgres, redis, minio, searxng, api, keycloak, smtp, jwt"
       - "Secrets written to terraform/kv: postgres, openbao"

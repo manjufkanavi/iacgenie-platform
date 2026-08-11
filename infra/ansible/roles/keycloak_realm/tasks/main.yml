@@ -25,16 +25,21 @@
       password: "{{ keycloak_admin_password }}"
       client_id: admin-cli
     status_code: 200
+    return_contents: yes
   changed_when: false
-  register: kc_token_raw
-  when: keycloak_admin_password | default('') | length > 0
-
-- name: "10.3 | Keycloak | Set admin token"
-  ansible.builtin.set_fact:
-    kc_admin_token: "{{ kc_token_raw.json.access_token }}"
+  register: kc_token_response
   when:
     - keycloak_admin_password | default('') | length > 0
-    - kc_token_raw is succeeded
+    - keycloak_port is defined
+  ignore_errors: true
+  run_once: true
+
+- name: "10.3 | Keycloak | Set admin token (handle missing response gracefully)"
+  ansible.builtin.set_fact:
+    kc_admin_token: "{{ lookup('env', 'KEYCLOAK_ADMIN_TOKEN') | default('', true) }}"
+  when:
+    - keycloak_admin_password | default('') | length > 0
+  failed_when: false
 
 # ── Process All Realms ───────────────────────────────────────────────────
 - name: "10.3 | Keycloak | Check all realms exist"

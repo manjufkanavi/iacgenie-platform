@@ -12,32 +12,32 @@ keycloak_admin_url: "http://127.0.0.1:{{ keycloak_port }}"
 lightserp_realm_enabled: true
 lightserp_clients:
   lightserp-webui:
-    secret: X3mPK9L3WNwU3F8iDBWxFp2VZLlwfbYZ
+    secret: "{{ lightserp_webui_secret }}"
     redirect_uris:
       - "https://lightserp.iacgenie.com/*"
       - "https://app.iacgenie.com/*"
   lightserp-api:
-    secret: 4gDElECb74VEKbmKE6317Qg6UEZTa1hC
+    secret: "{{ lightserp_api_secret }}"
     redirect_uris:
       - "https://api.iacgenie.com/*"
   openbao-oidc:
-    secret: 2AMmiNh62NQGzwmBiECfNWyIed1hbf04
+    secret: "{{ openbao_oidc_secret }}"
     redirect_uris:
       - "https://vault.iacgenie.com/*"
 
 # iacGenie realm clients
 iacgenie_clients:
   iacgenie-platform:
-    secret: fHjGjbMqf1xiJThpv1JftTjA79dvp01y
+    secret: "{{ iacgenie_platform_secret }}"
     redirect_uris:
       - "https://admin.iacgenie.com/*"
       - "https://iacgenie.com/*"
   gitea:
-    secret: DmDOIo0Cbw76jbr67BpRhmpERPb4PyZv
+    secret: "{{ gitea_secret }}"
     redirect_uris:
       - "https://gitea.iacgenie.com/user/oauth2/gitea"
   searxng:
-    secret: jvnJcywoiySjkDrgEhwjDSV9KBZb26Eu
+    secret: "{{ searxng_secret }}"
     redirect_uris:
       - "https://search.iacgenie.com/*"
 

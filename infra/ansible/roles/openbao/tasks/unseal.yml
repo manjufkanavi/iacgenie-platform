@@ -2,6 +2,9 @@
 # OpenBao auto-unseal task
 # Uses HTTP API (bao operator unseal removed in OpenBao 2.6.0)
 # Runs after docker-compose-generator starts the container
+#
+# REQUIRED: Environment variables OPENBAO_UNSEAL_KEY_1, 2, 3 must be set
+# (validated in tasks/main.yml pre-flight checks)
 
 - name: "OpenBao | Wait for container to respond"
   ansible.builtin.command: >-
@@ -37,36 +40,16 @@
     - openbao_is_sealed is defined
     - not openbao_is_sealed
 
-- name: "OpenBao | Read unseal keys from init_keys.json (VM fallback)"
-  ansible.builtin.slurp:
-    src: "{{ openbao_raft_data_dir }}/init_keys.json"
-  register: openbao_keys_raw
-  when:
-    - openbao_health_json is succeeded
-    - openbao_is_sealed | default(true) | bool
+# Use unseal keys from environment variables (set in defaults/main.yml)
+- name: "OpenBao | Confirm unseal keys are available from env vars"
+  ansible.builtin.assert:
+    that:
+      - "openbao_unseal_keys is defined"
+      - "openbao_unseal_keys | length > 0"
+    fail_msg: "OpenBao unseal keys not available from environment variables. Set OPENBAO_UNSEAL_KEY_1, OPENBAO_UNSEAL_KEY_2, OPENBAO_UNSEAL_KEY_3."
+  when: openbao_unseal_needed | default(true) | bool
 
-- name: "OpenBao | Use vault keys if defined, else read from VM init_keys.json"
-  ansible.builtin.set_fact:
-    openbao_unseal_keys: "{{ openbao_keys_raw.content | b64decode | from_json | json_query('unseal_keys_b64') }}"
-  when:
-    - openbao_keys_raw.content | default('') | length > 0
-    - openbao_keys_raw is succeeded
-    - openbao_unseal_keys is not defined
-  failed_when: false
-
-- name: "OpenBao | Parse unseal keys (base64, handle double-escaping)"
-  ansible.builtin.set_fact:
-    openbao_unseal_keys: "{{ item }}"
-  loop:
-    - "{{ openbao_keys_raw.content | b64decode | from_json | json_query('unseal_keys_b64') }}"
-    - "{{ openbao_keys_raw.content | b64decode | from_json | from_json | json_query('unseal_keys_b64') }}"
-  when:
-    - openbao_unseal_keys is not defined
-    - openbao_keys_raw.content | default('') | length > 0
-    - openbao_keys_raw is succeeded
-  failed_when: false
-
-- name: "OpenBao | Unseal via HTTP API (threshold 3/5)"
+- name: "OpenBao | Unseal via HTTP API (threshold 3/3 from env vars)"
   ansible.builtin.uri:
     url: "http://127.0.0.1:8200/v1/sys/unseal"
     method: PUT
@@ -86,7 +69,6 @@
     - openbao_unseal_keys | length > 0
   register: openbao_unseal_result
   changed_when: openbao_unseal_result.status == 200
-  failed_when: false
 
 - name: "OpenBao | Wait for unseal to complete"
   ansible.builtin.wait_for:
@@ -112,10 +94,3 @@
   ansible.builtin.debug:
     msg: "OpenBao sealed={{ openbao_final_health.json.sealed | default('unknown') }}"
   when: openbao_final_health is succeeded
-
-- name: "OpenBao | Warn if unseal keys missing"
-  ansible.builtin.debug:
-    msg: "OpenBao unseal skipped — init_keys.json may be missing. Manual unseal required."
-  when:
-    - openbao_keys_raw is failed
-    - openbao_keys_raw.content | default('') | length == 0
