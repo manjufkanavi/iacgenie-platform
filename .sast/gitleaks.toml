@@ -1,0 +1,28 @@
+# Gitleaks config for iacgenie-platform SAST
+# Curated to reduce false positives.
+# - Example/placeholder tokens in docs and code samples are not real secrets.
+# - The lc-keycloak.env file contains REAL bootstrap credentials — keep flagged.
+# - grafana-datasources.yml contains a real postgres password — keep flagged.
+# - keycloak_realm defaults contain a placeholder "CHANGE_ME_IN_VAULT" — allowlist.
+
+[extend]
+# Use the default gitleaks ruleset as a base
+useDefault = true
+
+[allowlist]
+description = "Example/placeholder tokens in docs and code samples"
+regexes = [
+  '''eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9''',   # JWT example header
+  '''eyJhbGciOiJIUzI1NiIsInR5cCI6''',           # JWT example header (HS256)
+  '''sk_live_abc123def456ghi789''',             # Stripe example key
+  '''AKIAIOSFODNN7EXAMPLE''',                   # AWS example access key
+  '''CHANGE_ME_IN_VAULT''',                     # Ansible placeholder
+  '''password123''',                            # Example password
+]
+paths = [
+  '''\.md$''',
+  '''docs/''',
+  '''research/''',
+  '''examples/''',
+  '''karnataka_colleges_complete\.json''',   # scraped data file with embedded third-party JS
+]

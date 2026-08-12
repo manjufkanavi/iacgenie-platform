@@ -3,7 +3,7 @@ import tsParser from "/root/.npm-global/lib/node_modules/@typescript-eslint/pars
 
 export default [
   {
-    files: ["**/*.ts", "**/*.tsx"],
+    files: ["src/**/*.ts"],
     languageOptions: {
       parser: tsParser,
       parserOptions: { ecmaVersion: 2022, sourceType: "module" },

@@ -1,0 +1,15 @@
+# Ruff config for iacgenie-platform SAST
+# Curated to reduce false positives. Only report real issues.
+# F401 (unused imports) and F821 (undefined names) are real bugs worth flagging.
+# Style rules (E/W) are excluded — they are noise for a security-focused scan.
+
+line-length = 120
+target-version = "py311"
+
+[lint]
+select = ["F"]          # Pyflakes: real bugs (undefined names, unused imports)
+ignore = []
+
+[lint.per-file-ignores]
+# __init__.py re-exports are intentional
+"__init__.py" = ["F401"]

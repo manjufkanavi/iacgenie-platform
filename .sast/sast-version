@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Print versions of all bundled SAST tools (for CI image verification).
+set -e
+echo "=== SAST Toolchain Versions ==="
+echo "node:    $(node --version)"
+echo "npm:     $(npm --version)"
+echo "git:     $(git --version)"
+echo "jq:      $(jq --version)"
+echo "--- Python ---"
+echo "ruff:    $(ruff --version)"
+echo "bandit:  $(bandit --version)"
+echo "semgrep: $(semgrep --version)"
+echo "mypy:    $(mypy --version)"
+echo "--- Node/TS ---"
+echo "eslint:  $(eslint --version)"
+echo "tsc:     $(tsc --version)"
+echo "gitleaks:$(gitleaks version)"
