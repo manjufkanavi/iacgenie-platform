@@ -30,96 +30,54 @@ jobs:
         continue-on-error: true
         run: |
           docker run --rm -v "$PWD":/workspace iacgenie-sast:latest \
-            bash -c 'mkdir -p /tmp/artifacts && cd /workspace && \
+            bash -c 'cd /workspace && mkdir -p /tmp/artifacts && \
             ruff check --config .sast/ruff.toml platform/backend --output-format json 2>/dev/null > /tmp/ruff.json; \
-            python3 - <<PYEOF
-import json
-d=json.load(open("/tmp/ruff.json"))
-out={"tool":"ruff","total":len(d),"errors":[{"file":x["filename"],"code":x["code"],"line":x["location"]["row"],"column":x["location"]["column"],"message":x["message"]} for x in d]}
-json.dump(out,open("/tmp/artifacts/ruff.json","w"),indent=2)
-print("ruff:",len(d),"findings")
-PYEOF'
+            python3 /workspace/.sast/sast-parse.py ruff /tmp/ruff.json /tmp/artifacts/ruff.json'
 
       - name: Run Bandit (Python security)
         id: bandit
         continue-on-error: true
         run: |
           docker run --rm -v "$PWD":/workspace iacgenie-sast:latest \
-            bash -c 'mkdir -p /tmp/artifacts && cd /workspace && \
+            bash -c 'cd /workspace && mkdir -p /tmp/artifacts && \
             bandit -q -r platform/backend -c .sast/bandit.toml -f json 2>/dev/null > /tmp/bandit.json; \
-            python3 - <<PYEOF
-import json
-d=json.load(open("/tmp/bandit.json"))
-res=d.get("results",[])
-out={"tool":"bandit","total":len(res),"errors":[{"file":r["filename"],"test_id":r["test_id"],"severity":r["issue_severity"],"confidence":r["issue_confidence"],"text":r["issue_text"]} for r in res]}
-json.dump(out,open("/tmp/artifacts/bandit.json","w"),indent=2)
-print("bandit:",len(res),"findings")
-PYEOF'
+            python3 /workspace/.sast/sast-parse.py bandit /tmp/bandit.json /tmp/artifacts/bandit.json'
 
       - name: Run Semgrep (Python security)
         id: semgrep
         continue-on-error: true
         run: |
           docker run --rm -v "$PWD":/workspace iacgenie-sast:latest \
-            bash -c 'mkdir -p /tmp/artifacts && cd /workspace && \
+            bash -c 'cd /workspace && mkdir -p /tmp/artifacts && \
             semgrep --config auto --json platform/backend 2>/dev/null > /tmp/semgrep.json; \
-            python3 - <<PYEOF
-import json
-d=json.load(open("/tmp/semgrep.json"))
-res=d.get("results",[])
-out={"tool":"semgrep","total":len(res),"errors":[{"file":r["path"],"check_id":r["check_id"],"severity":r["extra"].get("severity"),"message":r["extra"].get("message")} for r in res]}
-json.dump(out,open("/tmp/artifacts/semgrep.json","w"),indent=2)
-print("semgrep:",len(res),"findings")
-PYEOF'
+            python3 /workspace/.sast/sast-parse.py semgrep /tmp/semgrep.json /tmp/artifacts/semgrep.json'
 
       - name: Run Mypy (Python types)
         id: mypy
         continue-on-error: true
         run: |
           docker run --rm -v "$PWD":/workspace iacgenie-sast:latest \
-            bash -c 'mkdir -p /tmp/artifacts && cd /workspace && \
+            bash -c 'cd /workspace && mkdir -p /tmp/artifacts && \
             mypy --config-file .sast/mypy.ini platform/backend 2>/dev/null > /tmp/mypy.txt; \
-            python3 - <<PYEOF
-import json,re
-lines=[l for l in open("/tmp/mypy.txt") if ": error:" in l]
-out={"tool":"mypy","total":len(lines),"errors":[]}
-for l in lines:
-    m=re.match(r"^([^:]+):(\d+): error: (.*)$", l.strip())
-    if m: out["errors"].append({"file":m.group(1),"line":int(m.group(2)),"message":m.group(3)})
-json.dump(out,open("/tmp/artifacts/mypy.json","w"),indent=2)
-print("mypy:",len(out["errors"]),"findings")
-PYEOF'
+            python3 /workspace/.sast/sast-parse.py mypy /tmp/mypy.txt /tmp/artifacts/mypy.json'
 
       - name: Run ESLint (TypeScript)
         id: eslint
         continue-on-error: true
         run: |
           docker run --rm -v "$PWD":/workspace iacgenie-sast:latest \
-            bash -c 'mkdir -p /tmp/artifacts && cd /workspace/platform/frontend && \
-            eslint --format json src 2>/dev/null > /tmp/eslint.json; \
-            python3 - <<PYEOF
-import json
-d=json.load(open("/tmp/eslint.json"))
-msgs=[m for x in d for m in x["messages"]]
-out={"tool":"eslint","files":len(d),"total":len(msgs),"errors":[{"file":x["filePath"],"line":m["line"],"column":m["column"],"rule":m["ruleId"],"severity":m["severity"],"message":m["message"]} for x in d for m in x["messages"]]}
-json.dump(out,open("/tmp/artifacts/eslint.json","w"),indent=2)
-print("eslint:",len(msgs),"findings")
-PYEOF'
+            bash -c 'cd /workspace && mkdir -p /tmp/artifacts && \
+            cd platform/frontend && eslint --format json src 2>/dev/null > /tmp/eslint.json; \
+            python3 /workspace/.sast/sast-parse.py eslint /tmp/eslint.json /tmp/artifacts/eslint.json'
 
       - name: Run Gitleaks (secrets)
         id: gitleaks
         continue-on-error: true
         run: |
           docker run --rm -v "$PWD":/workspace iacgenie-sast:latest \
-            bash -c 'mkdir -p /tmp/artifacts && cd /workspace && \
+            bash -c 'cd /workspace && mkdir -p /tmp/artifacts && \
             gitleaks detect --source . --config .sast/gitleaks.toml --report-format json --report-path /tmp/gitleaks.json --no-banner 2>/dev/null; \
-            python3 - <<PYEOF
-import json
-d=json.load(open("/tmp/gitleaks.json"))
-out={"tool":"gitleaks","total":len(d),"errors":[{"file":f["File"],"rule":f["RuleID"],"secret":f["Secret"],"start_line":f["StartLine"],"end_line":f["EndLine"]} for f in d]}
-json.dump(out,open("/tmp/artifacts/gitleaks.json","w"),indent=2)
-print("gitleaks:",len(d),"findings")
-PYEOF'
+            python3 /workspace/.sast/sast-parse.py gitleaks /tmp/gitleaks.json /tmp/artifacts/gitleaks.json'
 
       - name: Upload SAST artifacts
         if: always()
