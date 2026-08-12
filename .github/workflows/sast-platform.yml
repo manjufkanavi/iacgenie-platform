@@ -79,12 +79,20 @@ jobs:
             gitleaks detect --source . --config .sast/gitleaks.toml --report-format json --report-path /tmp/gitleaks.json --no-banner 2>/dev/null; \
             python3 /workspace/.sast/sast-parse.py gitleaks /tmp/gitleaks.json /tmp/artifacts/gitleaks.json'
 
+      - name: Collect artifacts from container
+        if: always()
+        run: |
+          mkdir -p artifacts
+          docker run --rm -v "$PWD":/workspace iacgenie-sast:latest \
+            bash -c 'cp -r /tmp/artifacts/* /workspace/artifacts/ 2>/dev/null || true'
+          ls -la artifacts/
+
       - name: Upload SAST artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: sast-platform-${{ github.run_number }}
-          path: /tmp/artifacts/
+          path: artifacts/
           retention-days: 30
 
       - name: Summary
