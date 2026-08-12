@@ -18,5 +18,10 @@ COPY --from=builder /app/src ./src
 # Install runtime dependencies only
 RUN npm ci --production
 
+# Create non-root user for running the application
+RUN addgroup -S appgroup && adduser -S -G appgroup -h /app appuser && \
+    chown -R appuser:appgroup /app
+USER appuser
+
 EXPOSE 7805
 CMD ["node", "dist/server.js"]

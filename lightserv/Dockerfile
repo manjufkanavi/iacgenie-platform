@@ -33,6 +33,11 @@ RUN npm ci --omit=dev 2>/dev/null || npm install --omit=dev
 
 COPY --from=builder /app/dist ./dist
 
+# Create non-root user for running the application
+RUN groupadd -r appgroup && useradd -r -g appgroup -d /app -s /sbin/nologin appuser && \
+    chown -R appuser:appgroup /app
+USER appuser
+
 EXPOSE 3071
 
 CMD ["node", "dist/server.js"]

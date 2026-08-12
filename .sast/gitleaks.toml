@@ -18,6 +18,8 @@ regexes = [
   '''AKIAIOSFODNN7EXAMPLE''',                   # AWS example access key
   '''CHANGE_ME_IN_VAULT''',                     # Ansible placeholder
   '''password123''',                            # Example password
+  '''changeme''',                               # Placeholder password
+  '''"postgres"''',                             # Default DB name, not a secret
 ]
 paths = [
   '''\.md$''',

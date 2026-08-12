@@ -49,14 +49,14 @@ ENV POSTGRES_USER=iacgenie_user
 ENV HOST=0.0.0.0
 ENV PORT=8000
 
-# Health check - wait 10 seconds before starting health checks to allow app startup
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:8000/api/health || exit 1
-
 # Create non-root user for running the application
 RUN groupadd -r appgroup && useradd -r -g appgroup -d /app -s /sbin/nologin appuser
 RUN chown -R appuser:appgroup /app
 USER appuser
+
+# Health check - wait 10 seconds before starting health checks to allow app startup
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8000/api/health || exit 1
 
 # Start the application
 CMD ["python", "start.py"]

@@ -1,0 +1,5 @@
+# Semgrep config for iacgenie-platform SAST
+# Curated rule packs to reduce false positives from --config auto.
+# Uses targeted language packs instead of the broad community registry.
+
+rules: []

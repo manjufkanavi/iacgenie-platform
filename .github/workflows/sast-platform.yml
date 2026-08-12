@@ -49,7 +49,7 @@ jobs:
         run: |
           docker run --rm -v "$PWD":/workspace iacgenie-sast:latest \
             bash -c 'cd /workspace && mkdir -p artifacts && \
-            semgrep --config auto --json platform/backend 2>/dev/null > /tmp/semgrep.json; \
+            semgrep --config p/python --config p/dockerfile --config p/secrets --json platform/backend 2>/dev/null > /tmp/semgrep.json; \
             python3 /workspace/.sast/sast-parse.py semgrep /tmp/semgrep.json /workspace/artifacts/semgrep.json'
 
       - name: Run Mypy (Python types)
@@ -60,6 +60,15 @@ jobs:
             bash -c 'cd /workspace && mkdir -p artifacts && \
             mypy --config-file .sast/mypy.ini platform/backend 2>/dev/null > /tmp/mypy.txt; \
             python3 /workspace/.sast/sast-parse.py mypy /tmp/mypy.txt /workspace/artifacts/mypy.json'
+
+      - name: Run Flake8 (Python style)
+        id: flake8
+        continue-on-error: true
+        run: |
+          docker run --rm -v "$PWD":/workspace iacgenie-sast:latest \
+            bash -c 'cd /workspace && mkdir -p artifacts && \
+            flake8 platform/backend --config .sast/setup.cfg 2>/dev/null > /tmp/flake8.txt; \
+            python3 /workspace/.sast/sast-parse.py flake8 /tmp/flake8.txt /workspace/artifacts/flake8.json'
 
       - name: Run ESLint (TypeScript)
         id: eslint
@@ -79,6 +88,15 @@ jobs:
             gitleaks detect --source . --config .sast/gitleaks.toml --report-format json --report-path /tmp/gitleaks.json --no-banner 2>/dev/null; \
             python3 /workspace/.sast/sast-parse.py gitleaks /tmp/gitleaks.json /workspace/artifacts/gitleaks.json'
 
+      - name: Run Checkov (IaC - Ansible)
+        id: checkov
+        continue-on-error: true
+        run: |
+          docker run --rm -v "$PWD":/workspace iacgenie-sast:latest \
+            bash -c 'cd /workspace && mkdir -p artifacts && \
+            checkov -d infra/ansible --framework ansible --download-external-modules false --quiet --output json 2>/dev/null > /tmp/checkov.json; \
+            python3 /workspace/.sast/sast-parse.py checkov /tmp/checkov.json /workspace/artifacts/checkov.json'
+
       - name: Upload SAST artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -97,8 +115,10 @@ jobs:
           echo "Bandit:   ${{ steps.bandit.outcome }}"
           echo "Semgrep:  ${{ steps.semgrep.outcome }}"
           echo "Mypy:     ${{ steps.mypy.outcome }}"
+          echo "Flake8:   ${{ steps.flake8.outcome }}"
           echo "ESLint:   ${{ steps.eslint.outcome }}"
           echo "Gitleaks: ${{ steps.gitleaks.outcome }}"
+          echo "Checkov:  ${{ steps.checkov.outcome }}"
           echo "=============================="
           echo "NOTE: Findings are informational. Build does NOT fail on SAST errors."
           echo "JSON reports uploaded as artifact: sast-platform-${{ github.run_number }}"

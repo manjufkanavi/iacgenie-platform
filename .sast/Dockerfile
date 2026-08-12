@@ -45,7 +45,9 @@ RUN pip install --no-cache-dir \
         ruff==0.4.8 \
         bandit==1.7.9 \
         semgrep==1.78.0 \
-        mypy==1.10.0
+        mypy==1.10.0 \
+        flake8==7.1.1 \
+        checkov==3.2.529
 
 # Node/TS SAST tools (pinned)
 RUN npm install -g \

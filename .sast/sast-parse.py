@@ -67,9 +67,14 @@ def parse_mypy(path):
     lines = [l for l in open(path) if ": error:" in l]
     errors = []
     for l in lines:
-        m = re.match(r"^([^:]+):(\d+): error: (.*)$", l.strip())
+        m = re.match(r"^([^:]+):(\d+): error: (.*?)\s*\[(\w+)\]$", l.strip())
         if m:
-            errors.append({"file": m.group(1), "line": int(m.group(2)), "message": m.group(3)})
+            errors.append({
+                "file": m.group(1),
+                "line": int(m.group(2)),
+                "message": m.group(3),
+                "code": m.group(4),
+            })
     return {"tool": "mypy", "total": len(errors), "errors": errors}
 
 
@@ -113,6 +118,43 @@ def parse_gitleaks(path):
     }
 
 
+def parse_flake8(path):
+    lines = [l for l in open(path) if ": " in l and ":" in l.split(": ")[0]]
+    errors = []
+    for l in lines:
+        # Format: path:line:col: CODE message
+        m = re.match(r"^([^:]+):(\d+):(\d+):\s+(\S+)\s+(.*)$", l.strip())
+        if m:
+            errors.append({
+                "file": m.group(1),
+                "line": int(m.group(2)),
+                "column": int(m.group(3)),
+                "code": m.group(4),
+                "message": m.group(5),
+            })
+    return {"tool": "flake8", "total": len(errors), "errors": errors}
+
+
+def parse_checkov(path):
+    d = json.load(open(path))
+    res = d.get("results", {}).get("failed_checks", [])
+    return {
+        "tool": "checkov",
+        "total": len(res),
+        "errors": [
+            {
+                "file": f["file_path"],
+                "check_id": f["check_id"],
+                "check_name": f["check_name"],
+                "severity": f.get("severity"),
+                "line": f.get("file_line_range", [None, None])[0],
+                "message": f.get("check_name"),
+            }
+            for f in res
+        ],
+    }
+
+
 PARSERS = {
     "ruff": parse_ruff,
     "bandit": parse_bandit,
@@ -120,6 +162,8 @@ PARSERS = {
     "mypy": parse_mypy,
     "eslint": parse_eslint,
     "gitleaks": parse_gitleaks,
+    "flake8": parse_flake8,
+    "checkov": parse_checkov,
 }
 
 

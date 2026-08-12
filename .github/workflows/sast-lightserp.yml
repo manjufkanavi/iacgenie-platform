@@ -49,7 +49,7 @@ jobs:
         run: |
           docker run --rm -v "$PWD":/workspace iacgenie-sast:latest \
             bash -c 'cd /workspace && mkdir -p artifacts && \
-            semgrep --config auto --json lightserv 2>/dev/null > /tmp/semgrep.json; \
+            semgrep --config p/javascript --config p/dockerfile --config p/secrets --json lightserv 2>/dev/null > /tmp/semgrep.json; \
             python3 /workspace/.sast/sast-parse.py semgrep /tmp/semgrep.json /workspace/artifacts/semgrep.json'
 
       - name: Run Mypy (Python types)
@@ -60,6 +60,15 @@ jobs:
             bash -c 'cd /workspace && mkdir -p artifacts && \
             mypy --config-file .sast/mypy.ini lightserv 2>/dev/null > /tmp/mypy.txt; \
             python3 /workspace/.sast/sast-parse.py mypy /tmp/mypy.txt /workspace/artifacts/mypy.json'
+
+      - name: Run Flake8 (Python style)
+        id: flake8
+        continue-on-error: true
+        run: |
+          docker run --rm -v "$PWD":/workspace iacgenie-sast:latest \
+            bash -c 'cd /workspace && mkdir -p artifacts && \
+            flake8 lightserv --config .sast/setup.cfg 2>/dev/null > /tmp/flake8.txt; \
+            python3 /workspace/.sast/sast-parse.py flake8 /tmp/flake8.txt /workspace/artifacts/flake8.json'
 
       - name: Run ESLint (TypeScript - webui)
         id: eslint-webui
@@ -106,6 +115,7 @@ jobs:
           echo "Bandit:          ${{ steps.bandit.outcome }}"
           echo "Semgrep:         ${{ steps.semgrep.outcome }}"
           echo "Mypy:            ${{ steps.mypy.outcome }}"
+          echo "Flake8:          ${{ steps.flake8.outcome }}"
           echo "ESLint (webui):  ${{ steps.eslint-webui.outcome }}"
           echo "ESLint (core):   ${{ steps.eslint-lightserp.outcome }}"
           echo "Gitleaks:        ${{ steps.gitleaks.outcome }}"

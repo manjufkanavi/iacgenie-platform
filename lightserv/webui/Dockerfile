@@ -25,6 +25,11 @@ COPY --from=builder /app/public ./public
 # Update package.json for standalone
 RUN node -e "const pkg=require('./package.json'); delete pkg.devDependencies; pkg.scripts={}; require('fs').writeFileSync('package.json', JSON.stringify(pkg,null,2))"
 
+# Create non-root user for running the application
+RUN groupadd -r appgroup && useradd -r -g appgroup -d /app -s /sbin/nologin appuser && \
+    chown -R appuser:appgroup /app
+USER appuser
+
 EXPOSE 3070
 
 CMD ["node", "server.js"]

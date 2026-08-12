@@ -15,6 +15,11 @@ RUN npm install express
 
 COPY pagezen-server.mjs /app/server.mjs
 
+# Create non-root user for running the application
+RUN groupadd -r appgroup && useradd -r -g appgroup -d /app -s /sbin/nologin appuser && \
+    chown -R appuser:appgroup /app
+USER appuser
+
 EXPOSE 8082
 
 CMD ["node", "server.mjs"]

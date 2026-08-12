@@ -66,3 +66,6 @@ docker-compose.override.yml
 __tests__
 coverage/
 nyc_output/
+
+# SAST scan output
+artifacts/
