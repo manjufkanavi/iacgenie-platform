@@ -30,71 +30,63 @@ jobs:
         continue-on-error: true
         run: |
           docker run --rm -v "$PWD":/workspace iacgenie-sast:latest \
-            bash -c 'cd /workspace && mkdir -p /tmp/artifacts && \
+            bash -c 'cd /workspace && mkdir -p artifacts && \
             ruff check --config .sast/ruff.toml lightserv --output-format json 2>/dev/null > /tmp/ruff.json; \
-            python3 /workspace/.sast/sast-parse.py ruff /tmp/ruff.json /tmp/artifacts/ruff.json'
+            python3 /workspace/.sast/sast-parse.py ruff /tmp/ruff.json /workspace/artifacts/ruff.json'
 
       - name: Run Bandit (Python security)
         id: bandit
         continue-on-error: true
         run: |
           docker run --rm -v "$PWD":/workspace iacgenie-sast:latest \
-            bash -c 'cd /workspace && mkdir -p /tmp/artifacts && \
+            bash -c 'cd /workspace && mkdir -p artifacts && \
             bandit -q -r lightserv -c .sast/bandit.toml -f json 2>/dev/null > /tmp/bandit.json; \
-            python3 /workspace/.sast/sast-parse.py bandit /tmp/bandit.json /tmp/artifacts/bandit.json'
+            python3 /workspace/.sast/sast-parse.py bandit /tmp/bandit.json /workspace/artifacts/bandit.json'
 
       - name: Run Semgrep (Python security)
         id: semgrep
         continue-on-error: true
         run: |
           docker run --rm -v "$PWD":/workspace iacgenie-sast:latest \
-            bash -c 'cd /workspace && mkdir -p /tmp/artifacts && \
+            bash -c 'cd /workspace && mkdir -p artifacts && \
             semgrep --config auto --json lightserv 2>/dev/null > /tmp/semgrep.json; \
-            python3 /workspace/.sast/sast-parse.py semgrep /tmp/semgrep.json /tmp/artifacts/semgrep.json'
+            python3 /workspace/.sast/sast-parse.py semgrep /tmp/semgrep.json /workspace/artifacts/semgrep.json'
 
       - name: Run Mypy (Python types)
         id: mypy
         continue-on-error: true
         run: |
           docker run --rm -v "$PWD":/workspace iacgenie-sast:latest \
-            bash -c 'cd /workspace && mkdir -p /tmp/artifacts && \
+            bash -c 'cd /workspace && mkdir -p artifacts && \
             mypy --config-file .sast/mypy.ini lightserv 2>/dev/null > /tmp/mypy.txt; \
-            python3 /workspace/.sast/sast-parse.py mypy /tmp/mypy.txt /tmp/artifacts/mypy.json'
+            python3 /workspace/.sast/sast-parse.py mypy /tmp/mypy.txt /workspace/artifacts/mypy.json'
 
       - name: Run ESLint (TypeScript - webui)
         id: eslint-webui
         continue-on-error: true
         run: |
           docker run --rm -v "$PWD":/workspace iacgenie-sast:latest \
-            bash -c 'cd /workspace && mkdir -p /tmp/artifacts && \
+            bash -c 'cd /workspace && mkdir -p artifacts && \
             cd lightserv/webui && eslint --format json src 2>/dev/null > /tmp/eslint.json; \
-            python3 /workspace/.sast/sast-parse.py eslint /tmp/eslint.json /tmp/artifacts/eslint-webui.json'
+            python3 /workspace/.sast/sast-parse.py eslint /tmp/eslint.json /workspace/artifacts/eslint-webui.json'
 
       - name: Run ESLint (TypeScript - lightserp)
         id: eslint-lightserp
         continue-on-error: true
         run: |
           docker run --rm -v "$PWD":/workspace iacgenie-sast:latest \
-            bash -c 'cd /workspace && mkdir -p /tmp/artifacts && \
+            bash -c 'cd /workspace && mkdir -p artifacts && \
             cd lightserv && eslint --format json src 2>/dev/null > /tmp/eslint.json; \
-            python3 /workspace/.sast/sast-parse.py eslint /tmp/eslint.json /tmp/artifacts/eslint-lightserp.json'
+            python3 /workspace/.sast/sast-parse.py eslint /tmp/eslint.json /workspace/artifacts/eslint-lightserp.json'
 
       - name: Run Gitleaks (secrets)
         id: gitleaks
         continue-on-error: true
         run: |
           docker run --rm -v "$PWD":/workspace iacgenie-sast:latest \
-            bash -c 'cd /workspace && mkdir -p /tmp/artifacts && \
+            bash -c 'cd /workspace && mkdir -p artifacts && \
             gitleaks detect --source . --config .sast/gitleaks.toml --report-format json --report-path /tmp/gitleaks.json --no-banner 2>/dev/null; \
-            python3 /workspace/.sast/sast-parse.py gitleaks /tmp/gitleaks.json /tmp/artifacts/gitleaks.json'
-
-      - name: Collect artifacts from container
-        if: always()
-        run: |
-          mkdir -p artifacts
-          docker run --rm -v "$PWD":/workspace iacgenie-sast:latest \
-            bash -c 'cp -r /tmp/artifacts/* /workspace/artifacts/ 2>/dev/null || true'
-          ls -la artifacts/
+            python3 /workspace/.sast/sast-parse.py gitleaks /tmp/gitleaks.json /workspace/artifacts/gitleaks.json'
 
       - name: Upload SAST artifacts
         if: always()
