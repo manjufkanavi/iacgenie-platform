@@ -1,29 +1,172 @@
 ---
-# Bootstrap playbook: initial server setup
-- hosts: all
+# =============================================================================
+# IaCGenie Platform — OpenBao Bootstrap Playbook
+# =============================================================================
+# Single-shot bootstrap: initializes OpenBao, unseals it, seeds all secrets.
+# MUST be run ONCE manually before running services.yml.
+# Subsequent runs will detect "already bootstrapped" and skip most tasks.
+#
+# REQUIRED (--extra-vars or GitHub Secrets):
+#   openbao_root_token    — OpenBao root token
+#   openbao_unseal_key_1  — Unseal key 1/3
+#   openbao_unseal_key_2  — Unseal key 2/3
+#   openbao_unseal_key_3  — Unseal key 3/3
+#
+# Usage:
+#   ansible-playbook -i inventory/hosts.ini playbooks/bootstrap.yml \
+#     -e openbao_root_token='s.XXXX' \
+#     -e openbao_unseal_key_1='XXXX' \
+#     -e openbao_unseal_key_2='XXXX' \
+#     -e openbao_unseal_key_3='XXXX'
+# =============================================================================
+
+- name: "Bootstrap | Initialize OpenBao and seed all secrets"
+  hosts: iacgenie-server
   become: true
-  become_method: sudo
+  gather_facts: true
+  vars:
+    openbao_compose_dir: /home/mkanavi/docker/iacgenie
+    openbao_data_dir: /var/lib/openbao
+    openbao_raft_data_dir: /home/mkanavi/docker/iacgenie/data/openbao_raft
+    openbao_port: 8200
 
   pre_tasks:
-    - name: Update apt cache
-      apt:
-        update_cache: yes
-        cache_valid_time: 3600
+    - name: "Bootstrap | Validate required variables are set"
+      ansible.builtin.assert:
+        that:
+          - "openbao_root_token is defined and openbao_root_token | length > 0"
+          - "openbao_unseal_key_1 is defined and openbao_unseal_key_1 | length > 0"
+          - "openbao_unseal_key_2 is defined and openbao_unseal_key_2 | length > 0"
+          - "openbao_unseal_key_3 is defined and openbao_unseal_key_3 | length > 0"
+        fail_msg: "All OpenBao tokens and unseal keys must be set via --extra-vars."
+        success_msg: "All required variables are set."
 
-    - name: Check SSH connectivity before applying hardening
-      # This pre-flight check ensures we don't lock ourselves out.
-      # If SSH fails after applying sshd_config changes, we can't recover.
-      # When ssh_apply_changes_reboot is false, only sshd_config is written
-      # (no restart), so the admin can validate config manually before reboot.
-      ansible.builtin.command: echo "pre-flight check ok"
-      register: _ssh_check
+    - name: "Bootstrap | Check Docker is running"
+      ansible.builtin.command: docker info
+      register: docker_info
+      changed_when: false
+      failed_when: docker_info.rc != 0
+
+    - name: "Bootstrap | Check OpenBao container exists"
+      ansible.builtin.command: "docker ps -a --format '{{ '{{' }}.Names{{ '}}' }}' | grep openbao"
+      register: openbao_container_check
+      changed_when: false
+      failed_when: false
+      # Note: docker ps might not show if container is not running yet
+
+  tasks:
+    # ── Step 1: Deploy OpenBao Container ──────────────────────────────────────
+    - name: "Bootstrap | Include openbao role for container deployment"
+      ansible.builtin.include_role:
+        name: openbao
+      vars:
+        openbao_bootstrap_policies: false  # We handle this separately
+        openbao_bootstrap_kv: false        # We handle this separately
+        openbao_bootstrap_tokens: false    # We handle this separately
+
+    # ── Step 2: Wait for OpenBao to start ─────────────────────────────────────
+    - name: "Bootstrap | Wait for OpenBao API to respond"
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ openbao_port }}/v1/sys/health"
+        method: GET
+        validate_certs: false
+        status_code: [200, 501]
+        timeout: 10
+      register: openbao_health
+      retries: 30
+      delay: 5
+      until: (openbao_health.status | default(0)) == 200
+      failed_when: false
       changed_when: false
 
-  tags:
-    - skip_hardening
-    # NOTE: To skip SSH hardening entirely, run with --skip-tags skip_hardening
+    - name: "Bootstrap | Report OpenBao health"
+      ansible.builtin.debug:
+        msg: "OpenBao health: status={{ openbao_health.status | default('unreachable') }}, body={{ openbao_health.json | default('N/A') }}"
+      when: openbao_health is succeeded
 
-  roles:
-    - role: common
-    - role: docker
-    - role: ntp_config
+    - name: "Bootstrap | Fail if OpenBao didn't start"
+      ansible.builtin.fail:
+        msg: "OpenBao container failed to start within 150 seconds. Check docker logs: docker logs iacgenie_openbao"
+      when:
+        - openbao_health is failed or (openbao_health is succeeded and openbao_health.status != 200)
+        - openbao_health.retry_count | default(0) >= 30
+
+    # ── Step 3: Unseal OpenBao ───────────────────────────────────────────────
+    - name: "Bootstrap | Include unseal tasks"
+      ansible.builtin.include_tasks: roles/openbao/tasks/unseal.yml
+
+    # ── Step 4: Verify OpenBao is unsealed ───────────────────────────────────
+    - name: "Bootstrap | Verify OpenBao is unsealed"
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ openbao_port }}/v1/sys/health"
+        method: GET
+        validate_certs: false
+        status_code: [200]
+        timeout: 10
+      register: openbao_post_unseal
+      failed_when: false
+      changed_when: false
+
+    - name: "Bootstrap | Assert OpenBao is unsealed"
+      ansible.builtin.assert:
+        that:
+          - "openbao_post_unseal is succeeded"
+          - "not openbao_post_unseal.json.sealed"
+        fail_msg: "OpenBao is still sealed after unseal attempt. Check unseal keys and logs."
+        success_msg: "OpenBao is unsealed and ready."
+      when: openbao_post_unseal is succeeded
+
+    - name: "Bootstrap | Fail if unsealed check failed"
+      ansible.builtin.fail:
+        msg: "Could not verify OpenBao unsealed state. Health endpoint returned: {{ openbao_post_unseal | default('timeout') }}"
+      when:
+        - openbao_post_unseal is failed
+        - openbao_post_unseal is not succeeded
+
+    # ── Step 5: Create Policy Directory ───────────────────────────────────────
+    - name: "Bootstrap | Create OpenBao policies directory"
+      ansible.builtin.file:
+        path: "{{ openbao_raft_data_dir }}/policies"
+        state: directory
+        owner: mkanavi
+        group: mkanavi
+        mode: "0755"
+
+    # ── Step 6: Deploy Policies ──────────────────────────────────────────────
+    - name: "Bootstrap | Include policy deployment tasks"
+      ansible.builtin.include_tasks: roles/openbao/tasks/policies.yml
+
+    # ── Step 7: Initialize KV Engines ─────────────────────────────────────────
+    - name: "Bootstrap | Include KV bootstrap tasks"
+      ansible.builtin.include_tasks: roles/openbao/tasks/kv_bootstrap.yml
+
+    # ── Step 8: Generate Service Tokens ───────────────────────────────────────
+    - name: "Bootstrap | Include service token generation tasks"
+      ansible.builtin.include_tasks: roles/openbao/tasks/service_tokens.yml
+
+    # ── Step 9: Final Verification ───────────────────────────────────────────
+    - name: "Bootstrap | Final health check"
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ openbao_port }}/v1/sys/health"
+        method: GET
+        validate_certs: false
+        status_code: [200]
+        timeout: 10
+      register: openbao_final_health
+      changed_when: false
+      failed_when: false
+
+    - name: "Bootstrap | Show final status"
+      ansible.builtin.debug:
+        msg: >
+          Bootstrap complete!
+          OpenBao initialized={{ openbao_final_health.json.initialized | default('unknown') }},
+          sealed={{ openbao_final_health.json.sealed | default('unknown') }},
+          standby={{ openbao_final_health.json.standby | default('unknown') }}
+
+    - name: "Bootstrap | Verify KV engines"
+      ansible.builtin.debug:
+        msg:
+          - "Bootstrap completed successfully!"
+          - "OpenBao is unsealed with all policies, KV engines, and service tokens configured."
+          - "You can now run: ansible-playbook -i inventory/hosts.ini playbooks/services.yml"
