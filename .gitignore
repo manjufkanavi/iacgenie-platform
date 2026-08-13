@@ -23,8 +23,11 @@ Thumbs.db
 
 # Environment
 .env
-.env.local
 .env.*.local
+*.env
+*.env.prod
+*.env.staging
+.env.test
 *.secret
 .vault_key
 
