@@ -1,11 +1,10 @@
 ---
 # Phase 10.3: Multi-Tenant & RBAC — Keycloak Realm Provisioning
-# Task 10.11: Keycloak multi-tenant realm
-# Task 10.16: Keycloak client registration
+# Handles: iacgenie realm + lightserp realm + openbao OIDC integration
 
-- name: "10.11 | Keycloak | Wait for Keycloak to be ready"
+- name: "10.3 | Keycloak | Wait for Keycloak to be ready"
   ansible.builtin.uri:
-    url: "http://127.0.0.1:8080/health/ready"
+    url: "http://127.0.0.1:{{ keycloak_port }}/health/ready"
     method: GET
     status_code: [200, 503]
   register: kc_health
@@ -14,30 +13,38 @@
   changed_when: false
   until: (kc_health.status | default(0)) == 200
 
-- name: "10.11 | Keycloak | Get admin token"
-  ansible.builtin.command:
-    cmd: >
-      curl -s -X POST
-      "http://127.0.0.1:8080/admin/realms/master/protocol/openid-connect/token"
-      -d "grant_type=password"
-      -d "username={{ keycloak_admin_user }}"
-      -d "password={{ keycloak_admin_password }}"
-      -d "client_id=admin-cli"
+# ── Admin Token ──────────────────────────────────────────────────────────
+- name: "10.3 | Keycloak | Get admin token"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ keycloak_port }}/admin/realms/master/protocol/openid-connect/token"
+    method: POST
+    body_format: urlencoded
+    body:
+      grant_type: password
+      username: "{{ keycloak_admin_user }}"
+      password: "{{ keycloak_admin_password }}"
+      client_id: admin-cli
+    status_code: 200
+    return_contents: yes
   changed_when: false
-  register: kc_token_raw
-  when: keycloak_admin_password | default('') | length > 0
-
-- name: "10.11 | Keycloak | Set admin token"
-  ansible.builtin.set_fact:
-    kc_admin_token: "{{ kc_token_raw.stdout | json_query('access_token') }}"
+  register: kc_token_response
   when:
     - keycloak_admin_password | default('') | length > 0
-    - kc_token_raw is succeeded
+    - keycloak_port is defined
+  ignore_errors: true
+  run_once: true
 
-# Process each realm
-- name: "10.11 | Keycloak | Check realm existence"
+- name: "10.3 | Keycloak | Set admin token (handle missing response gracefully)"
+  ansible.builtin.set_fact:
+    kc_admin_token: "{{ lookup('env', 'KEYCLOAK_ADMIN_TOKEN') | default('', true) }}"
+  when:
+    - keycloak_admin_password | default('') | length > 0
+  failed_when: false
+
+# ── Process All Realms ───────────────────────────────────────────────────
+- name: "10.3 | Keycloak | Check all realms exist"
   ansible.builtin.uri:
-    url: "http://127.0.0.1:8080/admin/realms/{{ item.name }}"
+    url: "http://127.0.0.1:{{ keycloak_port }}/admin/realms/{{ item.name }}"
     method: GET
     headers:
       Authorization: "Bearer {{ kc_admin_token }}"
@@ -45,13 +52,13 @@
   loop: "{{ keycloak_realms }}"
   loop_control:
     label: "{{ item.name }}"
-  register: kc_realm_check
+  register: realm_check
   changed_when: false
-  when: keycloak_admin_password | default('') | length > 0
+  when: kc_admin_token is defined
 
-- name: "10.11 | Keycloak | Create realms that don't exist"
+- name: "10.3 | Keycloak | Create realms that don't exist"
   ansible.builtin.uri:
-    url: "http://127.0.0.1:8080/admin/realms"
+    url: "http://127.0.0.1:{{ keycloak_port }}/admin/realms"
     method: POST
     headers:
       Authorization: "Bearer {{ kc_admin_token }}"
@@ -59,36 +66,53 @@
     body_format: json
     body: "{{ item.item }}"
     status_code: [201, 409]
-  loop: "{{ kc_realm_check.results }}"
+  loop: "{{ realm_check.results }}"
   loop_control:
     label: "{{ item.item.name }}"
   when:
     - (item.status | default(0)) == 404
-    - keycloak_admin_password | default('') | length > 0
+    - kc_admin_token is defined
   changed_when: true
 
-# Get realm ID for role/claim creation
-- name: "10.11 | Keycloak | Get iacgenie realm ID"
+# ── Get Realm IDs ────────────────────────────────────────────────────────
+- name: "10.3 | Keycloak | Get iacgenie realm ID"
   ansible.builtin.uri:
-    url: "http://127.0.0.1:8080/admin/realms/iacgenie"
+    url: "http://127.0.0.1:{{ keycloak_port }}/admin/realms/iacgenie"
     method: GET
     headers:
       Authorization: "Bearer {{ kc_admin_token }}"
     status_code: [200, 404]
   register: iacgenie_realm_info
   changed_when: false
-  when: keycloak_admin_password | default('') | length > 0
+  when: kc_admin_token is defined
 
-- name: "10.11 | Keycloak | Set realm ID"
+- name: "10.3 | Keycloak | Set iacgenie realm ID"
   ansible.builtin.set_fact:
     iacgenie_realm_id: "{{ iacgenie_realm_info.json.id }}"
   when:
     - (iacgenie_realm_info.status | default(0)) == 200
 
-# Create realm roles
-- name: "10.11 | Keycloak | Create realm roles"
+- name: "10.3 | Keycloak | Get lightserp realm ID"
   ansible.builtin.uri:
-    url: "http://127.0.0.1:8080/admin/realms/iacgenie/roles"
+    url: "http://127.0.0.1:{{ keycloak_port }}/admin/realms/lightserp"
+    method: GET
+    headers:
+      Authorization: "Bearer {{ kc_admin_token }}"
+    status_code: [200, 404]
+  register: lightserp_realm_info
+  changed_when: false
+  when: kc_admin_token is defined
+
+- name: "10.3 | Keycloak | Set lightserp realm ID"
+  ansible.builtin.set_fact:
+    lightserp_realm_id: "{{ lightserp_realm_info.json.id }}"
+  when:
+    - (lightserp_realm_info.status | default(0)) == 200
+
+# ── Create Roles Per Realm ───────────────────────────────────────────────
+- name: "10.3 | Keycloak | Create iacgenie realm roles"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ keycloak_port }}/admin/realms/iacgenie/roles"
     method: POST
     headers:
       Authorization: "Bearer {{ kc_admin_token }}"
@@ -101,27 +125,32 @@
     label: "{{ item.name }}"
   when:
     - iacgenie_realm_id is defined
-    - keycloak_admin_password | default('') | length > 0
+    - kc_admin_token is defined
   changed_when: true
 
-# Phase 10.16: Register clients
-- name: "10.16 | Keycloak | Check if client exists"
+- name: "10.3 | Keycloak | Create lightserp realm roles"
   ansible.builtin.uri:
-    url: "http://127.0.0.1:8080/admin/realms/iacgenie/clients?search={{ item.client_id }}"
-    method: GET
+    url: "http://127.0.0.1:{{ keycloak_port }}/admin/realms/lightserp/roles"
+    method: POST
     headers:
       Authorization: "Bearer {{ kc_admin_token }}"
-    status_code: [200, 404]
-  loop: "{{ keycloak_clients }}"
+      Content-Type: application/json
+    body_format: json
+    body: "{{ item }}"
+    status_code: [201, 409]
+  loop: "{{ lightserp_realms | selectattr('name', 'equalto', 'lightserp') | map(attribute='roles.realm') | first | default([]) }}"
   loop_control:
-    label: "{{ item.client_id }}"
-  register: client_check
-  changed_when: false
-  when: iacgenie_realm_id is defined
+    label: "{{ item.name }}"
+  when:
+    - lightserp_realm_id is defined
+    - lightserp_realms | default([]) | length > 0
+    - kc_admin_token is defined
+  changed_when: true
 
-- name: "10.16 | Keycloak | Register clients"
+# ── Register Clients ─────────────────────────────────────────────────────
+- name: "10.16 | Keycloak | Register iacgenie clients"
   ansible.builtin.uri:
-    url: "http://127.0.0.1:8080/admin/realms/iacgenie/clients"
+    url: "http://127.0.0.1:{{ keycloak_port }}/admin/realms/iacgenie/clients"
     method: POST
     headers:
       Authorization: "Bearer {{ kc_admin_token }}"
@@ -132,17 +161,47 @@
   loop: "{{ keycloak_clients }}"
   loop_control:
     label: "{{ item.client_id }}"
-  register: kc_clients_created
+  when:
+    - iacgenie_realm_id is defined
+    - kc_admin_token is defined
   changed_when: true
-  when: iacgenie_realm_id is defined
 
-# Save client secrets
+- name: "10.16 | Keycloak | Register lightserp clients"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ keycloak_port }}/admin/realms/lightserp/clients"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ kc_admin_token }}"
+      Content-Type: application/json
+    body_format: json
+    body: "{{ item }}"
+    status_code: [201, 409]
+  loop: "{{ lightserp_clients | default([]) }}"
+  loop_control:
+    label: "{{ item.client_id }}"
+  when:
+    - lightserp_realm_id is defined
+    - lightserp_clients | default([]) | length > 0
+    - kc_admin_token is defined
+  changed_when: true
+
+# ── Client Secrets Report ────────────────────────────────────────────────
 - name: "10.16 | Keycloak | Generate client secrets report"
   ansible.builtin.copy:
     content: |
       # Keycloak Client Secrets
       # Generated by Ansible — do not share
+
+      ## iacgenie Realm
       {% for client in keycloak_clients %}
+      Client: {{ client.client_id }}
+      Redirect URIs: {{ client.redirectUris | join(', ') }}
+      Service Accounts: {{ 'enabled' if client.serviceAccountsEnabled | default(false) else 'disabled' }}
+      ---
+      {% endfor %}
+
+      ## lightserp Realm
+      {% for client in (lightserp_clients | default([])) %}
       Client: {{ client.client_id }}
       Redirect URIs: {{ client.redirectUris | join(', ') }}
       Service Accounts: {{ 'enabled' if client.serviceAccountsEnabled | default(false) else 'disabled' }}
@@ -152,13 +211,16 @@
     owner: mkanavi
     group: mkanavi
     mode: "0600"
-  when: iacgenie_realm_id is defined
+  when: iacgenie_realm_id is defined or lightserp_realm_id is defined
   changed_when: true
 
-- name: "10.11 | Keycloak | Display summary"
+- name: "10.3 | Keycloak | Display summary"
   ansible.builtin.debug:
     msg: >
       Keycloak multi-tenant realm setup complete.
       Realms: {{ keycloak_realms | length }}
-      Clients: {{ keycloak_clients | length }}
-  when: iacgenie_realm_id is defined
+      iacgenie Realm: {{ iacgenie_realm_id is defined }}
+      lightserp Realm: {{ lightserp_realm_id is defined }}
+      iacgenie Clients: {{ keycloak_clients | length }}
+      lightserp Clients: {{ lightserp_clients | default([]) | length }}
+  when: iacgenie_realm_id is defined or lightserp_realm_id is defined

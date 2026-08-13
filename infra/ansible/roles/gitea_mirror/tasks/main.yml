@@ -1,0 +1,100 @@
+---
+# Gitea Mirror role — Pull mirrors from GitHub
+# Creates pull mirror entries in Gitea DB and triggers initial sync
+
+- name: "Gitea Mirror | Check Gitea container is running"
+  ansible.builtin.command: docker ps --filter "name=iacgenie-gitea" --format "{{ '{{.Names'}} }}"
+  register: gitea_mirror_running
+  changed_when: false
+  failed_when: false
+
+- name: "Gitea Mirror | Show Gitea running status"
+  ansible.builtin.debug:
+    var: gitea_mirror_running.stdout_lines | default(['N/A'])
+
+# ========================
+# Verify DB mirror table exists
+# ========================
+
+- name: "Gitea Mirror | Verify mirror table exists in DB"
+  ansible.builtin.command: >
+    docker exec iacgenie_postgres psql -U gitea -d gitea -t
+    -c "SELECT 1 FROM information_schema.tables WHERE table_name='mirror' LIMIT 1;"
+  register: mirror_table_check
+  changed_when: false
+  failed_when: false
+
+- name: "Gitea Mirror | Show mirror table status"
+  ansible.builtin.debug:
+    msg: "Mirror table: {{ 'EXISTS' if '1' in mirror_table_check.stdout else 'MISSING - Gitea init required' }}"
+
+# ========================
+# Create pull mirror entries
+# ========================
+
+- name: "Gitea Mirror | Deploy pull mirrors"
+  ansible.builtin.command: >-
+    docker exec iacgenie_postgres psql -U gitea -d gitea
+    -c "INSERT INTO mirror (repo_id, interval, enable_prune, updated_unix, next_update_unix, lfs_enabled, lfs_endpoint, remote_address)
+    SELECT r.id, {{ gitea_mirror_interval | default(3600) }}, {{ gitea_mirror_enable_prune | default(true) | lower }}, EXTRACT(EPOCH FROM NOW())::BIGINT, 0, false, '', 'https://{{ gitea_github_pat }}@github.com/{{ gitea_github_owner }}/{{ item }}.git' FROM repository r WHERE r.name = '{{ item }}' ON CONFLICT DO NOTHING"
+  loop: "{{ gitea_mirror_repos | default([]) }}"
+  loop_control:
+    label: "{{ item }}"
+  when:
+    - gitea_mirror_repos | default([]) | length > 0
+    - gitea_github_pat | default('') | length > 0
+    - gitea_github_owner | default('') | length > 0
+
+- name: "Gitea Mirror | Mark repos as mirrors"
+  ansible.builtin.command: >
+    docker exec iacgenie_postgres psql -U gitea -d gitea
+    -c "
+    UPDATE repository SET is_mirror = true
+    WHERE id IN (
+      SELECT m.repo_id FROM mirror m
+      JOIN repository r ON m.repo_id = r.id
+      WHERE r.owner_id = 1
+        AND r.name IN ('{{ gitea_mirror_repos | join('\", \"') }}')
+    );
+    "
+  changed_when: true
+  failed_when: false
+
+# ========================
+# Verify mirror setup
+# ========================
+
+- name: "Gitea Mirror | Verify mirror configuration"
+  ansible.builtin.command: >
+    docker exec iacgenie_postgres psql -U gitea -d gitea -t
+    -c "SELECT m.id, r.name, m.remote_address, m.interval, m.enable_prune, m.updated_unix FROM mirror m JOIN repository r ON m.repo_id = r.id;"
+  register: mirror_verify
+  changed_when: false
+
+- name: "Gitea Mirror | Show mirror status"
+  ansible.builtin.debug:
+    msg: |
+      Gitea Pull Mirrors:
+      {{ mirror_verify.stdout | default('No mirrors configured') }}
+
+# ========================
+# Trigger initial sync
+# ========================
+
+- name: "Gitea Mirror | Trigger initial mirror sync for all repos"
+  ansible.builtin.uri:
+    url: "{{ gitea_api_url | default('http://127.0.0.1:3000') }}/api/v1/repos/{{ gitea_admin_user | default('manjufkanavi') }}/{{ item }}/mirror-sync"
+    method: POST
+    headers:
+      Authorization: "token {{ gitea_api_token | default('') }}"
+    status_code: [200, 204]
+  loop: "{{ gitea_mirror_repos }}"
+  register: mirror_sync_result
+  changed_when: true
+  failed_when: false
+  loop_control:
+    label: "{{ item }}"
+
+- name: "Gitea Mirror | Show sync results"
+  ansible.builtin.debug:
+    var: mirror_sync_result.results

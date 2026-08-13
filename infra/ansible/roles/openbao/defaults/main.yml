@@ -1,6 +1,99 @@
 openbao_version: "2.6.0"
 openbao_port: 8200
 openbao_data_dir: /var/lib/openbao
-openbao_storage_type: file
+openbao_storage_type: raft
 openbao_auto_unseal: false
-openbao_static_key: CHANGE_ME
+openbao_static_key: "{{ openbao_root_token }}"
+
+# ── OpenBao API URL (for internal container-to-container) ───────────────────
+openbao_api_url: "http://127.0.0.1:{{ openbao_port }}"
+
+# ── Root token — set via --extra-vars or GitHub Secrets (NOT from env vars) ──
+# Usage: ansible-playbook ... -e openbao_root_token='<actual_root_token>'
+openbao_root_token: "{{ openbao_root_token | default('CHANGE_ME_SEE_GITHUB_SECRETS') }}"
+
+# ── OpenBao unseal keys (Shamir 3/3) — set via --extra-vars or GitHub Secrets ──
+# Usage: ansible-playbook ... -e openbao_unseal_key_1='...' -e openbao_unseal_key_2='...' -e openbao_unseal_key_3='...'
+openbao_unseal_key_1: "{{ openbao_unseal_key_1 | default('') }}"
+openbao_unseal_key_2: "{{ openbao_unseal_key_2 | default('') }}"
+openbao_unseal_key_3: "{{ openbao_unseal_key_3 | default('') }}"
+openbao_unseal_keys:
+  - "{{ openbao_unseal_key_1 }}"
+  - "{{ openbao_unseal_key_2 }}"
+  - "{{ openbao_unseal_key_3 }}"
+
+# ── Raft / data directory on host ─────────────────────────────────────────
+openbao_raft_data_dir: /home/mkanavi/docker/iacgenie/data/openbao_raft
+openbao_compose_dir: /home/mkanavi/docker/iacgenie
+
+# ── Bootstrap toggles ─────────────────────────────────────────────────────
+openbao_bootstrap_policies: true   # Apply RBAC policies on bootstrap
+openbao_bootstrap_tokens: true     # Generate service tokens on bootstrap
+openbao_bootstrap_kv: true         # Enable KV engines and seed secrets
+
+# ── OIDC / Keycloak Integration (Phase 10.3) ──────────────────────────────
+openbao_oidc_enabled: true
+openbao_oidc_discovery_url: "http://127.0.0.1:8083/realms/lightserp/.well-known/openid-configuration"
+openbao_oidc_client_id: "openbao-oidc"
+openbao_oidc_client_secret: "{{ keycloak_openbao_oidc_secret }}"  # Keycloak openbao-oidc client secret (lightserp realm)
+openbao_oidc_redirect_uris:
+  - "https://vault.iacgenie.com/oidc/callback"
+  - "http://127.0.0.1:{{ openbao_port }}/oidc/callback"
+openbao_oidc_token_ttl: "8h"
+openbao_oidc_max_ttl: "24h"
+openbao_oidc_default_policies:
+  - "openbao-service-read"
+
+# ── KV Mount Paths ────────────────────────────────────────────────────────
+openbao_kv_mounts:
+  - name: iacgenie/kv
+    description: "IaCGenie application secrets"
+  - name: lightserp/kv
+    description: "LightSerp application secrets"
+  - name: terraform/kv
+    description: "Terraform state and provider secrets"
+
+# ── Policy Definitions ────────────────────────────────────────────────────
+openbao_policies:
+  - name: admin
+    file: admin.hcl.j2
+  - name: platform-admin
+    file: platform-admin.hcl.j2
+  - name: iacgenie-service
+    file: iacgenie-service.hcl.j2
+  - name: lightserp-service
+    file: lightserp-service.hcl.j2
+  - name: terraform-service
+    file: terraform-service.hcl.j2
+  - name: openbao-service-read
+    file: openbao-service-read.hcl.j2
+
+# ── Service Token TTLs ────────────────────────────────────────────────────
+openbao_ig_token_ttl: "720h"     # 30 days — IaCGenie service
+openbao_ls_token_ttl: "720h"     # 30 days — LightSerp service
+openbao_tf_token_ttl: "720h"     # 30 days — Terraform service
+openbao_backup_token_ttl: "168h" # 7 days — backup cron token
+
+# ── IaCGenie KV Secrets (from encrypted group_vars) ──────────────────────
+openbao_ig_pg_password: "{{ pg_root_password }}"
+openbao_ig_redis_password: "{{ redis_password }}"
+openbao_ig_minio_access_key: iacgenie
+openbao_ig_minio_secret_key: "{{ minio_root_password }}"
+openbao_ig_kc_admin_user: admin
+openbao_ig_kc_admin_password: "{{ keycloak_admin_password }}"
+openbao_ig_kc_db_password: "{{ keycloak_db_password }}"
+openbao_ig_gitea_db_password: "{{ gitea_db_password }}"
+openbao_ig_openbao_root_token: "{{ openbao_root_token }}"
+openbao_ig_searxng_secret: "{{ searxng_secret_key }}"
+openbao_ig_ls_api_secret: "{{ lightsrp_api_secret }}"
+
+# ── OIDC client secret (lightserp realm openbao-oidc client) ──
+keycloak_openbao_oidc_secret: "{{ openbao_oidc_secret }}"
+
+# PageZen
+openbao_ig_pagezen_port: "8081"
+
+# NSQD
+openbao_ig_nsqd_data_path: /nsq/data
+openbao_ig_nsqd_tcp_port: "4150"
+openbao_ig_nsqd_http_port: "4151"

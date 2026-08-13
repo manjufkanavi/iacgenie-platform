@@ -1,0 +1,17 @@
+[Unit]
+Description=Cloudflare Tunnel for IacGenie Platform
+Documentation=https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/
+After=network-online.target docker.service
+Wants=network-online.target docker.service
+
+[Service]
+Type=simple
+User=mkanavi
+ExecStartPre=/bin/mkdir -p /home/mkanavi/.config/cloudflared
+ExecStart=/home/mkanavi/.cloudflared/cloudflared tunnel --no-autoupdate run
+Restart=always
+RestartSec=10
+RestartPreSpawnSec=5
+
+[Install]
+WantedBy=multi-user.target

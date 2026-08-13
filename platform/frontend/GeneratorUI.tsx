@@ -3,7 +3,7 @@ import { CloudProvider, GeneratedCode, GeneratedFile, LogEntry, GenerationStatus
 import { startGeneration, pollGenerationStatus, downloadProject, submitClarifyAnswer } from './services/geminiService';
 import Button from './ui/Button';
 import Card from './ui/Card';
-import { AVAILABLE_MODELS } from './constants';
+import { AVAILABLE_MODELS } from './constants.ts';
 import { useAppStore } from './store/useAppStore';
 import { useProjectStore } from './store/useProjectStore';
 import toast from 'react-hot-toast';

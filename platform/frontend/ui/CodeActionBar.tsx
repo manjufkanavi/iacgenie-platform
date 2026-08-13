@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { Loader2, FileCheck, Copy, Check } from 'lucide-react';
-import { CodeActionState, ValidationIssue } from './types';
+import { CodeActionState, ValidationIssue } from '../types';
 import { Wifi, WifiOff, FileDiff } from 'lucide-react';
 
 interface CodeActionBarProps {

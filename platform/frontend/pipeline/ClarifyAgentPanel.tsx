@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
-import { workflowService as workflowService } from './workflowService';
+import { workflowService as workflowService } from '../workflowService';
 import toast from 'react-hot-toast';
-import { useAppStore } from '.././store/useAppStore';
+import { useAppStore } from '../store/useAppStore';
 
 const ClarifyAgentPanel: React.FC = () => {
   const deploymentMode = useAppStore(state => state.deploymentMode);

@@ -1,0 +1,157 @@
+---
+# OpenBao Service Token Generation (P1.2)
+# Creates scoped tokens via the OpenBao API with read-only policies
+# Uses root token to generate service tokens with project-scoped policies
+
+- name: "OpenBao Bootstrap | Create service tokens directory"
+  ansible.builtin.file:
+    path: "{{ openbao_raft_data_dir }}/service_tokens"
+    state: directory
+    owner: mkanavi
+    group: mkanavi
+    mode: "0750"
+
+# ── IaCGenie Service Token ────────────────────────────────────────────────
+- name: "OpenBao Bootstrap | Create IaCGenie service token"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/auth/token/create"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      policies: ["iacgenie-service"]
+      ttl: "{{ openbao_ig_token_ttl }}"
+      token_type: "service"
+      display_name: "iacgenie-service"
+    validate_certs: false
+    status_code: [200]
+    timeout: 15
+  register: openbao_ig_token_resp
+  when: openbao_bootstrap_tokens | default(true) | bool
+  failed_when: false
+
+- name: "OpenBao Bootstrap | Save IaCGenie token"
+  ansible.builtin.copy:
+    content: "{{ openbao_ig_token_resp.auth.client_token }}\n"
+    dest: "{{ openbao_raft_data_dir }}/service_tokens/iacgenie_token.txt"
+    owner: mkanavi
+    group: mkanavi
+    mode: "0600"
+  when:
+    - openbao_bootstrap_tokens | default(true) | bool
+    - openbao_ig_token_resp is defined
+    - openbao_ig_token_resp.auth is defined
+    - openbao_ig_token_resp.auth.client_token is defined
+
+# ── LightSerp Service Token ───────────────────────────────────────────────
+- name: "OpenBao Bootstrap | Create LightSerp service token"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/auth/token/create"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      policies: ["lightserp-service"]
+      ttl: "{{ openbao_ls_token_ttl }}"
+      token_type: "service"
+      display_name: "lightserp-service"
+    validate_certs: false
+    status_code: [200]
+    timeout: 15
+  register: openbao_ls_token_resp
+  when: openbao_bootstrap_tokens | default(true) | bool
+  failed_when: false
+
+- name: "OpenBao Bootstrap | Save LightSerp token"
+  ansible.builtin.copy:
+    content: "{{ openbao_ls_token_resp.auth.client_token }}\n"
+    dest: "{{ openbao_raft_data_dir }}/service_tokens/lightserp_token.txt"
+    owner: mkanavi
+    group: mkanavi
+    mode: "0600"
+  when:
+    - openbao_bootstrap_tokens | default(true) | bool
+    - openbao_ls_token_resp is defined
+    - openbao_ls_token_resp.auth is defined
+    - openbao_ls_token_resp.auth.client_token is defined
+
+# ── Terraform Service Token ───────────────────────────────────────────────
+- name: "OpenBao Bootstrap | Create Terraform service token"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/auth/token/create"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      policies: ["terraform-service"]
+      ttl: "{{ openbao_tf_token_ttl }}"
+      token_type: "service"
+      display_name: "terraform-service"
+    validate_certs: false
+    status_code: [200]
+    timeout: 15
+  register: openbao_tf_token_resp
+  when: openbao_bootstrap_tokens | default(true) | bool
+  failed_when: false
+
+- name: "OpenBao Bootstrap | Save Terraform token"
+  ansible.builtin.copy:
+    content: "{{ openbao_tf_token_resp.auth.client_token }}\n"
+    dest: "{{ openbao_raft_data_dir }}/service_tokens/terraform_token.txt"
+    owner: mkanavi
+    group: mkanavi
+    mode: "0600"
+  when:
+    - openbao_bootstrap_tokens | default(true) | bool
+    - openbao_tf_token_resp is defined
+    - openbao_tf_token_resp.auth is defined
+    - openbao_tf_token_resp.auth.client_token is defined
+
+# ── Backup Read Token (used by cron jobs) ─────────────────────────────────
+- name: "OpenBao Bootstrap | Create backup read token"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/auth/token/create"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      policies: ["iacgenie-service"]
+      ttl: "{{ openbao_backup_token_ttl }}"
+      token_type: "service"
+      display_name: "backup-read"
+    validate_certs: false
+    status_code: [200]
+    timeout: 15
+  register: openbao_backup_token_resp
+  when: openbao_bootstrap_tokens | default(true) | bool
+  failed_when: false
+
+- name: "OpenBao Bootstrap | Save backup token"
+  ansible.builtin.copy:
+    content: "{{ openbao_backup_token_resp.auth.client_token }}\n"
+    dest: "{{ openbao_raft_data_dir }}/service_tokens/backup_token.txt"
+    owner: mkanavi
+    group: mkanavi
+    mode: "0600"
+  when:
+    - openbao_bootstrap_tokens | default(true) | bool
+    - openbao_backup_token_resp is defined
+    - openbao_backup_token_resp.auth is defined
+    - openbao_backup_token_resp.auth.client_token is defined
+
+- name: "OpenBao Bootstrap | Summary service tokens"
+  ansible.builtin.debug:
+    msg:
+      - "Service tokens created:"
+      - "  iacgenie_token.txt    — read iacgenie/* (TTL: {{ openbao_ig_token_ttl }})"
+      - "  lightserp_token.txt   — read lightserp/* (TTL: {{ openbao_ls_token_ttl }})"
+      - "  terraform_token.txt   — read terraform/* (TTL: {{ openbao_tf_token_ttl }})"
+      - "  backup_token.txt      — read iacgenie/* for backups (TTL: {{ openbao_backup_token_ttl }})"

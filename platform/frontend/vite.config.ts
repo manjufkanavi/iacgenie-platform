@@ -6,7 +6,69 @@ import react from '@vitejs/plugin-react';
 // Vite plugin to fix broken imports:
 // 1. Resolves empty-string placeholder imports (`from ''`)
 // 2. Resolves ./name imports from subdirectories by checking parent dirs
+// 3. Does NOT interfere with node_modules imports or directory imports
 function fixImportsPlugin(): any {
+    // Known imports mapped to paths relative to project root
+    const KNOWN_IMPORTS: Record<string, string> = {
+        'useProjectStore': 'store/useProjectStore.ts',
+        'usePipelineStore': 'store/usePipelineStore.ts',
+        'useProjectSettingsStore': 'store/useProjectSettingsStore.ts',
+        'useAppStore': 'store/useAppStore.ts',
+        'usePipelineWebSocket': 'pipelineWebSocket.ts',
+        'workflowService': 'workflowService.ts',
+        'getAuthHeaders': 'workflowService.ts',
+        'startGeneration': 'workflowService.ts',
+        'pollGenerationStatus': 'workflowService.ts',
+        'downloadProject': 'workflowService.ts',
+        'submitClarifyAnswer': 'workflowService.ts',
+        'types': 'types.ts',
+        'constants': 'constants.ts',
+        'ICONS': 'icons.ts',
+        'AVAILABLE_MODELS': 'constants.ts',
+    };
+
+    function tryResolve(importName: string, dir: string): string | null {
+        // Check same file names at a directory level
+        const baseCandidates = [
+            path.join(dir, importName),
+            path.join(dir, importName + '.ts'),
+            path.join(dir, importName + '.tsx'),
+        ];
+        for (const candidate of baseCandidates) {
+            if (fs.existsSync(candidate)) {
+                if (candidate.includes('node_modules')) return null;
+                const stat = fs.statSync(candidate);
+                if (!stat.isDirectory()) return candidate;
+            }
+        }
+        // Check directory/index.ts or directory/index.tsx
+        const indexCandidates = [
+            path.join(dir, importName, 'index.ts'),
+            path.join(dir, importName, 'index.tsx'),
+        ];
+        for (const candidate of indexCandidates) {
+            if (fs.existsSync(candidate) && !candidate.includes('node_modules')) {
+                return candidate;
+            }
+        }
+        // Check common subdirectory patterns
+        for (const subDir of ['constants', 'model-config', 'ui']) {
+            const subCandidates = [
+                path.join(dir, subDir, importName),
+                path.join(dir, subDir, importName + '.ts'),
+                path.join(dir, subDir, importName + '.tsx'),
+            ];
+            for (const candidate of subCandidates) {
+                if (fs.existsSync(candidate)) {
+                    if (candidate.includes('node_modules')) return null;
+                    const stat = fs.statSync(candidate);
+                    if (!stat.isDirectory()) return candidate;
+                }
+            }
+        }
+        return null;
+    }
+
     return {
         name: 'fix-imports-resolver',
         enforce: 'pre',
@@ -18,53 +80,16 @@ function fixImportsPlugin(): any {
                 return null;
             }
 
-            // Handle relative imports starting with ./ or ../
+            // Only handle relative imports
             if (!source.startsWith('./') && !source.startsWith('../')) {
                 return null;
             }
 
             const importDir = path.dirname(importer);
-            const normalizedSource = source.replace(/^\.\.\//, '');
-            const importName = source.replace(/^\.\.\//, '').replace(/^\.\//, '');
-
-            // Handle known imports (store, types, constants, icons, services)
-            // These are mapped to paths relative to the project root
-            const KNOWN_IMPORTS: Record<string, string> = {
-                'useProjectStore': 'store/useProjectStore.ts',
-                'usePipelineStore': 'store/usePipelineStore.ts',
-                'useProjectSettingsStore': 'store/useProjectSettingsStore.ts',
-                'useAppStore': 'store/useAppStore.ts',
-                'usePipelineWebSocket': 'pipelineWebSocket.ts',
-                'workflowService': 'workflowService.ts',
-                'getAuthHeaders': 'workflowService.ts',
-                'startGeneration': 'workflowService.ts',
-                'pollGenerationStatus': 'workflowService.ts',
-                'downloadProject': 'workflowService.ts',
-                'submitClarifyAnswer': 'workflowService.ts',
-                'types': 'types.ts',
-                'constants': 'constants.ts',
-                'ICONS': 'icons.ts',
-                'AVAILABLE_MODELS': 'constants.ts',
-                'DEFAULT_MODEL': 'constants.ts',
-                'API_BASE_PATH': 'constants.ts',
-                // Named type imports → types.ts
-                'LogEntry': 'types.ts',
-                'ValidationStepLog': 'types.ts',
-                'Deployment': 'types.ts',
-                'DeploymentLog': 'types.ts',
-                'CloudCredentials': 'types.ts',
-                'CredentialStatus': 'types.ts',
-                'CloudProvider': 'types.ts',
-                'GeneratedFile': 'types.ts',
-                'GeneratedCode': 'types.ts',
-                'GenerationStatus': 'types.ts',
-                'PipelinePhase': 'types.ts',
-                'PhaseStatus': 'types.ts',
-            };
+            const importName = source.replace(/^\.\\.?\//, '');
 
             // Check if the import matches a known import name
-            // This handles cases like: from './useProjectStore' or from '../useProjectStore'
-            if (KNOWN_IMPORTS[importName]) {
+            if (KNOWN_IMPORTS.hasOwnProperty(importName)) {
                 const mappedPath = path.resolve(path.dirname(importer), KNOWN_IMPORTS[importName]);
                 if (fs.existsSync(mappedPath)) {
                     return mappedPath;
@@ -72,52 +97,18 @@ function fixImportsPlugin(): any {
             }
 
             // Try to resolve in the current directory
-            const localCandidates = [
-                path.join(importDir, importName),
-                path.join(importDir, importName + '.ts'),
-                path.join(importDir, importName + '.tsx'),
-                path.join(importDir, importName, 'index.ts'),
-                path.join(importDir, importName, 'index.tsx'),
-            ];
-
-            for (const candidate of localCandidates) {
-                if (fs.existsSync(candidate)) {
-                    return candidate;
-                }
-            }
+            const result = tryResolve(importName, importDir);
+            if (result) return result;
 
             // Try to resolve in parent directories (up to 3 levels)
-            for (let depth = 0; depth <= 3; depth++) {
-                const parentDir = depth === 0 ? importDir : path.join(importDir, '..'.repeat(depth));
-
-                // Check the same file names at each parent level
-                for (const base of [
-                    importName, importName + '.ts', importName + '.tsx',
-                    importName + '/index.ts', importName + '/index.tsx',
-                ]) {
-                    const candidate = path.join(parentDir, base);
-                    if (fs.existsSync(candidate)) {
-                        return candidate;
-                    }
-                }
-
-                // Check common subdirectory patterns at parent level
-                for (const subDir of ['constants', 'model-config', 'ui']) {
-                    const candidate = path.join(parentDir, subDir, importName);
-                    if (fs.existsSync(candidate)) {
-                        return candidate;
-                    }
-                    for (const ext of ['.ts', '.tsx']) {
-                        const candidate = path.join(parentDir, subDir, importName + ext);
-                        if (fs.existsSync(candidate)) {
-                            return candidate;
-                        }
-                    }
-                }
+            for (let depth = 1; depth <= 3; depth++) {
+                const parentDir = path.join(importDir, '..'.repeat(depth));
+                const resolved = tryResolve(importName, parentDir);
+                if (resolved) return resolved;
             }
 
             return null;
-        }
+        },
     };
 }
 
@@ -139,18 +130,20 @@ export default defineConfig(({ mode }) => {
         },
       },
       optimizeDeps: {
-        exclude: ['monaco-editor', '@monaco-editor/react'],
+        exclude: ['@monaco-editor/react'],
       },
       css: {
         postcss: './postcss.config.cjs'
       },
       build: {
         rollupOptions: {
-          external: ['monaco-editor', '@monaco-editor/react', 'react-hot-toast', 'framer-motion'],
           output: {
             manualChunks(id) {
               if (id.includes('node_modules')) {
-                return id.toString().split('node_modules/')[1].split('/')[0].toString();
+                const pkg = id.toString().split('node_modules/')[1].split('/')[0].toString();
+                // Keep UMD packages (react, react-dom, scheduler) in main bundle
+                if (['react', 'react-dom', 'scheduler'].includes(pkg)) return null;
+                return pkg;
               }
             }
           }

@@ -1,4 +1,16 @@
+# ── Backup Configuration ──────────────────────────────────────────────
 backup_enabled: true
 backup_retention_days: 30
-backup_schedule: "0 2 * * *"
-backup_dest: /mnt/backups
+backup_dir: /home/mkanavi/backups
+backup_pgbr_repo: /backup/pgbackrest
+backup_script: /home/mkanavi/scripts/backup.sh
+
+# Rclone configuration (optional, for cloud backup)
+rclone_enabled: false
+rclone_remote: "local"
+rclone_dest: "iacgenie-backups"
+
+# SSH key for remote backup destination
+backup_ssh_host: ""
+backup_ssh_user: ""
+backup_ssh_port: "22"

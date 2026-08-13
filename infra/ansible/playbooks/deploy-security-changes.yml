@@ -1,0 +1,9 @@
+---
+# Targeted playbook: deploy nginx + security changes only
+- hosts: all
+  become: true
+  become_method: sudo
+
+  roles:
+    - role: nginx
+    - role: security

@@ -1,0 +1,25 @@
+---
+- hosts: iacgenie-server
+  become: yes
+  vars:
+    iacgenie_docker_path: /home/mkanavi/docker/iacgenie
+    keycloak_auth_wrapper_secret: ""  # Set via --extra-vars or vault
+    grafana_domain: grafana.iacgenie.com
+    grafana_root_url: "https://grafana.iacgenie.com/"
+
+  roles:
+    - nginx
+    - grafana
+    - openbao
+    - docker-services
+
+  handlers:
+    - name: Reload nginx
+      ansible.builtin.systemd:
+        name: nginx
+        state: reloaded
+
+    - name: Restart grafana
+      community.docker.docker_container:
+        name: iacgenie_grafana
+        state: restarted

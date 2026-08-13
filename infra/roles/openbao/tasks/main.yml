@@ -1,0 +1,40 @@
+---
+# OpenBao role - handles auto-unseal functionality
+# Fixes: OpenBao sealed state on boot
+
+- name: Create auto-unseal script directory
+  ansible.builtin.file:
+    path: "{{ iacgenie_docker_path | default('/home/mkanavi/docker/iacgenie') }}/scripts"
+    state: directory
+    mode: '0755'
+
+- name: Deploy auto-unseal script
+  ansible.builtin.copy:
+    src: auto-unseal.sh
+    dest: "{{ iacgenie_docker_path | default('/home/mkanavi/docker/iacgenie') }}/scripts/auto-unseal.sh"
+    mode: '0755'
+    backup: yes
+
+- name: Create OpenBao unseal systemd service
+  ansible.builtin.copy:
+    src: openbao-unseal.service
+    dest: /etc/systemd/system/openbao-unseal.service
+    mode: '0644'
+  notify: Reload systemd
+
+- name: Enable OpenBao unseal service
+  ansible.builtin.systemd:
+    name: openbao-unseal
+    enabled: yes
+    daemon_reload: yes
+
+- name: Start OpenBao unseal service
+  ansible.builtin.systemd:
+    name: openbao-unseal
+    state: started
+
+- name: Check OpenBao unseal status
+  ansible.builtin.command: systemctl is-active openbao-unseal
+  register: unseal_status
+  changed_when: false
+  failed_when: false

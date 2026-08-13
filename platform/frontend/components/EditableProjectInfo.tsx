@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import Button from './ui/Button';
-import EditableField from './ui/EditableField';
-import { useAppStore } from './store/useAppStore';
+import Button from '../ui/Button';
+import EditableField from '../ui/EditableField';
+import { useAppStore } from '../store/useAppStore';
 import toast from 'react-hot-toast';
-import { ICONS } from './icons';
-import { useProjectStore } from './store/useProjectStore';
-import EnvironmentModeSelector from './settings/EnvironmentModeSelector';
+import { ICONS } from '../icons';
+import { useProjectStore } from '../store/useProjectStore';
+import EnvironmentModeSelector from '../settings/EnvironmentModeSelector';
 import { DollarSign, BarChart3, Tag } from 'lucide-react';
-import { usePipelineStore } from './store/usePipelineStore';
+import { usePipelineStore } from '../store/usePipelineStore';
 
 interface EditableProjectInfoProps {
   readOnly?: boolean;

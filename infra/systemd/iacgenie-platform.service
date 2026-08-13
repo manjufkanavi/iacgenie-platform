@@ -1,0 +1,23 @@
+[Unit]
+Description=IacGenie Platform — Master Startup Service
+Documentation=https://github.com/manjufkanavi/iacgenie-platform
+After=docker.service
+Requires=docker.service
+Wants=nginx.service cloudflared.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+
+# Pre-start: Ensure data directories exist with correct permissions
+ExecStartPre=/bin/bash -c 'mkdir -p /home/mkanavi/docker/iacgenie/data/{postgres,redis,minio,openbao,openbao_raft,keycloak,gitea,nsqd}'
+ExecStartPre=/bin/bash -c 'chmod 777 /home/mkanavi/docker/iacgenie/data/openbao /home/mkanavi/docker/iacgenie/data/openbao_raft 2>/dev/null || true'
+
+# Start all docker compose services
+ExecStart=/bin/bash -c 'cd /home/mkanavi/docker/iacgenie && docker compose up -d'
+
+# Wait for services to become healthy
+ExecStartPost=/bin/bash -c 'timeout 120 bash -c "while ! (cd /home/mkanavi/iacgenie-platform/infra && ./health-check.sh | grep -q healthy); do sleep 5; done"'
+
+[Install]
+WantedBy=multi-user.target

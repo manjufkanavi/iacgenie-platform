@@ -1,0 +1,171 @@
+version: "3.8"
+# =============================================================================
+# IacGenie Platform — Monitoring Stack
+# Services: Prometheus, Alertmanager, Grafana, Loki, Promtail, Node Exporter,
+#           Falco (runtime security), Falcosidekick (Falco Web UI)
+# Data Retention: 30 days (Prometheus + Loki compactor)
+# =============================================================================
+
+networks:
+  iacgenie_iacgenie-frontend:
+    external: true
+  iacgenie_iacgenie-messaging:
+    external: true
+
+services:
+  # ── Prometheus — Metrics collection (30-day retention) ──
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: iacgenie_prometheus
+    restart: unless-stopped
+    user: "0"
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - /home/mkanavi/docker/iacgenie/prometheus/data:/prometheus
+      - /home/mkanavi/docker/iacgenie/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - /home/mkanavi/docker/iacgenie/prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=30d"
+      - "--storage.tsdb.retention.size=10GB"
+      - "--web.enable-lifecycle"
+      - "--web.enable-admin-api"
+    networks:
+      - iacgenie_iacgenie-messaging
+      - iacgenie_iacgenie-frontend
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # ── Alertmanager — Alert routing (security, critical, warning) ──
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: iacgenie_alertmanager
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9093:9093"
+    volumes:
+      - /home/mkanavi/docker/iacgenie/prometheus/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+    networks:
+      - iacgenie_iacgenie-messaging
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.25"
+
+  # ── Grafana — Dashboards & visualization ──
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: iacgenie_grafana
+    restart: unless-stopped
+    user: "472"
+    ports:
+      - "127.0.0.1:3004:3000"
+    environment:
+      GF_SERVER_ROOT_URL: https://grafana.iacgenie.com
+      GF_SERVER_DOMAIN: grafana.iacgenie.com
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_AUTH_BASIC_ENABLED: "true"
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_INSTALL_PLUGINS: grafana-clock-panel
+    volumes:
+      - /home/mkanavi/docker/iacgenie/grafana:/var/lib/grafana
+      - /home/mkanavi/docker/iacgenie/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - iacgenie_iacgenie-frontend
+    depends_on:
+      - prometheus
+      - loki
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:3000/api/health | grep -q 'ok'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Loki — Log aggregation (30-day retention) ──
+  loki:
+    image: grafana/loki:2.9.8
+    container_name: iacgenie_loki
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3100:3100"
+    volumes:
+      - /home/mkanavi/docker/iacgenie/loki:/loki
+      - /home/mkanavi/docker/iacgenie/loki/config.yml:/etc/loki/config.yml:ro
+    networks:
+      - iacgenie_iacgenie-messaging
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3100/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # ── Promtail — Dual log shipper (Docker containers + systemd journald) ──
+  promtail:
+    image: grafana/promtail:2.9.8
+    container_name: iacgenie_promtail
+    restart: unless-stopped
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /run/log/journal:/run/log/journal:ro
+      - /home/mkanavi/docker/iacgenie/loki/promtail.yml:/etc/promtail/config.yml:ro
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - iacgenie_iacgenie-messaging
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.25"
+
+  # ── Node Exporter — Host-level metrics (disk, CPU, memory, network) ──
+  node-exporter:
+    image: prom/node-exporter:v1.7.0
+    container_name: iacgenie_node_exporter
+    restart: unless-stopped
+    pid: host
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+      - '--no-collector.arp'
+      - '--no-collector.btrfs'
+      - '--no-collector.infiniband'
+    ports:
+      - "127.0.0.1:9100:9100"
+    networks:
+      - iacgenie_iacgenie-messaging
+    deploy:
+      resources:
+        limits:
+          memory: 32M
+          cpus: "0.1"

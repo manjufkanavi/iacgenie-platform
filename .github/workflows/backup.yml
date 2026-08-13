@@ -1,25 +1,11 @@
-name: Backup All Services
+name: Backup Platform (Disabled on GitHub)
 
+# Disabled on GitHub — Gitea Actions is the primary runner.
 on:
   workflow_dispatch:
-    inputs:
-      backup_type:
-        description: 'Type of backup'
-        required: false
-        default: 'full'
-        type: choice
-        options:
-          - full
-          - selective
-      services:
-        description: 'Services to backup (comma-separated, only if selective)'
-        required: false
-        default: 'postgres,openbao,gitea,keycloak'
-  schedule:
-    - cron: '0 2 * * *'  # Daily at 2am UTC
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: iacgenie-platform-lifecycle
   cancel-in-progress: false
 
 jobs:

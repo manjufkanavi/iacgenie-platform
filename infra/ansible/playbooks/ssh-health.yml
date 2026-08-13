@@ -1,0 +1,149 @@
+---
+# ssh-health.yml — SSH Health Check & Auto-Remediation Playbook
+#
+# Run this when SSH is intermittently failing to diagnose and self-heal.
+#
+# Usage:
+#   ansible-playbook -i inventory/hosts.ini playbooks/ssh-health.yml
+#   ansible-playbook -i inventory/hosts.ini playbooks/ssh-health.yml --tags check-only
+#   ansible-playbook -i inventory/hosts.ini playbooks/ssh-health.yml --tags unban
+#
+# Checks:
+#   1. sshd is running — starts it if stopped
+#   2. sshd is listening on port 22
+#   3. fail2ban status — shows banned IPs
+#   4. fail2ban ignoreip is configured (admin IPs protected)
+#   5. systemd sshd Restart=always is in effect
+#   6. OOM score of sshd process (high score = at risk)
+
+- name: SSH Health Check and Auto-Remediation
+  hosts: all
+  gather_facts: true
+
+  tasks:
+
+    # ─── 1. Ensure sshd is running ─────────────────────────────────────────────
+    - name: "SSH Health | Ensure sshd service is running"
+      become: true
+      ansible.builtin.service:
+        name: sshd
+        state: started
+        enabled: yes
+      register: sshd_state
+      tags: [always, check-only]
+
+    - name: "SSH Health | Report sshd start result"
+      ansible.builtin.debug:
+        msg: "sshd was {{ 'already running' if not sshd_state.changed else 'STOPPED — just started it' }}"
+      tags: [always, check-only]
+
+    # ─── 2. Verify sshd is actually listening on port 22 ───────────────────────
+    - name: "SSH Health | Check sshd is listening on port 22"
+      become: true
+      ansible.builtin.command: ss -tlnp sport = :22
+      register: ss_output
+      changed_when: false
+      tags: [always, check-only]
+
+    - name: "SSH Health | Assert sshd is bound to port 22"
+      ansible.builtin.assert:
+        that: "'sshd' in ss_output.stdout or ':22' in ss_output.stdout"
+        fail_msg: "CRITICAL: sshd is NOT listening on port 22!"
+        success_msg: "OK: sshd is listening on port 22"
+      tags: [always, check-only]
+
+    # ─── 3. fail2ban status ─────────────────────────────────────────────────────
+    - name: "SSH Health | Check fail2ban sshd jail status"
+      become: true
+      ansible.builtin.command: fail2ban-client status sshd
+      register: f2b_status
+      changed_when: false
+      failed_when: false
+      tags: [always, check-only, unban]
+
+    - name: "SSH Health | Show fail2ban sshd status"
+      ansible.builtin.debug:
+        var: f2b_status.stdout_lines
+      tags: [always, check-only, unban]
+
+    # ─── 4. Unban admin IPs if present in ban list ─────────────────────────────
+    - name: "SSH Health | Unban admin IPs from fail2ban"
+      become: true
+      ansible.builtin.command: "fail2ban-client set sshd unbanip {{ item }}"
+      loop: "{{ fail2ban_admin_ips | default([]) }}"
+      register: unban_result
+      changed_when: "'already unbanned' not in (unban_result.stdout | default(''))"
+      failed_when: false
+      tags: [unban]
+
+    - name: "SSH Health | Show unban results"
+      ansible.builtin.debug:
+        var: unban_result.results
+      tags: [unban]
+
+    # ─── 5. Verify systemd Restart=always is in effect ─────────────────────────
+    - name: "SSH Health | Check sshd systemd Restart property"
+      become: true
+      ansible.builtin.command: systemctl show ssh --property=Restart
+      register: sshd_restart_prop
+      changed_when: false
+      failed_when: false
+      tags: [always, check-only]
+
+    - name: "SSH Health | Warn if sshd Restart is not 'always'"
+      ansible.builtin.debug:
+        msg: >
+          WARNING: sshd systemd Restart={{ sshd_restart_prop.stdout }}.
+          Run the bootstrap playbook to apply Restart=always.
+      when: "'Restart=always' not in sshd_restart_prop.stdout"
+      tags: [always, check-only]
+
+    # ─── 6. Check sshd OOM score ────────────────────────────────────────────────
+    - name: "SSH Health | Get sshd PID"
+      become: true
+      ansible.builtin.command: systemctl show ssh --property=MainPID --value
+      register: sshd_pid
+      changed_when: false
+      failed_when: false
+      tags: [always, check-only]
+
+    - name: "SSH Health | Get sshd OOM score"
+      become: true
+      ansible.builtin.command: "cat /proc/{{ sshd_pid.stdout | trim }}/oom_score"
+      register: oom_score
+      changed_when: false
+      failed_when: false
+      when: sshd_pid.stdout | trim | length > 0
+      tags: [always, check-only]
+
+    - name: "SSH Health | Set sshd OOM score adj to -500 (protect from OOM killer)"
+      become: true
+      ansible.builtin.copy:
+        dest: "/proc/{{ sshd_pid.stdout | trim }}/oom_score_adj"
+        content: "-500"
+      when:
+        - sshd_pid.stdout | trim | length > 0
+        - oom_score.stdout | default('0') | int > 100
+      failed_when: false
+      tags: [always]
+
+    - name: "SSH Health | Report OOM score"
+      ansible.builtin.debug:
+        msg: "sshd OOM score: {{ oom_score.stdout | default('N/A') }} (lower is safer; -500 = protected)"
+      tags: [always, check-only]
+
+    # ─── 7. Final summary ───────────────────────────────────────────────────────
+    - name: "SSH Health | Summary"
+      ansible.builtin.debug:
+        msg:
+          - "============================================"
+          - "  SSH Health Check Complete"
+          - "============================================"
+          - "  Host         : {{ inventory_hostname }}"
+          - "  IP           : {{ ansible_host }}"
+          - "  sshd running : {{ 'YES' if not sshd_state.failed else 'NO — was stopped!' }}"
+          - "  Port 22      : {{ 'LISTENING' if 'sshd' in ss_output.stdout else 'NOT FOUND' }}"
+          - "  OOM score    : {{ oom_score.stdout | default('N/A') }}"
+          - "  fail2ban     : {{ f2b_status.stdout_lines[0] | default('N/A') }}"
+          - "============================================"
+      tags: [always, check-only]

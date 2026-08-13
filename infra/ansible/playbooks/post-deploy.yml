@@ -17,7 +17,7 @@
         var: openbao_health.stdout
 
     - name: "OpenBao | Check seal status"
-      ansible.builtin.command: docker exec iacgenie_openbao bao operator list-seal-status
+      ansible.builtin.command: docker exec iacgenie_openbao bao operator list-seal-status -address=http://127.0.0.1:8200
       register: openbao_seal
       changed_when: false
       failed_when: false

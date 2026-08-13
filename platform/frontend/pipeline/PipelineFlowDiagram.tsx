@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import PhaseStatusIndicator from './PhaseStatusIndicator';
-import type { PipelinePhase, PhaseStatus } from './types';
+import type { PipelinePhase, PhaseStatus } from '../types';
 
 interface PipelineFlowDiagramProps {
   phases: Array<{ phase: PipelinePhase; status: PhaseStatus; label?: string }>;

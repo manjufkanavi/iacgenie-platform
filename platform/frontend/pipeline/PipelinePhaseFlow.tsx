@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import PhaseStatusBadge from './PhaseStatusBadge';
-import type { PipelinePhase, PhaseStatus } from './types';
+import type { PipelinePhase, PhaseStatus } from '../types';
 
 interface PhaseNode {
   phase: PipelinePhase;

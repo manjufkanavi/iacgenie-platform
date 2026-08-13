@@ -1,24 +1,21 @@
 ---
-# Gitea role - Main entry point
-# Note: Container deployment is handled by docker-compose-generator role
+# Gitea role — Main entry point
+# Manages: container health, Actions config, admin user, API tokens, runner status
+
 - name: "Gitea | Create data directory"
   ansible.builtin.file:
-    path: "{{ gitea_data_dir | default('/home/mkanavi/docker/iacgenie/gitea_data/data') }}"
-    owner: "100"
+    path: "{{ gitea_data_dir | default('/home/mkanavi/docker/iacgenie/data/gitea') }}"
+    owner: "1000"
     group: "1000"
     mode: "0755"
     state: directory
 
-- name: "Gitea | Create config directory"
-  ansible.builtin.file:
-    path: "{{ gitea_config_dir | default('/home/mkanavi/docker/iacgenie/gitea_data/config') }}"
-    owner: "100"
-    group: "1000"
-    mode: "0755"
-    state: directory
+# ========================
+# Container Health Check
+# ========================
 
 - name: "Gitea | Verify Gitea container is running"
-  ansible.builtin.command: docker ps -a --filter "name=iacgenie-gitea" --format "{{ '{{.Names}}' }}"
+  ansible.builtin.command: docker ps --filter "name=iacgenie-gitea" --format "{{ '{{.Names'}} }}"
   register: gitea_running
   changed_when: false
   failed_when: false
@@ -26,3 +23,78 @@
 - name: "Gitea | Show Gitea status"
   ansible.builtin.debug:
     var: gitea_running.stdout_lines | default(['N/A - managed by docker-compose-generator'])
+
+# ========================
+# Actions Configuration
+# ========================
+
+- name: "Gitea | Ensure app.ini has Actions enabled"
+  ansible.builtin.lineinfile:
+    path: "{{ gitea_data_dir | default('/home/mkanavi/docker/iacgenie/data/gitea') }}/app.ini"
+    insertafter: "\\[security\\]"
+    line: "[actions]\nENABLED = true"
+    create: yes
+    owner: "1000"
+    group: "1000"
+    mode: "0644"
+
+# ========================
+# Admin User Provisioning
+# ========================
+
+- name: "Gitea | Check if admin user exists"
+  ansible.builtin.command: docker exec iacgenie-gitea gitea admin user list
+  register: gitea_admin_users
+  changed_when: false
+  failed_when: false
+
+- name: "Gitea | Create admin user (if not exists)"
+  ansible.builtin.command: >
+    docker exec iacgenie-gitea gitea admin user create
+    --username {{ gitea_admin_user }}
+    --password {{ gitea_admin_password }}
+    --email {{ gitea_admin_email }}
+    --admin
+  when:
+    - gitea_admin_user not in (gitea_admin_users.stdout | default(''))
+    - gitea_admin_password != 'CHANGE_ME_IN_VAULT'
+  changed_when: true
+  failed_when: false
+
+- name: "Gitea | Create Gitea API token for CI"
+  ansible.builtin.command: >
+    docker exec iacgenie-gitea gitea admin user generate-access-token
+    --username {{ gitea_admin_user }}
+    --token-name hermes-ci-admin
+    --scopes all
+  register: gitea_api_token_result
+  changed_when: true
+  failed_when: false
+  when: gitea_admin_password != 'CHANGE_ME_IN_VAULT'
+
+# ========================
+# Runner Status
+# ========================
+
+- name: "Gitea | Verify Gitea runner is running"
+  ansible.builtin.command: systemctl is-active gitea-runner
+  register: runner_status
+  changed_when: false
+  failed_when: false
+
+- name: "Gitea | Show runner status"
+  ansible.builtin.debug:
+    msg: "Runner status: {{ runner_status.stdout | default('not found') }}"
+
+# ========================
+# Sync Script
+# ========================
+
+- name: "Gitea | Verify sync-gitea.py is deployed"
+  ansible.builtin.stat:
+    path: /home/mkanavi/bin/sync-gitea.py
+  register: sync_script
+
+- name: "Gitea | Show sync script status"
+  ansible.builtin.debug:
+    msg: "Sync script: {{ 'deployed' if sync_script.stat.exists else 'MISSING - run ansible-playbook' }}"

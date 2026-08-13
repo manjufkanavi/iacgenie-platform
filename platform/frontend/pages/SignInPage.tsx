@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
-import { View } from './types';
+import { View } from '../types';
 import Card from '../ui/Card';
 import FormGroup from '../ui/FormGroup';
 import SecurePasswordInput from '../ui/SecurePasswordInput';
 import SocialLogin from '../ui/SocialLogin';
 import SSOModal from '../ui/SSOModal';
 import Button from '../ui/Button';
-import { useAuthStore } from '../../store/useAuthStore';
-import { handleKeycloakCallback } from '../../services/keycloakAuthService';
+import { useAuthStore } from '../store/useAuthStore';
+import { handleKeycloakCallback } from '../services/keycloakAuthService';
 
 interface SignInPageProps {
     onSignIn: (user: any) => void;

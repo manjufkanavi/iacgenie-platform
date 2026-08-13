@@ -1,12 +1,11 @@
-name: Deploy & Verify All Services
+name: Deploy Platform (Disabled on GitHub)
 
+# Disabled on GitHub — Gitea Actions is the primary runner.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: iacgenie-platform-lifecycle
   cancel-in-progress: false
 
 jobs:

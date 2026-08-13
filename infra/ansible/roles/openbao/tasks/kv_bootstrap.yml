@@ -1,0 +1,565 @@
+---
+# OpenBao KV Bootstrap (P2.1)
+# Enables KV v2 engines and seeds secrets from role defaults
+# Uses: POST /v1/{path}/data/{key} for KV v2 writes
+
+# ── Step 1: Enable KV v2 Engines ──────────────────────────────────────────
+
+- name: "OpenBao KV Bootstrap | Enable iacgenie/kv engine"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/sys/mounts/iacgenie/kv"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      type: kv
+      options:
+        version: "2"
+    validate_certs: false
+    status_code: [200, 201, 409]
+    timeout: 10
+  register: openbao_ig_kv_mount
+  failed_when: false
+  changed_when: openbao_ig_kv_mount['status'] | default(409) in [200, 201]
+
+- name: "OpenBao KV Bootstrap | Enable lightserp/kv engine"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/sys/mounts/lightserp/kv"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      type: kv
+      options:
+        version: "2"
+    validate_certs: false
+    status_code: [200, 201, 409]
+    timeout: 10
+  register: openbao_ls_kv_mount
+  failed_when: false
+  changed_when: openbao_ls_kv_mount['status'] | default(409) in [200, 201]
+
+# ── Step 1b: Enable Terraform KV Engine ───────────────────────────────────
+
+- name: "OpenBao KV Bootstrap | Enable terraform/kv engine"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/sys/mounts/terraform/kv"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      type: kv
+      options:
+        version: "2"
+    validate_certs: false
+    status_code: [200, 201, 409]
+    timeout: 10
+  register: openbao_tf_kv_mount
+  failed_when: false
+  changed_when: openbao_tf_kv_mount['status'] | default(409) in [200, 201]
+
+# ── Step 2: Seed IaCGenie Secrets ─────────────────────────────────────────
+
+- name: "OpenBao KV Bootstrap | Seed postgres (iacgenie)"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/postgres"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      data:
+        username: postgres
+        host: postgres
+        port: "5432"
+        password: "{{ openbao_ig_pg_password }}"
+    validate_certs: false
+    status_code: [200, 201]
+    timeout: 10
+  register: openbao_ig_postgres
+  failed_when: false
+
+- name: "OpenBao KV Bootstrap | Seed redis (iacgenie)"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/redis"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      data:
+        host: redis
+        port: "6379"
+        password: "{{ openbao_ig_redis_password }}"
+    validate_certs: false
+    status_code: [200, 201]
+    timeout: 10
+  register: openbao_ig_redis
+  failed_when: false
+
+- name: "OpenBao KV Bootstrap | Seed minio (iacgenie)"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/minio"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      data:
+        access_key: "{{ openbao_ig_minio_access_key }}"
+        secret_key: "{{ openbao_ig_minio_secret_key }}"
+        endpoint: "http://minio:9000"
+    validate_certs: false
+    status_code: [200, 201]
+    timeout: 10
+  register: openbao_ig_minio
+  failed_when: false
+
+- name: "OpenBao KV Bootstrap | Seed keycloak (iacgenie)"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/keycloak"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      data:
+        admin_user: "{{ openbao_ig_kc_admin_user }}"
+        admin_password: "{{ openbao_ig_kc_admin_password }}"
+        db_password: "{{ openbao_ig_kc_db_password }}"
+        db_host: "postgres"
+        db_port: "5432"
+        db_name: keycloak
+    validate_certs: false
+    status_code: [200, 201]
+    timeout: 10
+  register: openbao_ig_keycloak
+  failed_when: false
+
+- name: "OpenBao KV Bootstrap | Seed gitea (iacgenie)"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/gitea"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      data:
+        db_password: "{{ openbao_ig_gitea_db_password }}"
+        smtp_addr: ""
+        smtp_port: ""
+        smtp_user: ""
+        smtp_pass: ""
+        smtp_from: ""
+    validate_certs: false
+    status_code: [200, 201]
+    timeout: 10
+  register: openbao_ig_gitea
+  failed_when: false
+
+- name: "OpenBao KV Bootstrap | Seed openbao (iacgenie)"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/openbao"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      data:
+        root_token: "{{ openbao_ig_openbao_root_token }}"
+        addr: "http://127.0.0.1:8200"
+        data_dir: /home/mkanavi/docker/iacgenie/data/openbao_raft
+        storage_type: raft
+    validate_certs: false
+    status_code: [200, 201]
+    timeout: 10
+  register: openbao_ig_openbao
+  failed_when: false
+
+- name: "OpenBao KV Bootstrap | Seed searxng (iacgenie)"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/searxng"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      data:
+        secret: "{{ openbao_ig_searxng_secret }}"
+        port: "8080"
+    validate_certs: false
+    status_code: [200, 201]
+    timeout: 10
+  register: openbao_ig_searxng
+  failed_when: false
+
+- name: "OpenBao KV Bootstrap | Seed lightserp (iacgenie)"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/lightserp"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      data:
+        api_secret: "{{ openbao_ig_ls_api_secret }}"
+        api_url: "http://lightserp-api:8000"
+    validate_certs: false
+    status_code: [200, 201]
+    timeout: 10
+  register: openbao_ig_lightserp
+  failed_when: false
+
+- name: "OpenBao KV Bootstrap | Seed pagezen (iacgenie)"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/pagezen"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      data:
+        api_url: "http://lightserp-api:8000"
+        api_secret: "{{ openbao_ig_ls_api_secret }}"
+        port: "{{ openbao_ig_pagezen_port }}"
+    validate_certs: false
+    status_code: [200, 201]
+    timeout: 10
+  register: openbao_ig_pagezen
+  failed_when: false
+
+- name: "OpenBao KV Bootstrap | Seed nsqd (iacgenie)"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/nsqd"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      data:
+        data_path: "{{ openbao_ig_nsqd_data_path }}"
+        tcp_port: "{{ openbao_ig_nsqd_tcp_port }}"
+        http_port: "{{ openbao_ig_nsqd_http_port }}"
+    validate_certs: false
+    status_code: [200, 201]
+    timeout: 10
+  register: openbao_ig_nsqd
+  failed_when: false
+
+# ── Step 2b: Seed SMTP Secrets (iacgenie) ─────────────────────────────────
+
+- name: "OpenBao KV Bootstrap | Seed smtp (iacgenie)"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/smtp"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      data:
+        api_key: "{{ openbao_ig_smtp_api_key | default('') }}"
+        server: "{{ openbao_ig_smtp_server | default('mail.smtp2go.com') }}"
+        port: "{{ openbao_ig_smtp_port | default('2525') }}"
+        from_address: "{{ openbao_ig_smtp_from | default('ceo@zencloudsec.com') }}"
+    validate_certs: false
+    status_code: [200, 201]
+    timeout: 10
+  register: openbao_ig_smtp
+  failed_when: false
+
+# ── Step 2c: Seed LLM API Keys (iacgenie) ─────────────────────────────────
+
+- name: "OpenBao KV Bootstrap | Seed llm (iacgenie)"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/llm"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      data:
+        gemini_api_key: "{{ openbao_ig_gemini_api_key | default('') }}"
+        anthropic_api_key: "{{ openbao_ig_anthropic_api_key | default('') }}"
+        openai_api_key: "{{ openbao_ig_openai_api_key | default('') }}"
+        llm_proxy_base_url: "{{ openbao_ig_llm_proxy_base_url | default('http://localhost:1234/v1') }}"
+    validate_certs: false
+    status_code: [200, 201]
+    timeout: 10
+  register: openbao_ig_llm
+  failed_when: false
+
+# ── Step 2d: Seed JWT Config (iacgenie) ───────────────────────────────────
+
+- name: "OpenBao KV Bootstrap | Seed jwt (iacgenie)"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/jwt"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      data:
+        secret: "{{ openbao_ig_jwt_secret | default('') }}"
+        issuer: "iacgenie-api"
+        audience: "iacgenie-frontend"
+    validate_certs: false
+    status_code: [200, 201]
+    timeout: 10
+  register: openbao_ig_jwt
+  failed_when: false
+
+# ── Step 2e: Seed Cloudflare (iacgenie) ───────────────────────────────────
+
+- name: "OpenBao KV Bootstrap | Seed cloudflare (iacgenie)"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/cloudflare"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      data:
+        tunnel_token: "{{ openbao_ig_cf_tunnel_token | default('') }}"
+        account_id: "{{ openbao_ig_cf_account_id | default('') }}"
+    validate_certs: false
+    status_code: [200, 201]
+    timeout: 10
+  register: openbao_ig_cloudflare
+  failed_when: false
+
+# ── Step 3: Seed LightSerp Secrets ────────────────────────────────────────
+
+- name: "OpenBao KV Bootstrap | Seed postgres (lightserp)"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/lightserp/kv/data/postgres"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      data:
+        username: lightsrp
+        host: postgres
+        port: "5432"
+    validate_certs: false
+    status_code: [200, 201]
+    timeout: 10
+  register: openbao_ls_postgres
+  failed_when: false
+
+- name: "OpenBao KV Bootstrap | Seed redis (lightserp)"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/lightserp/kv/data/redis"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      data:
+        host: redis
+        port: "6379"
+    validate_certs: false
+    status_code: [200, 201]
+    timeout: 10
+  register: openbao_ls_redis
+  failed_when: false
+
+- name: "OpenBao KV Bootstrap | Seed minio (lightserp)"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/lightserp/kv/data/minio"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      data:
+        access_key: "{{ openbao_ig_minio_access_key }}"
+        secret_key: "{{ openbao_ig_minio_secret_key }}"
+        endpoint: "http://minio:9000"
+    validate_certs: false
+    status_code: [200, 201]
+    timeout: 10
+  register: openbao_ls_minio
+  failed_when: false
+
+- name: "OpenBao KV Bootstrap | Seed searxng (lightserp)"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/lightserp/kv/data/searxng"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      data:
+        secret: "{{ openbao_ig_searxng_secret }}"
+        port: "8080"
+    validate_certs: false
+    status_code: [200, 201]
+    timeout: 10
+  register: openbao_ls_searxng
+  failed_when: false
+
+- name: "OpenBao KV Bootstrap | Seed api (lightserp)"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/lightserp/kv/data/api"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      data:
+        api_secret: "{{ openbao_ig_ls_api_secret }}"
+        api_url: "http://lightserp-api:8000"
+    validate_certs: false
+    status_code: [200, 201]
+    timeout: 10
+  register: openbao_ls_api
+  failed_when: false
+
+# ── Step 3b: Seed LightSerp Keycloak Secrets ──────────────────────────────
+
+- name: "OpenBao KV Bootstrap | Seed keycloak (lightserp)"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/lightserp/kv/data/keycloak"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      data:
+        admin_user: "{{ openbao_ls_kc_admin_user | default('admin') }}"
+        admin_password: "{{ openbao_ls_kc_admin_password | default(openbao_ig_kc_admin_password) }}"
+        db_password: "{{ openbao_ls_kc_db_password | default(openbao_ig_kc_db_password) }}"
+        db_host: "postgres"
+        db_port: "5432"
+        db_name: "lightserpkeycloak"
+        url: "http://keycloak:8080"
+        realm: "lightserp"
+        client_id: "lightserp-api"
+        client_secret: "{{ openbao_ls_kc_client_secret | default('') }}"
+    validate_certs: false
+    status_code: [200, 201]
+    timeout: 10
+  register: openbao_ls_keycloak
+  failed_when: false
+
+# ── Step 3c: Seed LightSerp SMTP Secrets ──────────────────────────────────
+
+- name: "OpenBao KV Bootstrap | Seed smtp (lightserp)"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/lightserp/kv/data/smtp"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      data:
+        api_key: "{{ openbao_ls_smtp_api_key | default(openbao_ig_smtp_api_key | default('')) }}"
+        server: "{{ openbao_ls_smtp_server | default('mail.smtp2go.com') }}"
+        port: "{{ openbao_ls_smtp_port | default('2525') }}"
+        from_address: "{{ openbao_ls_smtp_from | default('noreply@lightserp.ai') }}"
+    validate_certs: false
+    status_code: [200, 201]
+    timeout: 10
+  register: openbao_ls_smtp
+  failed_when: false
+
+# ── Step 3d: Seed LightSerp JWT Secret ────────────────────────────────────
+
+- name: "OpenBao KV Bootstrap | Seed jwt (lightserp)"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/lightserp/kv/data/jwt"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      data:
+        secret: "{{ openbao_ls_jwt_secret | default(openbao_ig_jwt_secret | default('')) }}"
+    validate_certs: false
+    status_code: [200, 201]
+    timeout: 10
+  register: openbao_ls_jwt
+  failed_when: false
+
+# ── Step 3e: Seed Terraform Secrets ──────────────────────────────────────
+
+- name: "OpenBao KV Bootstrap | Seed postgres (terraform)"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/terraform/kv/data/postgres"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      data:
+        username: lightsrp
+        host: postgres
+        port: "5432"
+        password: "{{ openbao_ig_pg_password }}"
+    validate_certs: false
+    status_code: [200, 201]
+    timeout: 10
+  register: openbao_tf_postgres
+  failed_when: false
+
+- name: "OpenBao KV Bootstrap | Seed openbao (terraform)"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/terraform/kv/data/openbao"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      data:
+        addr: "http://127.0.0.1:8200"
+        data_dir: /home/mkanavi/docker/iacgenie/data/openbao_raft
+        storage_type: raft
+    validate_certs: false
+    status_code: [200, 201]
+    timeout: 10
+  register: openbao_tf_openbao
+  failed_when: false
+
+# ── Summary ───────────────────────────────────────────────────────────────
+
+- name: "OpenBao KV Bootstrap | Summary"
+  ansible.builtin.debug:
+    msg:
+      - "KV v2 engines:"
+      - "  iacgenie/kv     ({{ 'enabled' if openbao_ig_kv_mount['status'] | default(409) in [200,201] else 'exists' }})"
+      - "  lightserp/kv    ({{ 'enabled' if openbao_ls_kv_mount['status'] | default(409) in [200,201] else 'exists' }})"
+      - "  terraform/kv    ({{ 'enabled' if openbao_tf_kv_mount['status'] | default(409) in [200,201] else 'exists' }}"
+      - "Secrets written to iacgenie/kv: postgres, redis, minio, keycloak, gitea, openbao, searxng, lightserp, pagezen, nsqd, smtp, llm, jwt, cloudflare"
+      - "Secrets written to lightserp/kv: postgres, redis, minio, searxng, api, keycloak, smtp, jwt"
+      - "Secrets written to terraform/kv: postgres, openbao"

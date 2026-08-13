@@ -1,0 +1,4 @@
+iacgenie_auth_wrapper          auth-wrapper:latest                127.0.0.1:9095->9090/tcp
+iacgenie_pagegen               service-dashboard:latest           127.0.0.1:3031->9091/tcp
+iacgenie_crowdsec              service-dashboard:latest           127.0.0.1:3030->9091/tcp
+iacgenie_clamav                service-dashboard:latest           127.0.0.1:9091->9091/tcp

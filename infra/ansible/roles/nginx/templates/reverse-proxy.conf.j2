@@ -14,15 +14,6 @@ limit_req_zone $binary_remote_addr zone=general:10m rate=10r/s;
 limit_req_zone $binary_remote_addr zone=auth:10m rate=3r/m;
 limit_req_zone $binary_remote_addr zone=api:10m rate=30r/s;
 
-# CORS headers — defined once, referenced via variables
-map $request_method $cors_method_header {
-    OPTIONS 'GET, POST, PUT, DELETE, PATCH, OPTIONS';
-    default 'GET, POST, PUT, DELETE, PATCH';
-}
-map $http_origin $cors_origin_header {
-    default "";
-}
-
 # ====== HTTP: Default redirect (external users, not cloudflared) ======
 server {
     listen 80 default_server;
@@ -33,14 +24,43 @@ server {
 # ====== HTTP: Cloudflare tunnel passthrough (no redirect) ======
 # cloudflared proxies to port 80 with the original Host header.
 # Each vHost is a separate server block to avoid duplicate location errors.
-# This prevents the redirect loop: cloudflared → nginx:80 → redirect → cloudflare → loop.
+
+# Vault/OpenBao (vault) — HTTP passthrough via Cloudflare Tunnel
+server {
+    listen 80;
+    server_name vault.iacgenie.com;
+
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    location / {
+        proxy_pass http://127.0.0.1:8200;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Port 80;
+        proxy_http_version 1.1;
+        proxy_connect_timeout 10s;
+        proxy_read_timeout 30s;
+        proxy_redirect off;
+        proxy_hide_header X-Powered-By;
+    }
+
+    location /health {
+        proxy_pass http://127.0.0.1:8200/v1/sys/health;
+        access_log off;
+    }
+}
 
 # Keycloak (auth)
 server {
     listen 80;
     server_name auth.iacgenie.com;
 
-    # Security headers (Phase 10.8)
     add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
@@ -83,79 +103,7 @@ server {
     }
 }
 
-# LightSerp API (api)
-server {
-    listen 80;
-    server_name api.iacgenie.com;
-
-    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-
-    location / {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_read_timeout 300;
-        proxy_redirect off;
-        proxy_hide_header X-Powered-By;
-    }
-}
-
-# LightSerp WebUI (app)
-server {
-    listen 80;
-    server_name app.iacgenie.com;
-
-    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-
-    location / {
-        proxy_pass http://127.0.0.1:3001;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_read_timeout 300;
-        proxy_redirect off;
-        proxy_hide_header X-Powered-By;
-    }
-}
-
-# Gitea (git)
-server {
-    listen 80;
-    server_name git.iacgenie.com;
-
-    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-
-    location / {
-        proxy_pass http://127.0.0.1:3000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_redirect off;
-        proxy_hide_header X-Powered-By;
-    }
-}
-
-# PageZen (page)
+# PageZen / PageGen (page) — WebUI proxy
 server {
     listen 80;
     server_name page.iacgenie.com;
@@ -177,10 +125,10 @@ server {
     }
 }
 
-# IacGenie Platform (platform) — UI proxy only, backend via api.iacgenie.com
+# Gitea (git)
 server {
     listen 80;
-    server_name platform.iacgenie.com;
+    server_name gitea.iacgenie.com;
 
     add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
     add_header X-Frame-Options "SAMEORIGIN" always;
@@ -189,7 +137,23 @@ server {
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
     location / {
-        proxy_pass http://127.0.0.1:3001;
+        proxy_pass http://127.0.0.1:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_redirect off;
+        proxy_hide_header X-Powered-By;
+    }
+}
+
+# IacGenie Platform (platform) — API proxy
+server {
+    listen 80;
+    server_name platform.iacgenie.com;
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:3003;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -202,7 +166,31 @@ server {
     }
 }
 
-# LightSerp (lightserp) — UI proxy only, backend via api.iacgenie.com
+server {
+    listen 80;
+    server_name platform.iacgenie.com;
+
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    location / {
+        proxy_pass http://127.0.0.1:3002;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_read_timeout 300;
+        proxy_redirect off;
+        proxy_hide_header X-Powered-By;
+    }
+}
+
+# LightSerp (lightserp) — WebUI proxy, API on port 8000
 server {
     listen 80;
     server_name lightserp.iacgenie.com;
@@ -223,6 +211,92 @@ server {
         proxy_set_header Connection 'upgrade';
         proxy_read_timeout 300;
         proxy_redirect off;
+        proxy_hide_header X-Powered-By;
+    }
+
+    # LightSerp API sub-path proxy
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_read_timeout 300;
+        proxy_redirect off;
+        proxy_hide_header X-Powered-By;
+    }
+}
+
+# Grafana (monitoring)
+server {
+    listen 80;
+    server_name grafana.iacgenie.com;
+
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    location / {
+        proxy_pass http://127.0.0.1:3004;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_read_timeout 300s;
+        proxy_hide_header X-Powered-By;
+    }
+}
+
+# ClamAV Web Client
+server {
+    listen 80;
+    server_name clamav.iacgenie.com;
+
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    location / {
+        proxy_pass http://127.0.0.1:9091;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_read_timeout 300s;
+        proxy_hide_header X-Powered-By;
+    }
+}
+
+# CrowdSec Web UI
+server {
+    listen 80;
+    server_name crowdsec.iacgenie.com;
+
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    location / {
+        proxy_pass http://127.0.0.1:3030;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_read_timeout 300s;
         proxy_hide_header X-Powered-By;
     }
 }
@@ -294,7 +368,6 @@ server {
     listen 443 ssl http2;
     server_name auth.iacgenie.com;
 
-    # Wildcard cert: replace with *.iacgenie.com once deployed
     ssl_certificate /etc/letsencrypt/live/iacgenie.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/iacgenie.com/privkey.pem;
 
@@ -305,7 +378,6 @@ server {
     ssl_session_timeout 1d;
     ssl_session_tickets off;
 
-    # Security headers (Phase 10.8)
     add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
@@ -347,7 +419,6 @@ server {
     listen 443 ssl http2;
     server_name search.iacgenie.com;
 
-    # Wildcard cert: replace with *.iacgenie.com once deployed
     ssl_certificate /etc/letsencrypt/live/iacgenie.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/iacgenie.com/privkey.pem;
 
@@ -379,12 +450,11 @@ server {
     }
 }
 
-# LightSerp API (api)
+# PageZen / PageGen (page) — HTTPS
 server {
     listen 443 ssl http2;
-    server_name api.iacgenie.com;
+    server_name page.iacgenie.com;
 
-    # Wildcard cert: replace with *.iacgenie.com once deployed
     ssl_certificate /etc/letsencrypt/live/iacgenie.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/iacgenie.com/privkey.pem;
 
@@ -400,72 +470,18 @@ server {
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-XSS-Protection "1; mode=block" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    add_header Content-Security-Policy "default-src 'none';" always;
-    add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
-    add_header X-Permitted-Cross-Domain-Policies "none" always;
-
-    # CORS headers (simple server-level approach — location block handles OPTIONS separately)
-    add_header 'Access-Control-Allow-Origin' '*' always;
-    add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, PATCH, OPTIONS' always;
-    add_header 'Access-Control-Allow-Headers' 'Authorization, Content-Type, X-Api-Key' always;
-    add_header 'Access-Control-Max-Age' 86400 always;
-
-    limit_req zone=api burst=30 nodelay;
-
-    # Handle CORS preflight
-    if ($request_method = 'OPTIONS') {
-        return 204;
-    }
-
-    location / {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_read_timeout 300;
-        proxy_hide_header X-Powered-By;
-    }
-}
-
-# LightSerp WebUI (app)
-server {
-    listen 443 ssl http2;
-    server_name app.iacgenie.com;
-
-    # Wildcard cert: replace with *.iacgenie.com once deployed
-    ssl_certificate /etc/letsencrypt/live/iacgenie.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/iacgenie.com/privkey.pem;
-
-    ssl_protocols       TLSv1.2 TLSv1.3;
-    ssl_ciphers         ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
-    ssl_prefer_server_ciphers on;
-    ssl_session_cache   shared:SSL:10m;
-    ssl_session_timeout 1d;
-    ssl_session_tickets off;
-
-    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' 'unsafe-eval'; img-src 'self' data: https:; connect-src 'self' api.iacgenie.com; frame-ancestors 'none';" always;
-    add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://lightserp.iacgenie.com; frame-ancestors 'none';" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
     add_header X-Permitted-Cross-Domain-Policies "none" always;
 
     limit_req zone=general burst=20 nodelay;
 
     location / {
-        proxy_pass http://127.0.0.1:3001;
+        proxy_pass http://127.0.0.1:8081;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_read_timeout 300;
         proxy_hide_header X-Powered-By;
     }
 }
@@ -473,9 +489,8 @@ server {
 # Gitea (git)
 server {
     listen 443 ssl http2;
-    server_name git.iacgenie.com;
+    server_name gitea.iacgenie.com;
 
-    # Wildcard cert: replace with *.iacgenie.com once deployed
     ssl_certificate /etc/letsencrypt/live/iacgenie.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/iacgenie.com/privkey.pem;
 
@@ -507,12 +522,29 @@ server {
     }
 }
 
-# PageZen (page)
+# IacGenie Platform (platform) HTTPS — API proxy
 server {
     listen 443 ssl http2;
-    server_name page.iacgenie.com;
+    server_name platform.iacgenie.com;
 
-    # Wildcard cert: replace with *.iacgenie.com once deployed
+    location /api/ {
+        proxy_pass http://127.0.0.1:3003;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_read_timeout 300;
+        proxy_redirect off;
+        proxy_hide_header X-Powered-By;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    server_name platform.iacgenie.com;
+
     ssl_certificate /etc/letsencrypt/live/iacgenie.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/iacgenie.com/privkey.pem;
 
@@ -528,28 +560,209 @@ server {
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-XSS-Protection "1; mode=block" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' api.iacgenie.com; frame-ancestors 'none';" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://platform.iacgenie.com; frame-ancestors 'none';" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+    add_header X-Permitted-Cross-Domain-Policies "none" always;
+
+    limit_req zone=general burst=20 nodelay;
+
+    location / {
+        proxy_pass http://127.0.0.1:3002;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_read_timeout 300;
+        proxy_hide_header X-Powered-By;
+    }
+}
+
+# LightSerp (lightserp) — HTTPS: WebUI + API
+server {
+    listen 443 ssl http2;
+    server_name lightserp.iacgenie.com;
+
+    ssl_certificate /etc/letsencrypt/live/iacgenie.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/iacgenie.com/privkey.pem;
+
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache   shared:SSL:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://lightserp.iacgenie.com; frame-ancestors 'none';" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+    add_header X-Permitted-Cross-Domain-Policies "none" always;
+
+    limit_req zone=general burst=20 nodelay;
+
+    location / {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_read_timeout 300;
+        proxy_hide_header X-Powered-By;
+    }
+
+    # LightSerp API sub-path proxy
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_read_timeout 300;
+        proxy_redirect off;
+        proxy_hide_header X-Powered-By;
+    }
+}
+
+# Vault/OpenBao (vault) — HTTPS
+server {
+    listen 443 ssl http2;
+    server_name vault.iacgenie.com;
+
+    ssl_certificate /etc/letsencrypt/live/vault.iacgenie.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/vault.iacgenie.com/privkey.pem;
+
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache   shared:SSL:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; frame-ancestors 'none';" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+    add_header X-Permitted-Cross-Domain-Policies "none" always;
+
+    limit_req zone=general burst=20 nodelay;
+
+    location / {
+        proxy_pass http://127.0.0.1:8200;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Port 443;
+        proxy_http_version 1.1;
+        proxy_connect_timeout 10s;
+        proxy_read_timeout 30s;
+        proxy_redirect off;
+        proxy_hide_header X-Powered-By;
+        proxy_hide_header Content-Security-Policy;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; frame-ancestors 'none';" always;
+    }
+
+    location /health {
+        proxy_pass http://127.0.0.1:8200/v1/sys/health;
+        access_log off;
+    }
+}
+
+# Grafana (monitoring)
+server {
+    listen 443 ssl http2;
+    server_name grafana.iacgenie.com;
+
+    ssl_certificate /etc/letsencrypt/live/iacgenie.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/iacgenie.com/privkey.pem;
+
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache   shared:SSL:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://grafana.iacgenie.com; frame-ancestors 'none';" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+    add_header X-Permitted-Cross-Domain-Policies "none" always;
+
+    limit_req zone=general burst=20 nodelay;
+
+    location / {
+        proxy_pass http://127.0.0.1:3004;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_read_timeout 300s;
+        proxy_hide_header X-Powered-By;
+    }
+}
+
+# ClamAV Web Client (HTTPS)
+server {
+    listen 443 ssl http2;
+    server_name clamav.iacgenie.com;
+
+    ssl_certificate /etc/letsencrypt/live/iacgenie.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/iacgenie.com/privkey.pem;
+
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache   shared:SSL:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://auth.iacgenie.com; frame-ancestors 'none';" always;
     add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
     add_header X-Permitted-Cross-Domain-Policies "none" always;
 
     limit_req zone=general burst=20 nodelay;
 
     location / {
-        proxy_pass http://127.0.0.1:8081;
+        proxy_pass http://127.0.0.1:9091;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_read_timeout 300s;
         proxy_hide_header X-Powered-By;
     }
 }
 
-# IacGenie Platform (platform)
+# CrowdSec Web UI (HTTPS)
 server {
     listen 443 ssl http2;
-    server_name platform.iacgenie.com;
+    server_name crowdsec.iacgenie.com;
 
-    # Wildcard cert: replace with *.iacgenie.com once deployed
     ssl_certificate /etc/letsencrypt/live/iacgenie.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/iacgenie.com/privkey.pem;
 
@@ -565,61 +778,21 @@ server {
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-XSS-Protection "1; mode=block" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' api.iacgenie.com; frame-ancestors 'none';" always;
-    add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://auth.iacgenie.com; frame-ancestors 'none';" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
     add_header X-Permitted-Cross-Domain-Policies "none" always;
 
     limit_req zone=general burst=20 nodelay;
 
     location / {
-        proxy_pass http://127.0.0.1:3001;
+        proxy_pass http://127.0.0.1:3030;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
-        proxy_read_timeout 300;
-        proxy_hide_header X-Powered-By;
-    }
-}
-
-# LightSerp (lightserp)
-server {
-    listen 443 ssl http2;
-    server_name lightserp.iacgenie.com;
-
-    # Wildcard cert: replace with *.iacgenie.com once deployed
-    ssl_certificate /etc/letsencrypt/live/iacgenie.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/iacgenie.com/privkey.pem;
-
-    ssl_protocols       TLSv1.2 TLSv1.3;
-    ssl_ciphers         ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
-    ssl_prefer_server_ciphers on;
-    ssl_session_cache   shared:SSL:10m;
-    ssl_session_timeout 1d;
-    ssl_session_tickets off;
-
-    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' 'unsafe-eval'; img-src 'self' data: https:; connect-src 'self' api.iacgenie.com; frame-ancestors 'none';" always;
-    add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
-    add_header X-Permitted-Cross-Domain-Policies "none" always;
-
-    limit_req zone=general burst=20 nodelay;
-
-    location / {
-        proxy_pass http://127.0.0.1:3001;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_read_timeout 300;
+        proxy_read_timeout 300s;
         proxy_hide_header X-Powered-By;
     }
 }

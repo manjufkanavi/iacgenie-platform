@@ -1,0 +1,19 @@
+{
+  "name": "iacgenie-auth-wrapper",
+  "version": "2.0.0",
+  "description": "IaCGenie Unified Auth Wrapper with per-service dashboards and backend proxy",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "express-session": "^1.17.3",
+    "jsonwebtoken": "^9.0.2",
+    "node-fetch": "^2.7.0",
+    "http-proxy-middleware": "^2.0.6"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

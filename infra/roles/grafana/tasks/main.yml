@@ -1,0 +1,32 @@
+---
+# Grafana role - handles Grafana configuration
+# Fixes: domain and root_url for correct HTTPS access
+
+- name: Ensure Grafana config directory exists
+  ansible.builtin.file:
+    path: "{{ iacgenie_docker_path | default('/home/mkanavi/docker/iacgenie') }}/grafana"
+    state: directory
+    mode: '0755'
+
+- name: Deploy Grafana configuration
+  ansible.builtin.template:
+    src: grafana.ini.j2
+    dest: "{{ iacgenie_docker_path | default('/home/mkanavi/docker/iacgenie') }}/grafana/grafana.ini"
+    mode: '0644'
+    backup: yes
+  notify: Restart grafana
+
+- name: Ensure Grafana container is running
+  community.docker.docker_container:
+    name: iacgenie_grafana
+    image: grafana/grafana:latest
+    state: started
+    restart_policy: unless-stopped
+    ports:
+      - "127.0.0.1:3004:3000"
+    volumes:
+      - "{{ iacgenie_docker_path | default('/home/mkanavi/docker/iacgenie') }}/grafana/grafana.ini:/etc/grafana/grafana.ini:ro"
+      - grafana-data:/var/lib/grafana
+    env:
+      GF_SERVER_DOMAIN: "{{ grafana_domain | default('grafana.iacgenie.com') }}"
+      GF_SERVER_ROOT_URL: "{{ grafana_root_url | default('https://grafana.iacgenie.com/') }}"

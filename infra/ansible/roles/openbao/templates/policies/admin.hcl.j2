@@ -1,0 +1,5 @@
+# OpenBao Admin Policy
+# Grants full access to all paths — reserved for platform-admin role only
+path "*" {
+  capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+}

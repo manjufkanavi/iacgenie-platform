@@ -1,20 +1,43 @@
 # Fail2Ban jail configuration
-# Managed by Ansible
+# Managed by Ansible — do not edit manually
 
 [DEFAULT]
-bantime = {{ fail2ban_bantime | default(3600) }}s
-findtime = 600s
-maxretry = {{ fail2ban_maxretry | default(5) }}
-backend = auto
+# ─── CRITICAL: Never ban trusted admin IPs ────────────────────────────────────
+# Prevents lockout when SSH auth fails due to agent/key issues.
+# Add your Mac's IP and any jump-box IPs here.
+ignoreip = 127.0.0.1/8 ::1 {% for ip in fail2ban_admin_ips | default([]) %}{{ ip }} {% endfor %}
+
+bantime   = {{ fail2ban_bantime | default(3600) }}s
+findtime  = {{ fail2ban_findtime | default(300) }}s
+maxretry  = {{ fail2ban_maxretry | default(5) }}
+backend   = auto
+
+# Send email on ban (optional — requires mail configured)
+# destemail = admin@iacgenie.com
+# sendername = Fail2Ban
+# mta = sendmail
 
 [sshd]
-enabled = true
-port = {{ ssh_port | default(22) }}
-filter = sshd
-logpath = /var/log/auth.log
+enabled  = true
+port     = {{ ssh_port | default(22) }}
+filter   = sshd
+logpath  = /var/log/auth.log
 maxretry = {{ fail2ban_maxretry | default(5) }}
-bantime = {{ fail2ban_bantime | default(3600) }}s
+bantime  = {{ fail2ban_bantime | default(3600) }}s
+# Action: ban IP via iptables drop
+banaction = iptables-multiport
 
 [ufw]
-enabled = true
+enabled  = true
 maxretry = {{ fail2ban_maxretry | default(5) }}
+
+# ─── Recidive: escalate persistent attackers to long-term ban ─────────────────
+[recidive]
+enabled  = true
+filter   = recidive
+logpath  = /var/log/fail2ban.log
+action   = iptables-allports[name=recidive]
+bantime  = 604800s  ; 7 days
+findtime = 86400s   ; 1 day
+maxretry = 5
+

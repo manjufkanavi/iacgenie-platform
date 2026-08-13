@@ -1,0 +1,27 @@
+# OpenBao OIDC Auth Backend Configuration
+# Managed by Ansible — do not edit manually
+#
+# This HCL file configures OpenBao's OIDC auth backend
+# to authenticate users via Keycloak.
+
+# OIDC Auth Backend Configuration
+oidc_discovery_url = "{{ openbao_oidc_discovery_url }}"
+oidc_client_id     = "{{ openbao_oidc_client_id }}"
+oidc_client_secret = "{{ openbao_oidc_client_secret }}"
+oidc_scopes        = "openid profile email roles"
+
+# Name claim mapping
+default_role = "user"
+
+# Allowed redirect URIs (Vault UI callbacks)
+oidc_allowed_redirect_uris = "{{ openbao_oidc_redirect_uris | join(',') }}"
+
+# User claims to extract from token
+user_claim           = "email"
+bindings_claim_name  = "roles"
+binding_rules        = "{}"
+
+# Token settings
+policies = "{{ openbao_oidc_default_policies | join(',') }}"
+ttl      = "{{ openbao_oidc_token_ttl }}"
+max_ttl  = "{{ openbao_oidc_max_ttl }}"

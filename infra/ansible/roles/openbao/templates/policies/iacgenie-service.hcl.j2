@@ -1,0 +1,9 @@
+# IaCGenie Service Policy — read-only access to iacgenie KV
+# Write access is reserved for the admin user only
+path "iacgenie/kv/*" {
+  capabilities = ["read", "list"]
+}
+
+path "iacgenie/kv" {
+  capabilities = ["list"]
+}

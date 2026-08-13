@@ -1,0 +1,9 @@
+# LightSerp Service Policy — read-only access to lightserp KV
+# Write access is reserved for the admin user only
+path "lightserp/kv/*" {
+  capabilities = ["read", "list"]
+}
+
+path "lightserp/kv" {
+  capabilities = ["list"]
+}

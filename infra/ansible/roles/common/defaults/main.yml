@@ -3,6 +3,37 @@ ssh_port: 22
 ssh_password_authentication: "no"
 ssh_permit_root_login: "no"
 ufw_enabled: true
+ufw_allowed_ports:
+  - "22/tcp"
+  - "80/tcp"
+  - "443/tcp"
+
+# ─── fail2ban ────────────────────────────────────────────────────────────────
 fail2ban_enabled: true
 fail2ban_maxretry: 5
-fail2ban_bantime: 3600
+fail2ban_bantime: 3600   # seconds — 1 hour default ban
+fail2ban_findtime: 300   # seconds — 5 min window to count failures
+
+# CRITICAL: IPs that fail2ban will NEVER ban.
+# Always include the admin/dev machine IP(s) to prevent self-lockout.
+fail2ban_admin_ips:
+  - "192.168.0.101"   # Mac dev machine (mkanavi)
+  # Add any CI/CD jump-box IPs here
+
+# ─── deploy user ─────────────────────────────────────────────────────────────
+deploy_username: mkanavi
+
+# SSH public keys to add/keep — must include the admin user's key
+# Use ansible-vault to encrypt real keys; placeholder format:
+# ssh_public_keys:
+#   - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... mkanavi@mac"
+ssh_public_keys: []
+
+# Safely apply SSH changes without restarting sshd
+# (avoids lockout if config is wrong)
+ssh_apply_changes_reboot: false
+
+# ─── sshd resilience ─────────────────────────────────────────────────────────
+# Configure sshd systemd unit to auto-restart on crash
+sshd_restart_on_failure: true
+sshd_restart_sec: 5

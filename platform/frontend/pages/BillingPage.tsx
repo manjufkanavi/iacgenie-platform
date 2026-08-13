@@ -4,12 +4,12 @@ import Button from '../ui/Button';
 import PageHeader from '../layout/PageHeader';
 import PlanCard from '../billing/PlanCard';
 import UsageProgressBar from '../billing/UsageProgressBar';
-import PaymentMethodsContainer from './components/billing/PaymentMethodsContainer';
-import InvoiceHistoryTable from './components/billing/InvoiceHistoryTable';
-import { billingService, BillingInfo } from '../../services/billingService';
-import { useProjectStore } from '.././store/useProjectStore';
+import PaymentMethodsContainer from '../billing/PaymentMethodsContainer';
+import InvoiceHistoryTable from '../billing/InvoiceHistoryTable';
+import { billingService, BillingInfo } from '../services/billingService';
+import { useProjectStore } from '../store/useProjectStore';
 import toast from 'react-hot-toast';
-import { Plan } from './types';
+import { Plan } from '../types';
 
 // Error boundary for billing page
 class BillingErrorBoundary extends React.Component<any, { hasError: boolean, error: any }> {

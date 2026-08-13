@@ -3,7 +3,7 @@
 # Admin connection
 keycloak_admin_url: "http://127.0.0.1:8080"
 keycloak_admin_user: admin
-keycloak_admin_password: "CHANGE_ME_IN_VAULT"
+keycloak_admin_password: "{{ keycloak_admin_password | default('CHANGE_ME_IN_VAULT') }}"
 keycloak_provision_realm: true
 keycloak_wait_retries: 30
 keycloak_wait_delay: 5
@@ -40,22 +40,102 @@ keycloak_realms:
       - project-member
       - offline_access
 
-# Client scopes (Phase 10.11)
-keycloak_client_scopes:
-  - name: project-info
-    description: "Project membership claims"
+# ── LightSerp Realm (Phase 10.3: Multi-Tenant & RBAC) ──────────────────────
+lightserp_realm_enabled: true
+lightserp_realms:
+  - name: lightserp
+    displayName: "LightSerp Platform"
+    enabled: true
+    registrationEmailAsUsername: false
+    rememberMe: true
+    loginWithEmailAllowed: true
+    duplicateEmailsAllowed: false
+    sslRequired: "external"
+    roles:
+      realm:
+        - name: platform-admin
+          description: "Full platform administrator — access all projects"
+          composite: false
+        - name: openbao-admin
+          description: "OpenBao vault administrator"
+          composite: false
+        - name: project-admin
+          description: "Project-level administrator — manage own project members"
+          composite: false
+        - name: project-member
+          description: "Project read-only member"
+          composite: false
+        - name: openbao-service-read
+          description: "Read-only OpenBao service access"
+          composite: false
+      client:
+        lightserp-webui:
+          - name: web-user
+            description: "WebUI user access"
+        lightserp-api:
+          - name: api-user
+            description: "LightSerp API access"
+    defaultRoles:
+      - project-member
+      - offline_access
+
+# LightSerp clients (lightserp realm)
+lightserp_clients:
+  - client_id: lightserp-webui
+    name: "LightSerp WebUI"
+    enabled: true
+    clientAuthenticatorType: client-secret
+    redirectUris:
+      - "https://lightserp.iacgenie.com/*"
+      - "https://app.iacgenie.com/*"
+    webOrigins:
+      - "https://lightserp.iacgenie.com"
+      - "https://app.iacgenie.com"
+    standardFlowEnabled: true
+    directAccessGrantsEnabled: false
+    serviceAccountsEnabled: false
+    consentRequired: false
     protocol: openid-connect
-    protocolMappers:
-      - name: project-ids
-        protocol: openid-connect
-        protocolMapper: oidc-user-attribute-protocol-mapper
-        config:
-          user.attribute: project_ids
-          claim.name: project_ids
-          jsonType.label: String
-          access:
-            - ID_TOKEN
-            - ACCESS_TOKEN
+    defaultClientScopes:
+      - web-origins
+      - role_list
+      - profile
+      - email
+
+  - client_id: lightserp-api
+    name: "LightSerp API"
+    enabled: true
+    clientAuthenticatorType: client-secret
+    redirectUris:
+      - "https://api.iacgenie.com/*"
+    webOrigins:
+      - "https://api.iacgenie.com"
+      - "+"
+    standardFlowEnabled: true
+    directAccessGrantsEnabled: true
+    serviceAccountsEnabled: true
+    consentRequired: false
+    protocol: openid-connect
+    defaultClientScopes:
+      - web-origins
+      - role_list
+
+  - client_id: openbao-oidc
+    name: "OpenBao OIDC"
+    enabled: true
+    clientAuthenticatorType: client-secret
+    redirectUris:
+      - "https://vault.iacgenie.com/*"
+    webOrigins:
+      - "https://vault.iacgenie.com"
+    standardFlowEnabled: true
+    directAccessGrantsEnabled: false
+    serviceAccountsEnabled: true
+    consentRequired: false
+    protocol: openid-connect
+    defaultClientScopes:
+      - web-origins
+      - role_list
 
 # Clients to register (Phase 10.16)
 keycloak_clients:
@@ -103,9 +183,9 @@ keycloak_clients:
     enabled: true
     clientAuthenticatorType: client-secret
     redirectUris:
-      - "https://git.iacgenie.com/user/oauth2/gitea"
+      - "https://gitea.iacgenie.com/user/oauth2/gitea"
     webOrigins:
-      - "https://git.iacgenie.com"
+      - "https://gitea.iacgenie.com"
     standardFlowEnabled: true
     directAccessGrantsEnabled: false
     serviceAccountsEnabled: false
@@ -131,3 +211,31 @@ keycloak_clients:
     defaultClientScopes:
       - web-origins
       - role_list
+
+  - client_id: auth-wrapper
+    name: "Auth Wrapper (Dashboards)"
+    enabled: true
+    clientAuthenticatorType: client-secret
+    redirectUris:
+      - "https://clamav.iacgenie.com/callback"
+      - "https://clamav.iacgenie.com/*"
+      - "https://pagegen.iacgenie.com/callback"
+      - "https://pagegen.iacgenie.com/*"
+      - "https://crowdsec.iacgenie.com/callback"
+      - "https://crowdsec.iacgenie.com/*"
+      - "https://auth.iacgenie.com/*"
+    webOrigins:
+      - "https://clamav.iacgenie.com"
+      - "https://pagegen.iacgenie.com"
+      - "https://crowdsec.iacgenie.com"
+      - "https://auth.iacgenie.com"
+    standardFlowEnabled: true
+    directAccessGrantsEnabled: false
+    serviceAccountsEnabled: false
+    consentRequired: false
+    protocol: openid-connect
+    defaultClientScopes:
+      - web-origins
+      - role_list
+      - profile
+      - email

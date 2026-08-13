@@ -1,19 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import Card from './ui/Card';
-import Button from './ui/Button';
-import Modal from './ui/Modal';
-import { useAppStore } from './store/useAppStore';
+import Card from '../ui/Card';
+import Button from '../ui/Button';
+import Modal from '../ui/Modal';
+import { useAppStore } from '../store/useAppStore';
 
-import { PROVIDERS, PROVIDER_CATEGORIES } from './constants/providers';
-import { MODELS, DEFAULT_CONFIGS, AdvancedConfig, ModelDefinition } from './constants/models';
+import { PROVIDERS, PROVIDER_CATEGORIES } from '../constants/providers';
+import { MODELS, DEFAULT_CONFIGS, AdvancedConfig, ModelDefinition } from '../constants/models';
 
-import { ProviderCard } from './model-config/ProviderCard';
-import { ModelCombobox } from './model-config/ModelCombobox';
-import { APIKeyInput } from './model-config/APIKeyInput';
-import { AdvancedConfigAccordion } from './model-config/AdvancedConfigAccordion';
-import { ConnectionTestButton, TestStatus, TestResult } from './model-config/ConnectionTestButton';
-import { StepIndicator, Step } from './model-config/StepIndicator';
-import { ModelConfigCard } from './model-config/ModelConfigCard';
+import { ProviderCard } from '../model-config/ProviderCard';
+import { ModelCombobox } from '../model-config/ModelCombobox';
+import { APIKeyInput } from '../model-config/APIKeyInput';
+import { AdvancedConfigAccordion } from '../model-config/AdvancedConfigAccordion';
+import { ConnectionTestButton, TestStatus, TestResult } from '../model-config/ConnectionTestButton';
+import { StepIndicator, Step } from '../model-config/StepIndicator';
+import { ModelConfigCard } from '../model-config/ModelConfigCard';
 
 interface ModelConfigFormData {
   projectId: string;

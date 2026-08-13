@@ -1,0 +1,180 @@
+# OpenBao OIDC Auth Backend Setup
+# Phase 10.3: Integrates OpenBao with Keycloak for centralized authentication
+
+- name: "10.3 | OpenBao | Enable OIDC auth method"
+  ansible.builtin.uri:
+    url: "{{ openbao_api_url }}/v1/sys/auth/oidc"
+    method: POST
+    body_format: json
+    body:
+      type: oidc
+      description: "OIDC auth via Keycloak"
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+    status_code: [200, 204]
+  changed_when: true
+  when: openbao_oidc_enabled | default(true) | bool
+
+- name: "10.3 | OpenBao | Configure OIDC discovery URL"
+  ansible.builtin.uri:
+    url: "{{ openbao_api_url }}/v1/oidc/config"
+    method: POST
+    body_format: json
+    body:
+      oidc_discovery_url: "{{ openbao_oidc_discovery_url }}"
+      oidc_client_id: "{{ openbao_oidc_client_id }}"
+      oidc_client_secret: "{{ openbao_oidc_client_secret }}"
+      default_role: "user"
+    headers:
+      X-Vault-token: "{{ openbao_root_token }}"
+    status_code: [200, 204]
+  changed_when: true
+  when: openbao_oidc_enabled | default(true) | bool
+
+- name: "10.3 | OpenBao | Configure OIDC scopes and claims"
+  ansible.builtin.uri:
+    url: "{{ openbao_api_url }}/v1/oidc/config/oidc_scopes"
+    method: POST
+    body_format: json
+    body:
+      oidc_scopes: "openid profile email roles"
+    headers:
+      X-Vault-token: "{{ openbao_root_token }}"
+    status_code: [200, 204]
+  changed_when: true
+  when: openbao_oidc_enabled | default(true) | bool
+
+# ── Create OIDC Roles ────────────────────────────────────────────────────
+
+- name: "10.3 | OpenBao | Create platform-admin OIDC role"
+  ansible.builtin.uri:
+    url: "{{ openbao_api_url }}/v1/oidc/roles/platform-admin"
+    method: POST
+    body_format: json
+    body:
+      user_claim: "email"
+      allowed_redirect_uris: "{{ openbao_oidc_redirect_uris }}"
+      bound_claims:
+        roles: "platform-admin"
+      policy: "admin"
+      ttl: "{{ openbao_oidc_token_ttl }}"
+      max_ttl: "{{ openbao_oidc_max_ttl }}"
+      policies: "admin,platform-admin"
+    headers:
+      X-Vault-token: "{{ openbao_root_token }}"
+    status_code: [200, 204, 409]
+  changed_when: true
+  when: openbao_oidc_enabled | default(true) | bool
+
+- name: "10.3 | OpenBao | Create openbao-admin OIDC role"
+  ansible.builtin.uri:
+    url: "{{ openbao_api_url }}/v1/oidc/roles/openbao-admin"
+    method: POST
+    body_format: json
+    body:
+      user_claim: "email"
+      allowed_redirect_uris: "{{ openbao_oidc_redirect_uris }}"
+      bound_claims:
+        roles: "openbao-admin"
+      policy: "admin"
+      ttl: "{{ openbao_oidc_token_ttl }}"
+      max_ttl: "{{ openbao_oidc_max_ttl }}"
+      policies: "admin,platform-admin,openbao-admin"
+    headers:
+      X-Vault-token: "{{ openbao_root_token }}"
+    status_code: [200, 204, 409]
+  changed_when: true
+  when: openbao_oidc_enabled | default(true) | bool
+
+- name: "10.3 | OpenBao | Create openbao-service-read OIDC role"
+  ansible.builtin.uri:
+    url: "{{ openbao_api_url }}/v1/oidc/roles/openbao-service-read"
+    method: POST
+    body_format: json
+    body:
+      user_claim: "email"
+      allowed_redirect_uris: "{{ openbao_oidc_redirect_uris }}"
+      bound_claims:
+        roles: "openbao-service-read"
+      policy: "openbao-service-read"
+      ttl: "{{ openbao_oidc_token_ttl }}"
+      max_ttl: "{{ openbao_oidc_max_ttl }}"
+      policies: "openbao-service-read"
+    headers:
+      X-Vault-token: "{{ openbao_root_token }}"
+    status_code: [200, 204, 409]
+  changed_when: true
+  when: openbao_oidc_enabled | default(true) | bool
+
+- name: "10.3 | OpenBao | Create iacgenie-service OIDC role"
+  ansible.builtin.uri:
+    url: "{{ openbao_api_url }}/v1/oidc/roles/iacgenie-service"
+    method: POST
+    body_format: json
+    body:
+      user_claim: "email"
+      allowed_redirect_uris: "{{ openbao_oidc_redirect_uris }}"
+      bound_claims:
+        roles: "iacgenie-service"
+      policy: "iacgenie-service"
+      ttl: "{{ openbao_oidc_token_ttl }}"
+      max_ttl: "{{ openbao_oidc_max_ttl }}"
+      policies: "iacgenie-service"
+    headers:
+      X-Vault-token: "{{ openbao_root_token }}"
+    status_code: [200, 204, 409]
+  changed_when: true
+  when: openbao_oidc_enabled | default(true) | bool
+
+- name: "10.3 | OpenBao | Create lightserp-service OIDC role"
+  ansible.builtin.uri:
+    url: "{{ openbao_api_url }}/v1/oidc/roles/lightserp-service"
+    method: POST
+    body_format: json
+    body:
+      user_claim: "email"
+      allowed_redirect_uris: "{{ openbao_oidc_redirect_uris }}"
+      bound_claims:
+        roles: "lightserp-service"
+      policy: "lightserp-service"
+      ttl: "{{ openbao_oidc_token_ttl }}"
+      max_ttl: "{{ openbao_oidc_max_ttl }}"
+      policies: "lightserp-service"
+    headers:
+      X-Vault-token: "{{ openbao_root_token }}"
+    status_code: [200, 204, 409]
+  changed_when: true
+  when: openbao_oidc_enabled | default(true) | bool
+
+- name: "10.3 | OpenBao | Create user OIDC role (default)"
+  ansible.builtin.uri:
+    url: "{{ openbao_api_url }}/v1/oidc/roles/user"
+    method: POST
+    body_format: json
+    body:
+      user_claim: "email"
+      allowed_redirect_uris: "{{ openbao_oidc_redirect_uris }}"
+      bound_claims: {}
+      policy: "openbao-service-read"
+      ttl: "{{ openbao_oidc_token_ttl }}"
+      max_ttl: "{{ openbao_oidc_max_ttl }}"
+      policies: "openbao-service-read"
+    headers:
+      X-Vault-token: "{{ openbao_root_token }}"
+    status_code: [200, 204, 409]
+  changed_when: true
+  when: openbao_oidc_enabled | default(true) | bool
+
+# ── Display Summary ──────────────────────────────────────────────────────
+
+- name: "10.3 | OpenBao | Display OIDC summary"
+  ansible.builtin.debug:
+    msg: >
+      OpenBao OIDC integration complete.
+      OIDC enabled: {{ openbao_oidc_enabled | default(true) }}
+      Discovery URL: {{ openbao_oidc_discovery_url }}
+      Auth URL: {{ openbao_api_url }}/v1/oidc/oidc/callback
+      User role: default (openbao-service-read)
+      Admin role: platform-admin / openbao-admin (full admin)
+      Service roles: iacgenie-service, lightserp-service, openbao-service-read
+  when: openbao_oidc_enabled | default(true) | bool

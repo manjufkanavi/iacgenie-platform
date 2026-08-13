@@ -18,23 +18,11 @@ service_memory_defaults:
   loki: "1g"
   prometheus: "1g"
   grafana: "512m"
-
-service_cpu_defaults:
-  postgres: "0.75"
-  redis: "0.25"
-  minio: "0.5"
-  openbao: "0.5"
-  keycloak: "1.0"
-  gitea: "0.5"
-  nginx: "0.25"
-  cloudflared: "0.25"
-  lightserp: "1.0"
-  pagezen: "0.25"
-  loki: "0.5"
-  prometheus: "0.5"
-  grafana: "0.25"
-
-# Service network assignments (Phase 10.7)
+  auth_wrapper: "256m"
+  clamav: "512m"
+  crowdsec: "512m"
+  pagegen: "512m"
+  searxng: "512m"
 service_networks:
   postgres:
     - iacgenie-backend
@@ -80,3 +68,7 @@ certbot_domains:
 certbot_challenge: dns
 certbot_auto_renew_hour: "3"
 certbot_auto_renew_minute: "30"
+
+# Auth wrapper — shared OIDC gateway for clamav, pagegen, crowdsec, searxng
+auth_wrapper_host_port: 9096
+keycloak_url: "https://auth.iacgenie.com"

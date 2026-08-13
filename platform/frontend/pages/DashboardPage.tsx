@@ -4,13 +4,13 @@ import Card from '../ui/Card';
 import Button from '../ui/Button';
 import Badge from '../ui/Badge';
 import PageHeader from '../layout/PageHeader';
-import { ICONS } from '.././constants';
-import { CloudProvider, Deployment, Generation, GenerationJob, JobStatus, OutputType, ProjectStatus, DeploymentStatus, Plan } from './types';
-import { useAppStore } from '.././store/useAppStore';
-import { useProjectStore } from '.././store/useProjectStore';
-import { generationService } from '../../services/generationService';
-import { deploymentService, DeploymentRecord } from '../../services/deploymentService';
-import { billingService, BillingInfo } from '../../services/billingService';
+import { ICONS } from '../constants.ts';
+import { CloudProvider, Deployment, Generation, GenerationJob, JobStatus, OutputType, ProjectStatus, DeploymentStatus, Plan } from '../types';
+import { useAppStore } from '../store/useAppStore';
+import { useProjectStore } from '../store/useProjectStore';
+import { generationService } from '../services/generationService';
+import { deploymentService, DeploymentRecord } from '../services/deploymentService';
+import { billingService, BillingInfo } from '../services/billingService';
 import toast from 'react-hot-toast';
 
 // Error boundary for dashboard section

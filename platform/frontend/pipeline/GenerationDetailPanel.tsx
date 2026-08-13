@@ -1,7 +1,7 @@
 import React from 'react';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
-import { Generation } from './types';
+import { Generation } from '../types';
 import { GenerationStatusBadge } from '../ui/StatusBadge';
 
 interface GenerationDetailPanelProps {

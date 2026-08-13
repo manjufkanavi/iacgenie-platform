@@ -1,0 +1,14 @@
+---
+# Gitea Mirror role — Defaults
+
+# Repos to mirror from GitHub to Gitea
+gitea_mirror_repos:
+  - iacgenie
+  - iacgenie-unified-infra
+  - LightSerp
+
+# Mirror sync interval in seconds (default: 1 hour)
+gitea_mirror_interval: 3600
+
+# Prune unreferenced objects on sync
+gitea_mirror_enable_prune: true

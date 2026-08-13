@@ -19,7 +19,7 @@ admin_gateway_backends:
 
   - name: gitea-admin
     path_prefix: "/gitea-admin/"
-    url: "https://git.iacgenie.com"
+    url: "https://gitea.iacgenie.com"
     requires_role: platform-admin
     description: "Gitea admin panel"
 

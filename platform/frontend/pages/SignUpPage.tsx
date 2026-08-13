@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View } from './types';
+import { View } from '../types';
 import Card from '../ui/Card';
 import FormGroup from '../ui/FormGroup';
 import SecurePasswordInput from '../ui/SecurePasswordInput';
@@ -9,8 +9,8 @@ import SSOModal from '../ui/SSOModal';
 import Button from '../ui/Button';
 import OTPInput from '../ui/OTPInput';
 import ResendTimer from '../ui/ResendTimer';
-import { useAuthStore } from '../../store/useAuthStore';
-import type { SignupCredentials, SignupResult } from '../../services/localAuthService';
+import { useAuthStore } from '../store/useAuthStore';
+import type { SignupCredentials, SignupResult } from '../services/localAuthService';
 
 interface SignUpPageProps {
     onNavigate: (view: View) => void;

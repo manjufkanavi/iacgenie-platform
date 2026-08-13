@@ -1,0 +1,18 @@
+server:
+  http_listen_port: 3100
+
+limits_config:
+  retention_period: 720h
+  max_line_size: 256K
+
+schema_config:
+  configs:
+    - from: 2020-10-24
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+auth_enabled: false

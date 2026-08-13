@@ -2,13 +2,13 @@ import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
-import { gitRepositoryService } from '../../services/gitRepositoryService';
-import { gitOpsService, type ListRunsResponse } from '../../services/gitOpsService';
-import type { GitRepository as GitRepositoryType } from '../../services/db/adapters/IDatabaseAdapter';
-import { useAppStore } from '.././store/useAppStore';
+import { gitRepositoryService } from '../services/gitRepositoryService';
+import { gitOpsService, type ListRunsResponse } from '../services/gitOpsService';
+import type { GitRepository as GitRepositoryType } from '../services/db/adapters/IDatabaseAdapter';
+import { useAppStore } from '../store/useAppStore';
 import { Github, Gitlab, Code, AlertCircle, CheckCircle2, AlertTriangle, Terminal, ExternalLink, Loader2 } from 'lucide-react';
 import Modal from '../ui/Modal';
-import GitRepositoryForm from './forms/GitRepositoryForm';
+import GitRepositoryForm from '../forms/GitRepositoryForm';
 import RepoSyncStatusBadge from './RepoSyncStatusBadge';
 import WebhookSetupForm from '../forms/WebhookSetupForm';
 import SyncProgressPanel, { SyncHealthData, ExecutionRun } from './SyncProgressPanel';
@@ -226,7 +226,7 @@ const RepoConfigPanel: React.FC = () => {
     const handleTestConnection = async (repoId: string) => {
         setTestingId(repoId);
         try {
-            const { getAuthHeaders } = await import('.././services/authHeaders');
+            const { getAuthHeaders } = await import('../services/authHeaders');
             const response = await fetch(`/api/git-repositories/${projectId}/${repoId}/test`, {
                 method: 'POST',
                 headers: getAuthHeaders()

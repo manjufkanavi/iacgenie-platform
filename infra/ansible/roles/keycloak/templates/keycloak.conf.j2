@@ -1,0 +1,19 @@
+# Keycloak Configuration for iacgenie platform
+# Managed by Ansible - do not edit manually
+# Read-only mount at /opt/keycloak/conf/keycloak.conf in container
+
+# Database (PostgreSQL driver baked into image via 'kc.sh build --db postgres')
+db=postgres
+
+# HTTP
+http-enabled=true
+http-port=8080
+
+# Hostname (external access)
+hostname={{ keycloak_hostname | default('https://auth.iacgenie.com') }}
+hostname-admin={{ keycloak_hostname | default('https://auth.iacgenie.com') }}
+hostname-admin-sts={{ keycloak_hostname | default('https://auth.iacgenie.com') }}
+
+# Admin Bootstrap (for first-boot admin user creation)
+bootstrap-admin-username={{ keycloak_admin_user | default('admin') }}
+bootstrap-admin-password={{ keycloak_admin_password | default('CHANGE_ME_IN_VAULT') }}

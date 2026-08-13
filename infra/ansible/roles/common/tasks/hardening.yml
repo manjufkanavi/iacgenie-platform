@@ -14,16 +14,58 @@
     mode: "0600"
     state: present
   loop:
-    - { regexp: "^#?Port .+", line: "Port {{ ssh_port | default(22) }}" }
-    - { regexp: "^#?PermitRootLogin .+", line: "PermitRootLogin {{ ssh_permit_root_login | default('no') }}" }
-    - { regexp: "^#?PasswordAuthentication .+", line: "PasswordAuthentication {{ ssh_password_authentication | default('no') }}" }
-    - { regexp: "^#?X11Forwarding .+", line: "X11Forwarding no" }
-    - { regexp: "^#?MaxAuthTries .+", line: "MaxAuthTries 3" }
-    - { regexp: "^#?LoginGraceTime .+", line: "LoginGraceTime 60" }
+    - { regexp: "^#?Port .+",                   line: "Port {{ ssh_port | default(22) }}" }
+    - { regexp: "^#?PermitRootLogin .+",         line: "PermitRootLogin {{ ssh_permit_root_login | default('no') }}" }
+    - { regexp: "^#?PasswordAuthentication .+",  line: "PasswordAuthentication {{ ssh_password_authentication | default('no') }}" }
+    - { regexp: "^#?X11Forwarding .+",           line: "X11Forwarding no" }
+    - { regexp: "^#?MaxAuthTries .+",            line: "MaxAuthTries 3" }
+    - { regexp: "^#?LoginGraceTime .+",          line: "LoginGraceTime 60" }
+    # ─── Keepalive: drops dead clients fast, freeing sshd slots ──────────────
+    - { regexp: "^#?ClientAliveInterval .+",     line: "ClientAliveInterval 60" }
+    - { regexp: "^#?ClientAliveCountMax .+",     line: "ClientAliveCountMax 3" }
+    # ─── Auth methods: key-only, reject weak ciphers ──────────────────────────
+    - { regexp: "^#?PubkeyAuthentication .+",    line: "PubkeyAuthentication yes" }
+    - { regexp: "^#?AuthenticationMethods .+",   line: "AuthenticationMethods publickey" }
+    - { regexp: "^#?UseDNS .+",                  line: "UseDNS no" }
+
+- name: "Common | Restart sshd if SSH config changed"
+  ansible.builtin.service:
+    name: sshd
+    state: restarted
+  when: ssh_apply_changes_reboot | default(false) | bool
+  # CRITICAL: Only restart sshd when explicitly requested.
+  # Automatic restart can cause lockout if the new config has errors
+  # or the admin SSH key is not yet authorized.
   notify: Restart sshd
 
+# ─── Fix B: sshd systemd auto-restart on crash ────────────────────────────────
+- name: "Common | Create sshd systemd override directory"
+  ansible.builtin.file:
+    path: /etc/systemd/system/ssh.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: sshd_restart_on_failure | default(true) | bool
+
+- name: "Common | Configure sshd to restart automatically on failure"
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/ssh.service.d/restart-on-failure.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by Ansible — ensures sshd recovers from OOM kills / crashes
+      [Service]
+      Restart=always
+      RestartSec={{ sshd_restart_sec | default(5) }}
+  when: sshd_restart_on_failure | default(true) | bool
+  notify: Reload systemd and restart sshd
+
 - name: "Common | Configure UFW"
-  when: ufw_enabled | default(true) | bool
+  when: (ufw_enabled | default(true) | bool) and (ssh_apply_changes_reboot | default(false) | bool)
+  # CRITICAL: UFW firewall can cause complete lockout if SSH port is not allowed.
+  # Only apply when explicitly requested after verifying SSH key auth works.
   block:
     - name: "Common | Enable UFW"
       community.general.ufw:

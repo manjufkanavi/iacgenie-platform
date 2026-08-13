@@ -1,2 +1,13 @@
 ---
-# Variables for {role_name}
+# Variables for openbao role
+# Environment variables must be set before running Ansible:
+#   OPENBAO_ROOT_TOKEN  — Root token (mandatory)
+#   OPENBAO_UNSEAL_KEY_1  — Unseal key share 1 of 3 (mandatory)
+#   OPENBAO_UNSEAL_KEY_2  — Unseal key share 2 of 3 (mandatory)
+#   OPENBAO_UNSEAL_KEY_3  — Unseal key share 3 of 3 (mandatory)
+#
+# These are populated from the `env` fact by the Ansible environment lookup
+# (set via `ansible.builtin.set_fact` in inventory or via `--extra-vars`).
+
+# Validate that env vars are available at play time
+openbao_env_check: true

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { CloudProvider, View, DeploymentMode } from './types';
-import { AVAILABLE_MODELS } from './constants';
+import { AVAILABLE_MODELS } from './constants.ts';
 import { LLMCompletionResponse } from './types';
 
 import { projectService } from '../services/projectService';

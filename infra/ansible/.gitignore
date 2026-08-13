@@ -1,0 +1,30 @@
+# === OpenBao secrets (never commit actual keys) ===
+**/init_keys.json
+**/.vault_key
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+venv/
+.venv/
+env/
+
+# === Docker ===
+docker-compose.yml
+
+# === OS / Editor ===
+.DS_Store
+*.swp
+*.swo
+*~
+
+# === Secrets (belt and suspenders) ===
+.env
+.env.*
+!.env.example
