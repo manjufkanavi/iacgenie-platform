@@ -132,7 +132,7 @@ def sha256_file(filepath):
     h = hashlib.sha256()
     with open(filepath, "rb") as f:
         for chunk in iter(lambda: f.read(8192), b""):
-            h.update(h)
+            h.update(chunk)
     return h.hexdigest()
 
 def verify_openbao_health():

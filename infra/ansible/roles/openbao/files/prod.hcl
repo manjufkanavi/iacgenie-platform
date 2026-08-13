@@ -17,13 +17,14 @@ telemetry {
   disable_hostname          = true
 }
 
-# === Listener (TLS directly — Let's Encrypt certs mounted via Docker) ===
+# === Listener (TLS via Nginx — bind to localhost for Docker) ===
+# OpenBao listens on 127.0.0.1 only. Nginx handles external TLS termination.
 listener "tcp" {
-  address     = "0.0.0.0:8200"
+  address     = "127.0.0.1:8200"
   tls_disable = 0
 
-  tls_cert_file = "/etc/openbao/tls/fullchain.pem"
-  tls_key_file  = "/etc/openbao/tls/privkey.pem"
+  tls_cert_file = "/etc/letsencrypt/live/vault.iacgenie.com/fullchain.pem"
+  tls_key_file  = "/etc/letsencrypt/live/vault.iacgenie.com/privkey.pem"
 }
 
 # === Cluster address (TLS for single-node) ===
@@ -33,10 +34,6 @@ cluster_addr = "https://127.0.0.1:8201"
 storage "raft" {
   path    = "/openbao/raft"
   node_id = "node1"
-
-  # Raft performance tuning
-  snapshot_interval = "30s"
-  publish_leader_change = true
 }
 
 # === Seal ===
@@ -57,12 +54,11 @@ api_addr = "https://127.0.0.1:8200"
 
 # === Log level ===
 # NOTE: Log level is controlled via OPENBAO_LOG_LEVEL env var
-# This is a fallback:
-# log_level = "info"
+log_level = "info"
 
 # === Audit ===
 # NOTE: Audit is enabled at runtime via `bao audit enable file`
-# This file-based audit is configured at startup for baseline logging:
+# File-based audit configured at runtime for security:
 # audit "file" {
 #   file_path = "/openbao/audit/audit.log"
 #   mode      = "0640"

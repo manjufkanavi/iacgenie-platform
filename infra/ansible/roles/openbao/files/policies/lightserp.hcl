@@ -1,23 +1,27 @@
-path "iacgenie/data/" {
+# OpenBao policy for lightserp-api service
+# Scope: Read access to lightserp secrets only
+# Prevents access to iacgenie, terraform, or system paths
+
+path "lightserp/data/config/lightserp/*" {
   capabilities = ["read"]
 }
 
-path "iacgenie/data/*" {
+path "lightserp/data/config/minio/*" {
   capabilities = ["read"]
 }
 
-path "iacgenie/metadata/*" {
-  capabilities = ["read", "list"]
-}
-
-path "lightserp/data/" {
+path "lightserp/data/config/redis/*" {
   capabilities = ["read"]
 }
 
-path "lightserp/data/*" {
+path "lightserp/data/config/lightserp" {
   capabilities = ["read"]
 }
 
-path "lightserp/metadata/*" {
-  capabilities = ["read", "list"]
+path "lightserp/data/config/minio" {
+  capabilities = ["read"]
+}
+
+path "lightserp/data/config/redis" {
+  capabilities = ["read"]
 }

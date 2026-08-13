@@ -156,8 +156,8 @@ services:
     # HCL at /openbao/raft/openbao-prod.hcl, storage at /openbao/raft
     command: bao server -config=/openbao/raft/openbao-prod.hcl
     environment:
-      OPENBAO_ADDR: http://127.0.0.1:8200
-      OPENBAO_CLUSTER_ADDR: http://127.0.0.1:8201
+      OPENBAO_ADDR: https://127.0.0.1:8200
+      OPENBAO_CLUSTER_ADDR: https://127.0.0.1:8201
       OPENBAO_UI: "true"
       OPENBAO_LOG_LEVEL: info
       BAO_SKIP_DROP_ROOT: "false"
@@ -165,6 +165,7 @@ services:
     volumes:
       - /home/mkanavi/docker/iacgenie/openbao_raft:/openbao/raft
       - /home/mkanavi/docker/iacgenie/data/openbao:/openbao/storage
+      - /etc/letsencrypt/live/vault.iacgenie.com:/etc/letsencrypt/live/vault.iacgenie.com:ro
     ports:
       - "127.0.0.1:8200:8200"
       - "127.0.0.1:8201:8201"
@@ -172,7 +173,7 @@ services:
     networks:
       - iacgenie-backend
     healthcheck:
-      test: ["CMD", "/usr/bin/bao", "status", "--address", "http://127.0.0.1:8200"]
+      test: ["CMD", "/usr/bin/bao", "status", "--address", "https://127.0.0.1:8200", "-tls-skip-verify"]
       interval: 30s
       timeout: 10s
       retries: 3

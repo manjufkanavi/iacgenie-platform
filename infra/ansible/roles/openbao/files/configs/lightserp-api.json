@@ -1,12 +1,12 @@
 {
   "secret_paths": {
-    "LIGHTSERP_DATABASE_URL": "lightserp/data/config/lightserp_database_url",
-    "LIGHTSERP_API_SECRET": "lightserp/data/config/lightserp_api_secret",
+    "DATABASE_URL": "lightserp/data/config/lightserp_database_url",
+    "API_SECRET": "lightserp/data/config/lightserp_api_secret",
     "MINIO_ACCESS_KEY": "lightserp/data/config/minio_access_key",
     "MINIO_SECRET_KEY": "lightserp/data/config/minio_secret_key",
     "REDIS_URL": "lightserp/data/config/redis_url",
-    "LIGHTSERP_KEYCLOAK_CLIENT_SECRET": "lightserp/data/config/lightserp_keycloak_client_secret"
+    "KEYCLOAK_CLIENT_SECRET": "lightserp/data/config/lightserp_keycloak_client_secret"
   },
-  "openbao_addr": "http://openbao:8200",
+  "openbao_addr": "https://127.0.0.1:8200",
   "approle_cred_file": "/var/run/approle/lightserp-api-svc-creds.txt"
 }

@@ -192,7 +192,7 @@
       ansible.builtin.command: >
         docker exec iacgenie_openbao bao policy write
         --address={{ openbao_addr }}
-        iacgenie-backend /tmp/iacgenie-backend-policy.hcl
+        iacgenie-backend-svc /tmp/iacgenie-backend-policy.hcl
       changed_when: true
 
     - name: "Phase 6 | Deploy lightserp policy"
@@ -204,56 +204,68 @@
       ansible.builtin.command: >
         docker exec iacgenie_openbao bao policy write
         --address={{ openbao_addr }}
-        lightserp /tmp/lightserp-policy.hcl
+        lightserp-api-svc /tmp/lightserp-policy.hcl
+      changed_when: true
+
+    - name: "Phase 6 | Deploy openbao-backup policy"
+      ansible.builtin.copy:
+        content: "{{ lookup('file', 'roles/openbao/files/policies/openbao-backup.hcl') }}"
+        dest: /tmp/openbao-backup-policy.hcl
+
+    - name: "Phase 6 | Apply openbao-backup policy"
+      ansible.builtin.command: >
+        docker exec iacgenie_openbao bao policy write
+        --address={{ openbao_addr }}
+        openbao-backup /tmp/openbao-backup-policy.hcl
+      changed_when: true
+
+    - name: "Phase 6 | Deploy root-admin policy"
+      ansible.builtin.copy:
+        content: "{{ lookup('file', 'roles/openbao/files/policies/root-admin.hcl') }}"
+        dest: /tmp/root-admin-policy.hcl
+
+    - name: "Phase 6 | Apply root-admin policy"
+      ansible.builtin.command: >
+        docker exec iacgenie_openbao bao policy write
+        --address={{ openbao_addr }}
+        root-admin /tmp/root-admin-policy.hcl
       changed_when: true
 
     # ── Phase 7: Create AppRole roles ────────────────────────────────────
-    - name: "Phase 7 | Create AppRole for iacgenie-backend"
-      ansible.builtin.command: >
-        docker exec iacgenie_openbao bao write
-        --address={{ openbao_addr }}
-        auth/approle/role/iacgenie-backend
-        secret_id_ttl=0
-        token_num_uses=0
-        token_ttl=24h
-        token_max_ttl=48h
-        policies=iacgenie-backend
-      changed_when: true
-
-    - name: "Phase 7 | Create AppRole for LightSerp"
-      ansible.builtin.command: >
-        docker exec iacgenie_openbao bao write
-        --address={{ openbao_addr }}
-        auth/approle/role/lightserp
-        secret_id_ttl=0
-        token_num_uses=0
-        token_ttl=24h
-        token_max_ttl=48h
-        policies=lightserp
-      changed_when: true
-
-    - name: "Phase 7 | Create AppRole for iacgenie-backend service"
+    - name: "Phase 7 | Create AppRole for iacgenie-backend-svc"
       ansible.builtin.command: >
         docker exec iacgenie_openbao bao write
         --address={{ openbao_addr }}
         auth/approle/role/iacgenie-backend-svc
         secret_id_ttl=0
         token_num_uses=0
-        token_ttl=24h
-        token_max_ttl=48h
-        policies=iacgenie-backend
+        token_ttl=2h
+        token_max_ttl=4h
+        policies=iacgenie-backend-svc
       changed_when: true
 
-    - name: "Phase 7 | Create AppRole for lightserp-api service"
+    - name: "Phase 7 | Create AppRole for lightserp-api-svc"
       ansible.builtin.command: >
         docker exec iacgenie_openbao bao write
         --address={{ openbao_addr }}
         auth/approle/role/lightserp-api-svc
         secret_id_ttl=0
         token_num_uses=0
-        token_ttl=24h
-        token_max_ttl=48h
-        policies=lightserp
+        token_ttl=2h
+        token_max_ttl=4h
+        policies=lightserp-api-svc
+      changed_when: true
+
+    - name: "Phase 7 | Create AppRole for openbao-backup"
+      ansible.builtin.command: >
+        docker exec iacgenie_openbao bao write
+        --address={{ openbao_addr }}
+        auth/approle/role/openbao-backup
+        secret_id_ttl=0
+        token_num_uses=0
+        token_ttl=1h
+        token_max_ttl=2h
+        policies=openbao-backup
       changed_when: true
 
     - name: "Phase 7 | Create AppRole credential dir on host"
@@ -323,32 +335,64 @@
         group: mkanavi
         mode: "0750"
 
-    # ── Phase 7.5: Store missing service secrets in OpenBao ─────────────────
-    - name: "Phase 7.5 | Store KC admin username secret"
+    # ── Phase 7.5: Store all service secrets in OpenBao ─────────────────
+    - name: "Phase 7.5 | Store iacgenie backend secrets in OpenBao"
       ansible.builtin.command: >
         docker exec iacgenie_openbao bao write
         --address={{ openbao_addr }}
         -format=json
-        iacgenie/data/config/keycloak/kc_admin_user
-        KC_BOOTSTRAP_ADMIN_USERNAME={{ env.KEYCLOAK_ADMIN_USER }}
-      register: kc_user_result
-      changed_when: "'data' in (kc_user_result.stdout | default('{}') | from_json)"
+        iacgenie/data/config/platform/{{ item.path }}
+        {{ item.env }}={{ env[item.env] }}
+      loop:
+        - { path: "database_url", env: "DATABASE_URL" }
+        - { path: "redis_url", env: "REDIS_URL" }
+        - { path: "jwt_secret", env: "JWT_SECRET" }
+        - { path: "openbao_addr", env: "OPENBAO_ADDR" }
+      register: iacgenie_secrets
+      changed_when: "'data' in (iacgenie_secrets.results | last | default({}))"
 
-    - name: "Phase 7.5 | Store KC admin password secret"
+    - name: "Phase 7.5 | Store iacgenie Keycloak admin secrets in OpenBao"
       ansible.builtin.command: >
         docker exec iacgenie_openbao bao write
         --address={{ openbao_addr }}
         -format=json
-        iacgenie/data/config/keycloak/kc_admin_password
-        KC_BOOTSTRAP_ADMIN_PASSWORD={{ env.KEYCLOAK_ADMIN_PASSWORD }}
-      register: kc_pass_result
-      changed_when: "'data' in (kc_pass_result.stdout | default('{}') | from_json)"
+        iacgenie/data/config/keycloak/{{ item.path }}
+        {{ item.env }}={{ env[item.env] }}
+      loop:
+        - { path: "kc_admin_user", env: "KEYCLOAK_ADMIN_USER" }
+        - { path: "kc_admin_password", env: "KEYCLOAK_ADMIN_PASSWORD" }
+      register: kc_secrets
+      changed_when: "'data' in (kc_secrets.results | last | default({}))"
 
-    - name: "Phase 7.5 | Store KC admin secret versions"
-      ansible.builtin.debug:
-        msg: >-
-          KC_ADMIN_USER version: {{ kc_user_result.stdout | from_json | json_query('data.version') | default('new') }},
-          KC_ADMIN_PASSWORD version: {{ kc_pass_result.stdout | from_json | json_query('data.version') | default('new') }}
+    - name: "Phase 7.5 | Store iacgenie MinIO secrets in OpenBao"
+      ansible.builtin.command: >
+        docker exec iacgenie_openbao bao write
+        --address={{ openbao_addr }}
+        -format=json
+        iacgenie/data/config/minio/{{ item.path }}
+        {{ item.env }}={{ env[item.env] }}
+      loop:
+        - { path: "minio_root_user", env: "MINIO_ROOT_USER" }
+        - { path: "minio_root_password", env: "MINIO_ROOT_PASSWORD" }
+      register: minio_secrets
+      changed_when: "'data' in (minio_secrets.results | last | default({}))"
+
+    - name: "Phase 7.5 | Store LightSerp secrets in OpenBao"
+      ansible.builtin.command: >
+        docker exec iacgenie_openbao bao write
+        --address={{ openbao_addr }}
+        -format=json
+        lightserp/data/config/{{ item.path }}
+        {{ item.env }}={{ env[item.env] }}
+      loop:
+        - { path: "lightserp_database_url", env: "LIGHTSERP_DATABASE_URL" }
+        - { path: "lightserp_api_secret", env: "LIGHTSERP_API_SECRET" }
+        - { path: "lightserp_keycloak_client_secret", env: "LIGHTSERP_KEYCLOAK_CLIENT_SECRET" }
+        - { path: "redis_url", env: "LIGHTSERP_REDIS_URL" }
+        - { path: "minio_access_key", env: "LIGHTSERP_MINIO_ACCESS_KEY" }
+        - { path: "minio_secret_key", env: "LIGHTSERP_MINIO_SECRET_KEY" }
+      register: lightserp_secrets
+      changed_when: "'data' in (lightserp_secrets.results | last | default({}))"
 
     # ── Phase 8: Deploy scripts & configs ────────────────────────────────
     - name: "Phase 8 | Deploy backup script"
