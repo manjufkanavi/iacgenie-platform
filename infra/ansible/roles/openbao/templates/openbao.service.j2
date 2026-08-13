@@ -1,0 +1,41 @@
+[Unit]
+Description=OpenBao Server
+After=network-online.target docker.service
+Wants=docker.service
+
+[Service]
+Type=notify
+User=mkanavi
+Group=mkanavi
+WorkingDirectory=/home/mkanavi/docker/iacgenie
+ExecStartPre=/usr/bin/docker rm -f openbao
+ExecStart=/usr/bin/docker run \
+    --name openbao \
+    --restart unless-stopped \
+    --user 100:100 \
+    --memory 1g \
+    --cpus 0.5 \
+    --publish 127.0.0.1:8200:8200 \
+    --publish 127.0.0.1:8201:8201 \
+    --volume /home/mkanavi/docker/iacgenie/data/openbao:/openbao/storage \
+    --volume /home/mkanavi/docker/iacgenie/data/openbao_raft:/openbao/raft \
+    --env OPENBAO_ADDR=http://127.0.0.1:8200 \
+    --env OPENBAO_CLUSTER_ADDR=http://127.0.0.1:8201 \
+    --env OPENBAO_UI=true \
+    --env OPENBAO_STORAGE_TYPE=raft \
+    --env OPENBAO_STORAGE_PATH=/openbao/storage \
+    --env OPENBAO_LOG_LEVEL=info \
+    --cap-drop ALL \
+    --cap-add SETGID \
+    --cap-add SETUID \
+    --cap-add DAC_OVERRIDE \
+    --security-opt no-new-privileges \
+    openbao/openbao:2.6.0 \
+    bao server -config=/openbao/storage/openbao-prod.hcl
+ExecStop=/usr/bin/docker stop -t 30 openbao
+ExecStopPost=/usr/bin/docker rm -f openbao
+TimeoutStartSec=infinity
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

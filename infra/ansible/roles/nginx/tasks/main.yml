@@ -26,13 +26,10 @@
     mode: "0644"
   notify: Restart nginx
 
-- name: "Nginx | Deploy OpenBao vHost configuration"
-  ansible.builtin.copy:
-    src: vault-iacgenie.conf
-    dest: /etc/nginx/conf.d/vault-iacgenie.conf
-    owner: root
-    group: root
-    mode: "0644"
+- name: "Nginx | Remove stale vault-iacgenie vHost (now in unified conf)"
+  ansible.builtin.file:
+    path: /etc/nginx/conf.d/vault-iacgenie.conf
+    state: absent
   notify: Restart nginx
 
 - name: "Nginx | Remove stale unified config files"
@@ -50,8 +47,8 @@
   changed_when: false
   failed_when: false
 
-- name: "Nginx | Stop and disable Nginx host service"
+- name: "Nginx | Enable and start systemd nginx"
   ansible.builtin.service:
     name: nginx
-    state: stopped
-    enabled: no
+    state: started
+    enabled: yes

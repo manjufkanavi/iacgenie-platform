@@ -1,18 +1,5 @@
 ---
-# =============================================================================
-# nginx-config role — handlers
-# =============================================================================
-
-- name: reload nginx
+- name: Reload nginx
   ansible.builtin.systemd:
     name: nginx
     state: reloaded
-  check_mode: false
-  failed_when: false
-
-- name: test nginx config
-  ansible.builtin.command:
-    cmd: nginx -t
-  register: nginx_test_reload
-  changed_when: false
-  check_mode: false

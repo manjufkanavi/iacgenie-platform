@@ -1,0 +1,41 @@
+---
+# System Services Playbook: manages all host-level systemd services
+# These services run OUTSIDE docker compose and are essential infrastructure.
+#
+# Order matters:
+# 1. Nginx (reverse proxy — must be running for cloudflared)
+# 2. Cloudflared (tunnel — depends on nginx being accessible)
+# 3. OpenBao (secret manager — standalone systemd service)
+
+- hosts: all
+  become: true
+  become_method: sudo
+  serial: 1  # One at a time to avoid port conflicts
+
+  pre_tasks:
+    - name: "System Services | Verify required ports are free"
+      ansible.builtin.command: ss -tlnp | grep -E ':(80|8200)\b' || true
+      register: port_check
+      changed_when: false
+
+    - name: "System Services | Report port status"
+      ansible.builtin.debug:
+        var: port_check.stdout_lines
+
+  roles:
+    - role: nginx
+    - role: openbao
+    - role: cloudflare_tunnel
+
+  tasks:
+    - name: "System Services | Verify all services are active"
+      ansible.builtin.command: "systemctl is-active {{ item }}"
+      loop: [nginx, openbao, cloudflared]
+      register: service_status
+      changed_when: false
+      failed_when: false
+
+    - name: "System Services | Report service status"
+      ansible.builtin.debug:
+        msg: "{{ item.item }} = {{ item.stdout | default('unknown') }}"
+      loop: "{{ service_status.results }}"

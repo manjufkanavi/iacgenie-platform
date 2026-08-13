@@ -2,6 +2,17 @@
 # Deploy-env role: Generate unified .env from OpenBao KV
 # Depends on: openbao-secrets (which ensures OpenBao is running and unsealed)
 
+- name: "Deploy Env | Check if .env already exists"
+  ansible.builtin.stat:
+    path: /home/mkanavi/docker/iacgenie/.env
+  register: _existing_env_file
+
+- name: "Deploy Env | Check if OpenBao is healthy"
+  ansible.builtin.command: docker inspect --format='{{ "{{" }}.State.Health.Status{{ "}}" }}' iacgenie_openbao
+  register: _openbao_health
+  changed_when: false
+  failed_when: false
+
 - name: "Deploy Env | Deploy fetch script to VM"
   ansible.builtin.copy:
     src: ../../../scripts/fetch-openbao-env.py
@@ -14,12 +25,20 @@
   ansible.builtin.command: python3 /tmp/fetch-openbao-env.py
   register: _env_result
   changed_when: true
+  failed_when: false
+  when: _openbao_health.stdout == 'healthy'
 
-- name: "Deploy Env | Show result"
+- name: "Deploy Env | Use existing .env fallback if OpenBao is down"
   ansible.builtin.debug:
-    var: _env_result.stdout_lines
+    msg: "OpenBao is not healthy. Skipping .env generation and falling back to existing .env file."
+  when: _openbao_health.stdout != 'healthy' and _existing_env_file.stat.exists
 
-- name: "Deploy Env | Verify .env file exists"
+- name: "Deploy Env | Fail if OpenBao is down and NO fallback .env exists"
+  ansible.builtin.fail:
+    msg: "OpenBao is down AND no existing .env file was found. Cannot proceed with deployment."
+  when: _openbao_health.stdout != 'healthy' and not _existing_env_file.stat.exists
+
+- name: "Deploy Env | Verify .env file exists after all checks"
   ansible.builtin.stat:
     path: /home/mkanavi/docker/iacgenie/.env
   register: _env_file
@@ -28,12 +47,3 @@
   ansible.builtin.fail:
     msg: "Failed to generate .env from OpenBao. Check OpenBao KV health."
   when: not _env_file.stat.exists
-
-- name: "Deploy Env | Show .env line count"
-  ansible.builtin.command: wc -l /home/mkanavi/docker/iacgenie/.env
-  register: _env_count
-  changed_when: false
-
-- name: "Deploy Env | Show count"
-  ansible.builtin.debug:
-    var: _env_count.stdout

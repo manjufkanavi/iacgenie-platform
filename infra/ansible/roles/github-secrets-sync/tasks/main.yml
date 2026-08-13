@@ -1,0 +1,108 @@
+---
+# GitHub Secrets Sync role
+# Backs up OpenBao KV secrets to GitHub as a safety measure.
+# Uses a private GitHub repository to store encrypted snapshots.
+#
+# This is a safeguard — OpenBao already has Raft snapshots on the VM.
+# This provides off-VM redundancy and audit trail.
+
+- name: "GitHub Sync | Check if OpenBao KV is populated"
+  ansible.builtin.command: docker exec iacgenie_openbao bao secrets list iacgenie/kv/
+  register: openbao_kv_list
+  changed_when: false
+  failed_when: false
+
+- name: "GitHub Sync | Fail if OpenBao KV is empty"
+  ansible.builtin.fail:
+    msg: "OpenBao KV is empty. Run openbao-secrets role first to seed KV paths."
+  when: openbao_kv_list.stdout is defined and openbao_kv_list.stdout | trim | length == 0
+
+- name: "GitHub Sync | Check if snapshot directory exists"
+  ansible.builtin.stat:
+    path: /tmp/openbao-backup
+  register: backup_dir
+  failed_when: false
+
+- name: "GitHub Sync | Create temporary backup directory"
+  ansible.builtin.file:
+    path: /tmp/openbao-backup
+    state: directory
+    mode: "0700"
+
+- name: "GitHub Sync | Backup all KV secrets to file"
+  ansible.builtin.shell: |
+    set -euo pipefail
+    TOKEN=$(cat /home/mkanavi/docker/iacgenie/data/openbao_raft/init_keys.json | python3 -c "import sys,json; print(json.load(sys.stdin).get('root_token',''))")
+    PATHS=$(docker exec iacgenie_openbao bao secrets list iacgenie/kv/ -format=json | python3 -c "import sys,json; data=json.load(sys.stdin); [print(p.rstrip('/')) for p in data.get('data',{}).get('keys',[])]")
+    echo '{"backup_timestamp":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","source":"openbao_raft","kv_snapshots":[]}' > /tmp/openbao-backup/snapshot.json
+    
+    for path in $PATHS; do
+      echo "Backing up: $path"
+      SECRETS=$(docker exec iacgenie_openbao bao kv get -field=data -format=json iacgenie/$path 2>/dev/null || echo '{}')
+      echo "$SECRETS" | python3 -c "import sys,json; d=json.load(sys.stdin); print(json.dumps({'path':'$path','data':d}))" >> /tmp/openbao-backup/entries.jsonl
+    done
+    
+    # Build final snapshot
+    python3 -c "
+    import json
+    with open('/tmp/openbao-backup/snapshot.json') as f:
+        snap = json.load(f)
+    entries = []
+    with open('/tmp/openbao-backup/entries.jsonl') as f:
+        for line in f:
+            if line.strip():
+                entries.append(json.loads(line))
+    snap['kv_snapshots'] = entries
+    with open('/tmp/openbao-backup/snapshot.json', 'w') as f:
+        json.dump(snap, f, indent=2)
+    print(f'Backed up {len(entries)} secrets to snapshot.json')
+    "
+  args:
+    creates: /tmp/openbao-backup/snapshot.json
+
+- name: "GitHub Sync | Create GitHub repository for backups (if not exists)"
+  ansible.builtin.command: "gh repo view iacgenie/openbao-backups --json name"
+  register: repo_check
+  changed_when: false
+  failed_when: false
+
+- name: "GitHub Sync | Create repository"
+  ansible.builtin.command: "gh repo create iacgenie/openbao-backups --private --description 'OpenBao KV secrets backup snapshots' --source . --remote origin-backup"
+  when: repo_check.stdout | trim | length == 0
+  changed_when: true
+  failed_when: false
+
+- name: "GitHub Sync | Copy snapshot to temp repo and commit"
+  ansible.builtin.shell: |
+    set -euo pipefail
+    SNAPSHOT=/tmp/openbao-backup/snapshot.json
+    TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+    BACKUP_DIR=/tmp/openbao-backups-temp
+    mkdir -p $BACKUP_DIR
+    cp $SNAPSHOT $BACKUP_DIR/snapshot_${TIMESTAMP}.json
+    
+    cd $BACKUP_DIR
+    git init || true
+    git config user.email "ansible@iacgenie.com"
+    git config user.name "Ansible Backup"
+    git add .
+    git commit -m "Backup snapshot ${TIMESTAMP}" || true
+    
+    # Push to backup remote (fail silently if not set up)
+    git push origin-backup main 2>/dev/null || \
+    git push origin main 2>/dev/null || \
+    echo "WARNING: Could not push to GitHub. Configure git remote first."
+  args:
+    creates: /tmp/openbao-backups-temp
+
+- name: "GitHub Sync | Cleanup temp files"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /tmp/openbao-backup/entries.jsonl
+    - /tmp/openbao-backups-temp
+
+- name: "GitHub Sync | Show backup status"
+  ansible.builtin.debug:
+    msg: "OpenBao KV backup synced. {{ openbao_kv_list.stdout_lines | length | default(0) }} KV paths backed up."

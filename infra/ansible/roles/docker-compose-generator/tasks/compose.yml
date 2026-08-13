@@ -20,13 +20,17 @@
     - /home/mkanavi/docker/iacgenie/data/redis
     - /home/mkanavi/docker/iacgenie/data/minio
     - /home/mkanavi/docker/iacgenie/data/openbao
-    - /home/mkanavi/docker/iacgenie/data/openbao_raft
     - /home/mkanavi/docker/iacgenie/data/keycloak
     - /home/mkanavi/docker/iacgenie/data/gitea
     - /home/mkanavi/docker/iacgenie/data/nsqd
-    
     - /home/mkanavi/docker/iacgenie/data/grafana
     - /home/mkanavi/docker/iacgenie/data/prometheus
+    - /home/mkanavi/docker/iacgenie/data/crowdsec-db
+    - /home/mkanavi/docker/iacgenie/data/crowdsec-config
+    - /home/mkanavi/docker/iacgenie/loki
+    - /home/mkanavi/docker/iacgenie/promtail
+    # OpenBao raft data directory — contains vault.db, raft/, certs, HCL
+    - /home/mkanavi/docker/iacgenie/openbao_raft
 
 - name: "Compose Gen | Fix data directory permissions"
   ansible.builtin.file:
@@ -40,16 +44,23 @@
     - /home/mkanavi/docker/iacgenie/data/redis
     - /home/mkanavi/docker/iacgenie/data/minio
     - /home/mkanavi/docker/iacgenie/data/nsqd
-    
     - /home/mkanavi/docker/iacgenie/data/grafana
     - /home/mkanavi/docker/iacgenie/data/prometheus
 
-- name: "Compose Gen | Fix OpenBao raft data ownership"
+- name: "Compose Gen | Fix OpenBao raft data ownership (keys/raft data are sensitive)"
   ansible.builtin.file:
-    path: /home/mkanavi/docker/iacgenie/data/openbao_raft
+    path: /home/mkanavi/docker/iacgenie/openbao_raft
     owner: mkanavi
     group: mkanavi
     mode: "0750"
+    recurse: true
+
+- name: "Compose Gen | Fix OpenBao storage data permissions"
+  ansible.builtin.file:
+    path: /home/mkanavi/docker/iacgenie/data/openbao
+    owner: mkanavi
+    group: mkanavi
+    mode: "0755"
     recurse: true
 
 - name: "Compose Gen | Render docker-compose template"

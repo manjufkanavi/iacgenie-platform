@@ -1,0 +1,5 @@
+---
+# GitHub secrets sync configuration
+github_repo: "iacgenie/openbao-backups"
+github_token_var: "GITHUB_TOKEN"
+backup_retention_days: 30

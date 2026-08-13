@@ -19,7 +19,7 @@ services:
     container_name: iacgenie_grafana
     restart: unless-stopped
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: *** grafana_admin_password | default('CHANGE_ME_IN_VAULT') }}
+      GF_SECURITY_ADMIN_PASSWORD: {{ grafana_admin_password | default('CHANGE_ME_IN_VAULT') }}
     volumes:
       - grafana_data:/var/lib/grafana
     ports:

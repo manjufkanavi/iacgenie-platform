@@ -1,10 +1,13 @@
 ---
-# openbao-secrets role: Seed KV data into OpenBao
+# openbao-secrets role: Generate and seed all service secrets into OpenBao
 # This runs AFTER openbao role (which starts the container)
 
+# =====================
+# Step 1: Wait for OpenBao
+# =====================
 - name: "OpenBao Secrets | Wait for OpenBao container to be ready"
   ansible.builtin.command: >
-    docker inspect --format='{{ "{{".State.Health.Status "}}" }}' iacgenie_openbao
+    docker inspect --format='{{ "{{"}}.State.Health.Status{{"}}" }}' iacgenie_openbao
   register: _openbao_health
   retries: 20
   delay: 15
@@ -36,6 +39,9 @@
     msg: "OpenBao not yet initialized. Run openbao role first to create init_keys.json."
   when: openbao_root_token is not defined
 
+# =====================
+# Step 2: Create admin token
+# =====================
 - name: "OpenBao Secrets | Create admin token for KV operations"
   ansible.builtin.uri:
     url: "http://127.0.0.1:8200/v1/auth/token/create"
@@ -55,7 +61,10 @@
     openbao_admin_token: "{{ _admin_token.json.auth.client_token | default(openbao_root_token) }}"
   when: openbao_root_token is defined
 
-- name: "OpenBao Secrets | Seed KV mount"
+# =====================
+# Step 3: Mount KV v2
+# =====================
+- name: "OpenBao Secrets | Create KV v2 mount"
   ansible.builtin.uri:
     url: "http://127.0.0.1:8200/v1/sys/mounts/iacgenie/kv"
     method: PUT
@@ -66,6 +75,234 @@
         version: "2"
     headers:
       X-Vault-Token: "{{ openbao_admin_token | default(openbao_root_token) }}"
-    status_code: [200, 400]  # 400 = already exists
+    status_code: [200, 400]
     validate_certs: no
   when: openbao_root_token is defined
+
+# =====================
+# Step 4: Seed service secrets
+# =====================
+- name: "OpenBao Secrets | Seed PostgreSQL credentials"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/postgres"
+    method: POST
+    body_format: json
+    body:
+      data:
+        POSTGRES_USER: "iacgenie_pg"
+        POSTGRES_PASSWORD: "{{ (lookup('password', '/dev/null chars=ascii_letters,digits length=32')) }}"
+        POSTGRES_DB: "iacgenie"
+    headers:
+      X-Vault-Token: "{{ openbao_admin_token | default(openbao_root_token) }}"
+    status_code: 200
+    validate_certs: no
+  when: openbao_root_token is defined
+
+- name: "OpenBao Secrets | Seed Redis password"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/redis"
+    method: POST
+    body_format: json
+    body:
+      data:
+        REDIS_PASSWORD: "{{ (lookup('password', '/dev/null chars=ascii_letters,digits length=32')) }}"
+    headers:
+      X-Vault-Token: "{{ openbao_admin_token | default(openbao_root_token) }}"
+    status_code: 200
+    validate_certs: no
+  when: openbao_root_token is defined
+
+- name: "OpenBao Secrets | Seed MinIO credentials"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/minio"
+    method: POST
+    body_format: json
+    body:
+      data:
+        MINIO_ROOT_USER: "iacgenie_minio"
+        MINIO_ROOT_PASSWORD: "{{ (lookup('password', '/dev/null chars=ascii_letters,digits length=48')) }}"
+    headers:
+      X-Vault-Token: "{{ openbao_admin_token | default(openbao_root_token) }}"
+    status_code: 200
+    validate_certs: no
+  when: openbao_root_token is defined
+
+- name: "OpenBao Secrets | Seed Keycloak admin credentials"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/keycloak_admin"
+    method: POST
+    body_format: json
+    body:
+      data:
+        KEYCLOAK_ADMIN_USER: "admin"
+        KEYCLOAK_ADMIN_PASSWORD: "{{ (lookup('password', '/dev/null chars=ascii_letters,digits length=32')) }}"
+    headers:
+      X-Vault-Token: "{{ openbao_admin_token | default(openbao_root_token) }}"
+    status_code: 200
+    validate_certs: no
+  when: openbao_root_token is defined
+
+- name: "OpenBao Secrets | Seed Keycloak DB credentials"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/keycloak_db"
+    method: POST
+    body_format: json
+    body:
+      data:
+        KC_DB_PASSWORD: "{{ (lookup('password', '/dev/null chars=ascii_letters,digits length=32')) }}"
+        KC_DB_HOST: "postgres"
+        KC_DB_PORT: "5432"
+        KC_DB_NAME: "keycloak"
+    headers:
+      X-Vault-Token: "{{ openbao_admin_token | default(openbao_root_token) }}"
+    status_code: 200
+    validate_certs: no
+  when: openbao_root_token is defined
+
+- name: "OpenBao Secrets | Seed Gitea DB credentials"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/gitea_db"
+    method: POST
+    body_format: json
+    body:
+      data:
+        GITEA_DB_PASSWORD: "{{ (lookup('password', '/dev/null chars=ascii_letters,digits length=32')) }}"
+    headers:
+      X-Vault-Token: "{{ openbao_admin_token | default(openbao_root_token) }}"
+    status_code: 200
+    validate_certs: no
+  when: openbao_root_token is defined
+
+- name: "OpenBao Secrets | Seed Gitea admin credentials"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/gitea_admin"
+    method: POST
+    body_format: json
+    body:
+      data:
+        GITEA_ADMIN_USERNAME: "admin"
+        GITEA_ADMIN_PASSWORD: "{{ (lookup('password', '/dev/null chars=ascii_letters,digits length=32')) }}"
+    headers:
+      X-Vault-Token: "{{ openbao_admin_token | default(openbao_root_token) }}"
+    status_code: 200
+    validate_certs: no
+  when: openbao_root_token is defined
+
+- name: "OpenBao Secrets | Seed LightSerp credentials"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/lightserp"
+    method: POST
+    body_format: json
+    body:
+      data:
+        LIGHTSERP_API_SECRET: "{{ (lookup('password', '/dev/null chars=ascii_letters,digits length=32')) }}"
+        LIGHTSERP_DATABASE_URL: "postgresql://iacgenie_pg:***@postgres:5432/iacgenie"
+        LIGHTSERP_KEYCLOAK_CLIENT_SECRET: "{{ (lookup('password', '/dev/null chars=ascii_letters,digits length=32')) }}"
+    headers:
+      X-Vault-Token: "{{ openbao_admin_token | default(openbao_root_token) }}"
+    status_code: 200
+    validate_certs: no
+  when: openbao_root_token is defined
+
+- name: "OpenBao Secrets | Seed JWT secrets"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/jwt"
+    method: POST
+    body_format: json
+    body:
+      data:
+        IACGENIE_JWT_SECRET: "{{ (lookup('password', '/dev/null chars=ascii_letters,digits length=48')) }}"
+        AUTH_WRAPPER_SESSION_SECRET: "{{ (lookup('password', '/dev/null chars=ascii_letters,digits length=32')) }}"
+    headers:
+      X-Vault-Token: "{{ openbao_admin_token | default(openbao_root_token) }}"
+    status_code: 200
+    validate_certs: no
+  when: openbao_root_token is defined
+
+- name: "OpenBao Secrets | Seed Cloudflare tunnel token"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/cloudflare"
+    method: POST
+    body_format: json
+    body:
+      data:
+        CLOUDFLARE_TUNNEL_TOKEN: "${CLOUDFLARE_TUNNEL_TOKEN}"
+    headers:
+      X-Vault-Token: "{{ openbao_admin_token | default(openbao_root_token) }}"
+    status_code: 200
+    validate_certs: no
+  when: openbao_root_token is defined
+
+- name: "OpenBao Secrets | Seed Grafana credentials"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/grafana"
+    method: POST
+    body_format: json
+    body:
+      data:
+        GRAFANA_ADMIN_PASSWORD: "{{ (lookup('password', '/dev/null chars=ascii_letters,digits length=32')) }}"
+    headers:
+      X-Vault-Token: "{{ openbao_admin_token | default(openbao_root_token) }}"
+    status_code: 200
+    validate_certs: no
+  when: openbao_root_token is defined
+
+- name: "OpenBao Secrets | Seed SearXNG secret"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/searxng"
+    method: POST
+    body_format: json
+    body:
+      data:
+        SEARXNG_SECRET_KEY: "{{ (lookup('password', '/dev/null chars=ascii_letters,digits length=32')) }}"
+    headers:
+      X-Vault-Token: "{{ openbao_admin_token | default(openbao_root_token) }}"
+    status_code: 200
+    validate_certs: no
+  when: openbao_root_token is defined
+
+- name: "OpenBao Secrets | Seed NSQD credentials"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/nsqd"
+    method: POST
+    body_format: json
+    body:
+      data:
+        NSQD_AUTH_PASSWORD: "{{ (lookup('password', '/dev/null chars=ascii_letters,digits,length=32')) }}"
+    headers:
+      X-Vault-Token: "{{ openbao_admin_token | default(openbao_root_token) }}"
+    status_code: 200
+    validate_certs: no
+  when: openbao_root_token is defined
+
+- name: "OpenBao Secrets | Seed SMTP credentials"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/smtp"
+    method: POST
+    body_format: json
+    body:
+      data:
+        SMTP_ADDR: "{{ smtp_addr | default('mail.smtp2go.com') }}"
+        SMTP_PORT: "{{ smtp_port | default('587') }}"
+        SMTP_USER: "{{ smtp_user | default('') }}"
+        SMTP_PASS: "{{ smtp_pass | default('') }}"
+        SMTP_FROM: "{{ smtp_from | default('noreply@iacgenie.com') }}"
+    headers:
+      X-Vault-Token: "{{ openbao_admin_token | default(openbao_root_token) }}"
+    status_code: 200
+    validate_certs: no
+  when: openbao_root_token is defined
+
+# =====================
+# Step 5: Report seeded secrets
+# =====================
+- name: "OpenBao Secrets | List KV paths"
+  ansible.builtin.command: docker exec iacgenie_openbao bao secrets list iacgenie/kv/
+  register: _kv_paths
+  changed_when: false
+  when: openbao_root_token is defined
+
+- name: "OpenBao Secrets | Report"
+  ansible.builtin.debug:
+    var: _kv_paths.stdout_lines
+  when: openbao_root_token is defined and _kv_paths.stdout_lines is defined

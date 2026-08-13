@@ -1,0 +1,58 @@
+# =============================================================================
+# Deploy Compose — deploy all infrastructure from unified template
+# =============================================================================
+
+- hosts: iacgenie-server
+  become: true
+
+  pre_tasks:
+    - name: "Ensure base directory exists"
+      ansible.builtin.file:
+        path: "/home/mkanavi/docker/iacgenie"
+        state: directory
+        owner: mkanavi
+        group: mkanavi
+        mode: "0755"
+
+  tasks:
+    - name: "Copy docker-compose.yml to target"
+      ansible.builtin.copy:
+        src: docker-compose/docker-compose-unified.yml
+        dest: /home/mkanavi/docker/iacgenie/docker-compose.yml
+        owner: mkanavi
+        group: mkanavi
+        mode: "0644"
+
+    - name: "Copy OpenBao HCL config to target"
+      ansible.builtin.copy:
+        src: openbao/prod.hcl
+        dest: /home/mkanavi/docker/iacgenie/openbao_data/openbao-prod.hcl
+        owner: mkanavi
+        group: mkanavi
+        mode: "0644"
+
+    - name: "Copy OpenBao backup script to target"
+      ansible.builtin.copy:
+        src: scripts/backup_openbao.py
+        dest: /home/mkanavi/docker/iacgenie/scripts/backup_openbao.py
+        owner: mkanavi
+        group: mkanavi
+        mode: "0755"
+
+    - name: "Verify compose file"
+      ansible.builtin.command: wc -l /home/mkanavi/docker/iacgenie/docker-compose.yml
+      changed_when: false
+
+    - name: "Deploy docker compose"
+      ansible.builtin.command: "docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.yml up -d"
+      register: compose_deploy
+      changed_when: "'Creating' in compose_deploy.stdout or 'Recreating' in compose_deploy.stdout"
+
+    - name: "Show deployment status"
+      ansible.builtin.command: "docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.yml ps"
+      register: deploy_status
+      changed_when: false
+
+    - name: "Show status"
+      ansible.builtin.debug:
+        var: deploy_status.stdout

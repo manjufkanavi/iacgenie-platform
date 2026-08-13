@@ -46,10 +46,10 @@
     - role: minio
 
     # Phase 3: OpenBao
-    - role: openbao
+    # - role: openbao
 
     # Phase 4: OpenBao secrets generation
-    - role: openbao-secrets
+    # - role: openbao-secrets
 
     # Phase 5: Runtime environment generation
     - role: deploy-env

@@ -19,25 +19,6 @@ services:
       - /home/mkanavi/docker/iacgenie/data/postgres:/var/lib/postgresql/data
     ports:
       - "127.0.0.1:5432:5432"
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: iacgenie_cloudflared
-    restart: unless-stopped
-    command: tunnel --no-autoupdate --credentials-file /etc/cloudflared/cert.json run iacgenie-pi
-    volumes:
-      - /home/mkanavi/docker/iacgenie/docker/cloudflared/auth.json:/etc/cloudflared/cert.json:ro
-    networks:
-      - iacgenie-frontend
-    deploy:
-      resources:
-        limits:
-          cpus: "0.25"
-          memory: "256m"
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-
 
     networks:
       - iacgenie-backend
@@ -74,25 +55,6 @@ services:
       - /home/mkanavi/docker/iacgenie/data/redis:/data
     ports:
       - "127.0.0.1:6379:6379"
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: iacgenie_cloudflared
-    restart: unless-stopped
-    command: tunnel --no-autoupdate --credentials-file /etc/cloudflared/cert.json run iacgenie-pi
-    volumes:
-      - /home/mkanavi/docker/iacgenie/docker/cloudflared/auth.json:/etc/cloudflared/cert.json:ro
-    networks:
-      - iacgenie-frontend
-    deploy:
-      resources:
-        limits:
-          cpus: "0.25"
-          memory: "256m"
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-
 
     networks:
       - iacgenie-backend
@@ -132,25 +94,6 @@ services:
       - /home/mkanavi/docker/iacgenie/data/minio:/data
     ports:
       - "127.0.0.1:9000:9000"
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: iacgenie_cloudflared
-    restart: unless-stopped
-    command: tunnel --no-autoupdate --credentials-file /etc/cloudflared/cert.json run iacgenie-pi
-    volumes:
-      - /home/mkanavi/docker/iacgenie/docker/cloudflared/auth.json:/etc/cloudflared/cert.json:ro
-    networks:
-      - iacgenie-frontend
-    deploy:
-      resources:
-        limits:
-          cpus: "0.25"
-          memory: "256m"
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-
 
     networks:
       - iacgenie-backend
@@ -182,25 +125,6 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:9001:9001"
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: iacgenie_cloudflared
-    restart: unless-stopped
-    command: tunnel --no-autoupdate --credentials-file /etc/cloudflared/cert.json run iacgenie-pi
-    volumes:
-      - /home/mkanavi/docker/iacgenie/docker/cloudflared/auth.json:/etc/cloudflared/cert.json:ro
-    networks:
-      - iacgenie-frontend
-    deploy:
-      resources:
-        limits:
-          cpus: "0.25"
-          memory: "256m"
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-
 
     networks:
       - iacgenie-frontend
@@ -221,48 +145,29 @@ services:
   # =====================
   # OpenBao 2.6.0
   # =====================
+  # Production-ready OpenBao with Raft storage, TLS via Nginx reverse proxy.
+  # Raft data at: /home/mkanavi/docker/iacgenie/openbao_raft/
+  # Storage configs at: /home/mkanavi/docker/iacgenie/data/openbao/
   openbao:
     image: openbao/openbao:2.6.0
     container_name: iacgenie_openbao
     restart: unless-stopped
-    # FIXED: Run as non-root (uid 100:gid 100)
     user: "100:100"
-    command: bao server -config=/openbao/storage/openbao-prod.hcl
+    # HCL at /openbao/raft/openbao-prod.hcl, storage at /openbao/raft
+    command: bao server -config=/openbao/raft/openbao-prod.hcl
     environment:
       OPENBAO_ADDR: http://127.0.0.1:8200
+      OPENBAO_CLUSTER_ADDR: http://127.0.0.1:8201
       OPENBAO_UI: "true"
-      OPENBAO_STORAGE_TYPE: raft
-      OPENBAO_STORAGE_PATH: /openbao/storage
       OPENBAO_LOG_LEVEL: info
-      # FIXED: Don't skip root privilege hardening
       BAO_SKIP_DROP_ROOT: "false"
-      OPENBAO_CLUSTER_ADDR: "http://0.0.0.0:8201"
+    # FIXED: Correct volume paths — raft data lives at openbao_raft/ not data/openbao_raft/
     volumes:
+      - /home/mkanavi/docker/iacgenie/openbao_raft:/openbao/raft
       - /home/mkanavi/docker/iacgenie/data/openbao:/openbao/storage
-      - /home/mkanavi/docker/iacgenie/data/openbao_raft:/openbao/raft
-      # FIXED: Removed /etc/letsencrypt mount — OpenBao should not have access to host TLS keys
     ports:
       - "127.0.0.1:8200:8200"
       - "127.0.0.1:8201:8201"
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: iacgenie_cloudflared
-    restart: unless-stopped
-    command: tunnel --no-autoupdate --credentials-file /etc/cloudflared/cert.json run iacgenie-pi
-    volumes:
-      - /home/mkanavi/docker/iacgenie/docker/cloudflared/auth.json:/etc/cloudflared/cert.json:ro
-    networks:
-      - iacgenie-frontend
-    deploy:
-      resources:
-        limits:
-          cpus: "0.25"
-          memory: "256m"
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-
 
     networks:
       - iacgenie-backend
@@ -312,25 +217,6 @@ services:
       - /home/mkanavi/docker/iacgenie/data/keycloak:/opt/keycloak/data
     ports:
       - "127.0.0.1:8083:8080"
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: iacgenie_cloudflared
-    restart: unless-stopped
-    command: tunnel --no-autoupdate --credentials-file /etc/cloudflared/cert.json run iacgenie-pi
-    volumes:
-      - /home/mkanavi/docker/iacgenie/docker/cloudflared/auth.json:/etc/cloudflared/cert.json:ro
-    networks:
-      - iacgenie-frontend
-    deploy:
-      resources:
-        limits:
-          cpus: "0.25"
-          memory: "256m"
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-
 
     networks:
       - iacgenie-backend
@@ -392,25 +278,6 @@ services:
     ports:
       - "127.0.0.1:3000:3000"
       - "127.0.0.1:2222:2222"
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: iacgenie_cloudflared
-    restart: unless-stopped
-    command: tunnel --no-autoupdate --credentials-file /etc/cloudflared/cert.json run iacgenie-pi
-    volumes:
-      - /home/mkanavi/docker/iacgenie/docker/cloudflared/auth.json:/etc/cloudflared/cert.json:ro
-    networks:
-      - iacgenie-frontend
-    deploy:
-      resources:
-        limits:
-          cpus: "0.25"
-          memory: "256m"
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-
 
     networks:
       - iacgenie-backend
@@ -454,25 +321,6 @@ services:
       LIGHTSERP_KEYCLOAK_CLIENT_SECRET: "${LIGHTSERP_KEYCLOAK_CLIENT_SECRET}"
     ports:
       - "127.0.0.1:8000:3000"
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: iacgenie_cloudflared
-    restart: unless-stopped
-    command: tunnel --no-autoupdate --credentials-file /etc/cloudflared/cert.json run iacgenie-pi
-    volumes:
-      - /home/mkanavi/docker/iacgenie/docker/cloudflared/auth.json:/etc/cloudflared/cert.json:ro
-    networks:
-      - iacgenie-frontend
-    deploy:
-      resources:
-        limits:
-          cpus: "0.25"
-          memory: "256m"
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-
 
     networks:
       - iacgenie-frontend
@@ -502,25 +350,6 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:3001:3070"
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: iacgenie_cloudflared
-    restart: unless-stopped
-    command: tunnel --no-autoupdate --credentials-file /etc/cloudflared/cert.json run iacgenie-pi
-    volumes:
-      - /home/mkanavi/docker/iacgenie/docker/cloudflared/auth.json:/etc/cloudflared/cert.json:ro
-    networks:
-      - iacgenie-frontend
-    deploy:
-      resources:
-        limits:
-          cpus: "0.25"
-          memory: "256m"
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-
 
     networks:
       - iacgenie-frontend
@@ -550,25 +379,6 @@ services:
       - "127.0.0.1:8082:8080"
     volumes:
       - /home/mkanavi/docker/iacgenie/data/searxng:/etc/searxng
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: iacgenie_cloudflared
-    restart: unless-stopped
-    command: tunnel --no-autoupdate --credentials-file /etc/cloudflared/cert.json run iacgenie-pi
-    volumes:
-      - /home/mkanavi/docker/iacgenie/docker/cloudflared/auth.json:/etc/cloudflared/cert.json:ro
-    networks:
-      - iacgenie-frontend
-    deploy:
-      resources:
-        limits:
-          cpus: "0.25"
-          memory: "256m"
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-
 
     networks:
       - iacgenie-frontend
@@ -607,25 +417,6 @@ services:
     ports:
       - "127.0.0.1:4150:4150"
       - "127.0.0.1:4151:4151"
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: iacgenie_cloudflared
-    restart: unless-stopped
-    command: tunnel --no-autoupdate --credentials-file /etc/cloudflared/cert.json run iacgenie-pi
-    volumes:
-      - /home/mkanavi/docker/iacgenie/docker/cloudflared/auth.json:/etc/cloudflared/cert.json:ro
-    networks:
-      - iacgenie-frontend
-    deploy:
-      resources:
-        limits:
-          cpus: "0.25"
-          memory: "256m"
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-
 
     networks:
       - iacgenie-messaging
@@ -662,25 +453,6 @@ services:
       LIGHTSERP_API_SECRET: "${LIGHTSERP_API_SECRET}"
     ports:
       - "127.0.0.1:8081:8082"
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: iacgenie_cloudflared
-    restart: unless-stopped
-    command: tunnel --no-autoupdate --credentials-file /etc/cloudflared/cert.json run iacgenie-pi
-    volumes:
-      - /home/mkanavi/docker/iacgenie/docker/cloudflared/auth.json:/etc/cloudflared/cert.json:ro
-    networks:
-      - iacgenie-frontend
-    deploy:
-      resources:
-        limits:
-          cpus: "0.25"
-          memory: "256m"
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-
 
     networks:
       - iacgenie-frontend
@@ -718,25 +490,6 @@ services:
       APP_ENV: "production"
     ports:
       - "127.0.0.1:3003:8000"
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: iacgenie_cloudflared
-    restart: unless-stopped
-    command: tunnel --no-autoupdate --credentials-file /etc/cloudflared/cert.json run iacgenie-pi
-    volumes:
-      - /home/mkanavi/docker/iacgenie/docker/cloudflared/auth.json:/etc/cloudflared/cert.json:ro
-    networks:
-      - iacgenie-frontend
-    deploy:
-      resources:
-        limits:
-          cpus: "0.25"
-          memory: "256m"
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-
 
     networks:
       - iacgenie-backend
@@ -769,25 +522,6 @@ services:
       NEXT_PUBLIC_PLATFORM_URL: "https://platform.iacgenie.com"
     ports:
       - "127.0.0.1:3002:80"
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: iacgenie_cloudflared
-    restart: unless-stopped
-    command: tunnel --no-autoupdate --credentials-file /etc/cloudflared/cert.json run iacgenie-pi
-    volumes:
-      - /home/mkanavi/docker/iacgenie/docker/cloudflared/auth.json:/etc/cloudflared/cert.json:ro
-    networks:
-      - iacgenie-frontend
-    deploy:
-      resources:
-        limits:
-          cpus: "0.25"
-          memory: "256m"
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-
 
     networks:
       - iacgenie-frontend
@@ -818,25 +552,6 @@ services:
       - "127.0.0.1:3004:3000"
     volumes:
       - /home/mkanavi/docker/iacgenie/data/grafana:/var/lib/grafana
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: iacgenie_cloudflared
-    restart: unless-stopped
-    command: tunnel --no-autoupdate --credentials-file /etc/cloudflared/cert.json run iacgenie-pi
-    volumes:
-      - /home/mkanavi/docker/iacgenie/docker/cloudflared/auth.json:/etc/cloudflared/cert.json:ro
-    networks:
-      - iacgenie-frontend
-    deploy:
-      resources:
-        limits:
-          cpus: "0.25"
-          memory: "256m"
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-
 
     networks:
       - iacgenie-frontend
@@ -865,25 +580,6 @@ services:
       - /home/mkanavi/docker/iacgenie/data/prometheus:/prometheus
     ports:
       - "127.0.0.1:9090:9090"
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: iacgenie_cloudflared
-    restart: unless-stopped
-    command: tunnel --no-autoupdate --credentials-file /etc/cloudflared/cert.json run iacgenie-pi
-    volumes:
-      - /home/mkanavi/docker/iacgenie/docker/cloudflared/auth.json:/etc/cloudflared/cert.json:ro
-    networks:
-      - iacgenie-frontend
-    deploy:
-      resources:
-        limits:
-          cpus: "0.25"
-          memory: "256m"
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-
 
     networks:
       - iacgenie-frontend
@@ -912,25 +608,6 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:9092:80"
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: iacgenie_cloudflared
-    restart: unless-stopped
-    command: tunnel --no-autoupdate --credentials-file /etc/cloudflared/cert.json run iacgenie-pi
-    volumes:
-      - /home/mkanavi/docker/iacgenie/docker/cloudflared/auth.json:/etc/cloudflared/cert.json:ro
-    networks:
-      - iacgenie-frontend
-    deploy:
-      resources:
-        limits:
-          cpus: "0.25"
-          memory: "256m"
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-
 
     networks:
       - iacgenie-frontend
@@ -957,25 +634,6 @@ services:
       - /home/mkanavi/docker/iacgenie/data/crowdsec-config:/etc/crowdsec
     ports:
       - "127.0.0.1:3033:8080"
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: iacgenie_cloudflared
-    restart: unless-stopped
-    command: tunnel --no-autoupdate --credentials-file /etc/cloudflared/cert.json run iacgenie-pi
-    volumes:
-      - /home/mkanavi/docker/iacgenie/docker/cloudflared/auth.json:/etc/cloudflared/cert.json:ro
-    networks:
-      - iacgenie-frontend
-    deploy:
-      resources:
-        limits:
-          cpus: "0.25"
-          memory: "256m"
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-
 
     networks:
       - iacgenie-frontend
@@ -1015,25 +673,6 @@ services:
       SERVICE_BACKENDS: "clamav:9092,pagegen:3032,crowdsec:3033,searxng:8084,default:9090"
     ports:
       - "127.0.0.1:9096:9096"
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: iacgenie_cloudflared
-    restart: unless-stopped
-    command: tunnel --no-autoupdate --credentials-file /etc/cloudflared/cert.json run iacgenie-pi
-    volumes:
-      - /home/mkanavi/docker/iacgenie/docker/cloudflared/auth.json:/etc/cloudflared/cert.json:ro
-    networks:
-      - iacgenie-frontend
-    deploy:
-      resources:
-        limits:
-          cpus: "0.25"
-          memory: "256m"
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-
 
     networks:
       - iacgenie-frontend
@@ -1060,25 +699,6 @@ services:
       - /home/mkanavi/docker/iacgenie/loki/loki-config.yaml:/etc/loki/local-config.yaml:ro
     ports:
       - "127.0.0.1:3100:3100"
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: iacgenie_cloudflared
-    restart: unless-stopped
-    command: tunnel --no-autoupdate --credentials-file /etc/cloudflared/cert.json run iacgenie-pi
-    volumes:
-      - /home/mkanavi/docker/iacgenie/docker/cloudflared/auth.json:/etc/cloudflared/cert.json:ro
-    networks:
-      - iacgenie-frontend
-    deploy:
-      resources:
-        limits:
-          cpus: "0.25"
-          memory: "256m"
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-
 
     networks:
       - iacgenie-frontend
@@ -1103,25 +723,6 @@ services:
       - /var/log:/var/log:ro
       - /home/mkanavi/docker/iacgenie/promtail/positions:/etc/promtail
       - /home/mkanavi/docker/iacgenie/promtail/promtail-config.yaml:/etc/promtail/config.yml:ro
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: iacgenie_cloudflared
-    restart: unless-stopped
-    command: tunnel --no-autoupdate --credentials-file /etc/cloudflared/cert.json run iacgenie-pi
-    volumes:
-      - /home/mkanavi/docker/iacgenie/docker/cloudflared/auth.json:/etc/cloudflared/cert.json:ro
-    networks:
-      - iacgenie-frontend
-    deploy:
-      resources:
-        limits:
-          cpus: "0.25"
-          memory: "256m"
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-
 
     networks:
       - iacgenie-frontend
@@ -1138,25 +739,6 @@ services:
 # =====================
 # Docker Network Segmentation
 # =====================
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: iacgenie_cloudflared
-    restart: unless-stopped
-    command: tunnel --no-autoupdate --credentials-file /etc/cloudflared/cert.json run iacgenie-pi
-    volumes:
-      - /home/mkanavi/docker/iacgenie/docker/cloudflared/auth.json:/etc/cloudflared/cert.json:ro
-    networks:
-      - iacgenie-frontend
-    deploy:
-      resources:
-        limits:
-          cpus: "0.25"
-          memory: "256m"
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-
 
 networks:
   # Frontend: nginx-exposed services

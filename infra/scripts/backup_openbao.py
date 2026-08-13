@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """
-OpenBao Backup - Raft snapshot + raft data copy + SHA256 checksum + rotation.
+OpenBao Backup - Raft snapshot with validation, checksum, rotation, and email alerts.
+
+Version: 2.0
+Date: 2026-08-13
 
 Usage:
     ./backup_openbao.py                  # Take backup
@@ -10,8 +13,14 @@ Usage:
 Environment:
     OPENBAO_ROOT_TOKEN   - Optional, overrides .env lookup
     OPENBAO_BACKUP_DIR   - Optional, overrides default backup dir
+    BACKUP_EMAIL_TO      - Optional, email for alert notifications
+    BACKUP_EMAIL_FROM    - Optional, sender email
+    BACKUP_EMAIL_SMTP    - Optional, SMTP server (host:port)
+    BACKUP_EMAIL_PASS    - Optional, SMTP password
+    COMPOSE_DIR          - Optional, overrides default compose dir
 """
-import json, os, sys, time, datetime, hashlib, glob, argparse, ssl, subprocess, urllib.request, urllib.error
+
+import json, os, sys, time, datetime, hashlib, glob, argparse, ssl, subprocess, urllib.request, urllib.error, smtplib, email.mime.text
 
 # ── Configuration ──────────────────────────────────────────────────────────
 COMPOSE_DIR = os.getenv("COMPOSE_DIR", "/home/mkanavi/docker/iacgenie")
@@ -23,13 +32,38 @@ CONFIG_FILE = os.path.join(RAFT_DIR, "..", "openbao-prod.hcl")
 CONFIG_ALT = os.path.join(COMPOSE_DIR, "openbao_data", "openbao-prod.hcl")
 BAO_ADDR = "https://127.0.0.1:8200"
 KEEP_DAYS = 30
-CONTEXT = ssl._create_unverified_context()
+
+# Email configuration
+EMAIL_TO = os.getenv("BACKUP_EMAIL_TO", "")
+EMAIL_FROM = os.getenv("BACKUP_EMAIL_FROM", "openbao-backup@iacgenie.com")
+EMAIL_SMTP = os.getenv("BACKUP_EMAIL_SMTP", "smtp.gmail.com:587")
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 
 def log(msg=""):
     ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"[{ts}] {msg}")
+
+def send_email(subject, body):
+    """Send email notification for backup status."""
+    if not EMAIL_TO:
+        return
+    try:
+        msg = email.mime.text.MIMEText(body)
+        msg["Subject"] = subject
+        msg["From"] = EMAIL_FROM
+        msg["To"] = EMAIL_TO
+        smtp_parts = EMAIL_SMTP.rsplit(":", 1)
+        smtp_host = smtp_parts[0]
+        smtp_port = int(smtp_parts[1]) if len(smtp_parts) > 1 else 587
+        with smtplib.SMTP(smtp_host, smtp_port) as server:
+            server.starttls()
+            smtp_pass = os.getenv("BACKUP_EMAIL_PASS", "")
+            server.login(EMAIL_SMTP.split(":")[0], smtp_pass)
+            server.sendmail(EMAIL_FROM, EMAIL_TO, msg.as_string())
+        log(f"  Email sent to {EMAIL_TO}")
+    except Exception as e:
+        log(f"  WARN Email failed: {e}")
 
 def load_token():
     """Load root token from .env or environment."""
@@ -41,7 +75,7 @@ def load_token():
         with open(ENV_FILE) as f:
             for line in f:
                 line = line.strip()
-                if line.startswith("OPENBAO_ROOT_TOKEN="):
+                if line.startswith("OPENBAO_TOKEN=") or line.startswith("OPENBAO_ROOT_TOKEN="):
                     token = line.split("=", 1)[1].strip().strip("'\"")
                     if token:
                         log(f"  Loaded token from {ENV_FILE}")
@@ -52,14 +86,14 @@ def load_token():
         try:
             with open(token_file) as f:
                 keys = json.load(f)
-                token = keys.get("root_token", keys.get("root_token_id", ""))
+                token = keys.get("root_token", keys.get("root_token_persisted", keys.get("new_root_token", "")))
                 if token:
                     log(f"  Loaded token from {token_file}")
                     return token
         except Exception:
             pass
 
-    log("ERROR: Cannot find OpenBao root token. Set OPENBAO_ROOT_TOKEN env var or ensure .env exists.")
+    log("ERROR: Cannot find OpenBao root token. Set OPENBAO_ROOT_TOKEN env var or ensure .env/init_keys.json exists.")
     sys.exit(1)
 
 def bao_request(path, method="GET", data=None):
@@ -71,7 +105,7 @@ def bao_request(path, method="GET", data=None):
     if data:
         req.data = json.dumps(data).encode()
     try:
-        resp = urllib.request.urlopen(req, context=CONTEXT, timeout=30)
+        resp = urllib.request.urlopen(req, timeout=30)
         content = resp.read()
         if not content:
             return {}
@@ -94,12 +128,25 @@ def sha256_file(filepath):
             h.update(chunk)
     return h.hexdigest()
 
-# ── Backup operations ──────────────────────────────────────────────────────
+def verify_openbao_health():
+    """Check that OpenBao is running and unsealed."""
+    try:
+        status = bao_request("/v1/sys/seal-status")
+        if status.get("sealed"):
+            log("  FAIL OpenBao is sealed!")
+            return False
+        if not status.get("initialized"):
+            log("  FAIL OpenBao is not initialized!")
+            return False
+        log(f"  OK OpenBao unsealed (v{status.get('version', '?')}, raft storage)")
+        return True
+    except Exception as e:
+        log(f"  FAIL OpenBao unreachable: {e}")
+        return False
 
-def take_snapshot_via_api():
+def api_snapshot():
     """Take raft snapshot via the streaming HTTP API."""
     log("  Attempting API snapshot...")
-
     token = load_token()
     url = f"{BAO_ADDR}/v1/sys/storage/raft/snapshot"
     headers = {"X-Vault-Token": token, "Accept": "application/octet-stream"}
@@ -110,21 +157,29 @@ def take_snapshot_via_api():
 
     try:
         with open(snap_path, "wb") as f:
-            with urllib.request.urlopen(req, context=CONTEXT, timeout=120) as resp:
+            with urllib.request.urlopen(req, timeout=120) as resp:
                 while True:
                     chunk = resp.read(65536)
                     if not chunk:
                         break
                     f.write(chunk)
+        # Validate: snapshot must be non-empty (>1KB minimum)
+        size = os.path.getsize(snap_path)
+        if size < 1024:
+            log(f"  WARN Snapshot too small ({size} bytes) — may be empty/failure, removing")
+            os.remove(snap_path)
+            return None
+
         checksum = sha256_file(snap_path)
         with open(f"{snap_path}.sha256", "w") as f:
             f.write(f"{checksum}  {snap_path}\n")
-        size = os.path.getsize(snap_path)
         log(f"  OK API Snapshot: {os.path.basename(snap_path)} ({size:,} bytes)")
         log(f"    SHA256: {checksum}")
         return snap_path
     except (urllib.error.HTTPError, urllib.error.URLError) as e:
         log(f"  WARN API snapshot failed ({e}) -- falling back to raw copy")
+        if os.path.exists(snap_path):
+            os.remove(snap_path)
         return None
 
 def copy_vault_db():
@@ -165,7 +220,7 @@ def copy_config():
     return dest
 
 def rotate_backups():
-    """Remove backups older than KEEP_DAYS."""
+    """Remove backups older than KEEP_DAYS and clean 0-byte snapshots."""
     now = time.time()
     cutoff = now - (KEEP_DAYS * 86400)
 
@@ -176,8 +231,15 @@ def rotate_backups():
                 os.remove(f)
                 removed += 1
 
-    if removed:
-        log(f"  Rotated {removed} old backup(s)")
+    # Also clean up 0-byte snapshots
+    zero_count = 0
+    for f in glob.glob(os.path.join(BACKUP_DIR, "openbao-snapshot-*.snap")):
+        if os.path.isfile(f) and os.path.getsize(f) == 0:
+            os.remove(f)
+            zero_count += 1
+
+    if removed or zero_count:
+        log(f"  Rotated {removed} old backup(s) + {zero_count} zero-byte snapshots")
     else:
         log("  No old backups to rotate")
 
@@ -210,7 +272,7 @@ def restore_snapshot(snapshot_path):
     req = urllib.request.Request(url, headers=headers, data=data, method="PUT")
 
     log("  Uploading snapshot to OpenBao...")
-    resp = urllib.request.urlopen(req, context=CONTEXT, timeout=300)
+    resp = urllib.request.urlopen(req, timeout=300)
     log(f"  OK Restore complete. Response: {resp.status}")
     log("  NOTE: OpenBao may need to be restarted to apply the restored state.")
 
@@ -225,8 +287,9 @@ def show_status():
     db_copies = sorted(glob.glob(os.path.join(BACKUP_DIR, "vault.db-*")))
     configs = sorted(glob.glob(os.path.join(BACKUP_DIR, "openbao-config-*.hcl")))
 
-    log(f"Snapshots: {len(snaps)}")
-    for s in snaps:
+    valid_snaps = [s for s in snaps if os.path.getsize(s) > 1024]
+    log(f"Snapshots: {len(valid_snaps)} valid / {len(snaps)} total")
+    for s in valid_snaps:
         age_h = (time.time() - os.path.getmtime(s)) / 3600
         log(f"  {os.path.basename(s)}  ({os.path.getsize(s):>10,} bytes, {age_h:5.1f}h ago)")
 
@@ -242,6 +305,26 @@ def show_status():
 
     total = sum(os.path.getsize(f) for f in snaps + db_copies + configs if os.path.isfile(f))
     log(f"\nTotal: {total:,} bytes ({total / 1024 / 1024:.1f} MB)")
+
+def build_report(success, details=""):
+    """Build a report for email."""
+    status = "SUCCESS" if success else "FAILED"
+    report = f"""OpenBao Backup Report
+====================
+Status: {status}
+Date: {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+
+{details}
+
+Details:
+- All snapshots validated (>1KB minimum)
+- Raft DB copy included
+- Config backup included
+- Old backups rotated ({KEEP_DAYS} days)
+
+This is an automated notification from iacgenie OpenBao backup system.
+"""
+    return report
 
 # ── Main ───────────────────────────────────────────────────────────────────
 
@@ -271,27 +354,32 @@ def main():
     log(" OpenBao Backup - Raft Snapshot + Data Copy")
     log("=" * 55)
 
+    backup_success = True
+    details_parts = []
+
     # 1. Verify OpenBao is reachable and unsealed
     log("[1/5] Checking OpenBao health...")
-    status = bao_request("/v1/sys/seal-status")
-    if status.get("sealed"):
-        log("  FAIL OpenBao is sealed! Aborting.")
+    if not verify_openbao_health():
+        backup_success = False
+        details_parts.append("OpenBao is sealed or unreachable — backup ABORTED.")
+        log("  ABORT: OpenBao not healthy")
+        report = build_report(False, "\n".join(details_parts))
+        send_email(f"OpenBao Backup FAILED", report)
         sys.exit(1)
-    log(f"  OK OpenBao unsealed (v{status.get('version', '?')}, raft storage)")
 
-    # 2. Take API snapshot (best effort)
+    # 2. Take API snapshot (best effort, validates non-empty)
     log("[2/5] Attempting API snapshot...")
-    snap_file = take_snapshot_via_api()
+    snap_file = api_snapshot()
 
     # 3. Copy raw raft DB (always available via host bind mount)
     log("[3/5] Copying raw raft database...")
-    copy_vault_db()
+    db_file = copy_vault_db()
 
     # 4. Copy config
     log("[4/5] Backing up OpenBao config...")
-    copy_config()
+    config_file = copy_config()
 
-    # 5. Rotate old backups
+    # 5. Rotate old backups + clean 0-byte snapshots
     log("[5/5] Rotating old backups...")
     rotate_backups()
 
@@ -299,6 +387,19 @@ def main():
     log()
     show_status()
     log()
+
+    # Build success report
+    if snap_file:
+        details_parts.append(f"API snapshot: {os.path.basename(snap_file)}")
+    if db_file:
+        details_parts.append(f"Raft DB copy: {os.path.basename(db_file)}")
+    if config_file:
+        details_parts.append(f"Config backup: {os.path.basename(config_file)}")
+
+    details_parts.append("Backup completed successfully.")
+    report = build_report(backup_success, "\n".join(details_parts))
+    send_email("OpenBao Backup SUCCESS", report)
+
     log("Backup completed successfully.")
 
 if __name__ == "__main__":

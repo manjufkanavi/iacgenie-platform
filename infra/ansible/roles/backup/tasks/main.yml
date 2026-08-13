@@ -1,33 +1,46 @@
----
+# =============================================================================
 # Backup role - Main entry point
-- name: "Backup | Deploy backup script"
-  ansible.builtin.template:
-    src: backup.sh.j2
-    dest: /usr/local/bin/backup.sh
-    owner: root
-    group: root
-    mode: "0755"
-  notify: Run backup
+# Deploys backup infrastructure and schedules per-service cron jobs
+# =============================================================================
 
-- name: "Backup | Deploy pgBackRest configuration"
-  ansible.builtin.template:
-    src: pgbackrest.conf.j2
-    dest: /etc/pgbackrest/pgbackrest.conf
-    owner: root
-    group: root
-    mode: "0644"
+- name: "Backup | Ensure OpenBao backup script exists on VM"
+  ansible.builtin.stat:
+    path: /home/mkanavi/docker/iacgenie/scripts/backup_openbao.py
+  register: openbao_backup_script
+  failed_when: false
 
-- name: "Backup | Create backup schedule"
+- name: "Backup | Notify: OpenBao backup script missing"
+  ansible.builtin.debug:
+    msg: "OpenBao backup script must be deployed by openbao role first"
+  when: not openbao_backup_script.stat.exists
+
+- name: "Backup | Create OpenBao backup cron schedule (every 6 hours)"
   ansible.builtin.cron:
-    name: "Daily backup"
+    name: "OpenBao Raft snapshot backup"
     minute: "0"
-    hour: "2"
-    job: "/usr/local/bin/backup.sh >> /var/log/backup.log 2>&1"
+    hour: "0,6,12,18"
+    job: "python3 /home/mkanavi/docker/iacgenie/scripts/backup_openbao.py >> /var/log/openbao-backup.log 2>&1"
+    user: mkanavi
+    state: present
 
-- name: "Backup | Verify backup directory exists"
+- name: "Backup | Create generic backup destination directory"
   ansible.builtin.file:
     path: "{{ backup_dest | default('/mnt/backups') }}"
     state: directory
     owner: root
     group: root
     mode: "0755"
+
+- name: "Backup | Remove stale cron entries (old daily backup)"
+  ansible.builtin.cron:
+    name: "Daily backup"
+    state: absent
+  ignore_errors: true
+
+- name: "Backup | Ensure backup log file exists"
+  ansible.builtin.file:
+    path: /var/log/openbao-backup.log
+    state: touch
+    owner: mkanavi
+    group: mkanavi
+    mode: "0644"

@@ -1,17 +1,11 @@
 ---
-# Handlers for docker-compose-generator
-# Note: Path changed from /home/mkanavi/docker/iacgenie/ to /home/mkanavi/docker/iacgenie/
-
 - name: Reload docker compose
-  ansible.builtin.command: docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.yml -p iacgenie up -d
-  changed_when: true
-  listen: "Reload docker compose"
+  ansible.builtin.command: "docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.yml up -d"
 
 - name: Wait for containers to be healthy
-  ansible.builtin.command: docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.yml -p iacgenie ps --filter "status=running" --format json
-  listen: "Reload docker compose"
-  register: _healthy_check
+  ansible.builtin.command: "docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.yml ps"
+  register: _compose_status
   changed_when: false
-  retries: 12
-  delay: 5
-  until: _healthy_check is succeeded
+  retries: 10
+  delay: 15
+  until: "'unhealthy' not in _compose_status.stdout"

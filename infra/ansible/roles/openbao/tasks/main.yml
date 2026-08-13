@@ -1,28 +1,123 @@
----
+# =============================================================================
 # OpenBao role - Main entry point
-- name: "OpenBao | Create data directory"
-  ansible.builtin.file:
-    path: "{{ openbao_data_dir }}"
-    owner: root
-    group: root
-    mode: "0700"
-    state: directory
+# Deploys OpenBao 2.6.0 as a Docker container with Raft storage
+# Managed by Ansible — updates must flow through docker-compose.yml
+# =============================================================================
 
-- name: "OpenBao | Deploy environment file"
-  ansible.builtin.template:
-    src: .env.j2
-    dest: /home/mkanavi/docker/iacgenie/.env.openbao
+- name: "OpenBao | Create data directories with secure permissions"
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - path: /home/mkanavi/docker/iacgenie/openbao_raft
+      owner: mkanavi
+      group: mkanavi
+      mode: "0750"
+    - path: /home/mkanavi/docker/iacgenie/data/openbao
+      owner: mkanavi
+      group: mkanavi
+      mode: "0755"
+    - path: /home/mkanavi/docker/iacgenie/scripts
+      owner: mkanavi
+      group: mkanavi
+      mode: "0755"
+  loop_control:
+    label: "{{ item.path }}"
+
+- name: "OpenBao | Deploy OpenBao HCL config"
+  ansible.builtin.copy:
+    src: prod.hcl
+    dest: /home/mkanavi/docker/iacgenie/openbao_raft/openbao-prod.hcl
     owner: mkanavi
     group: mkanavi
+    mode: "0644"
+  notify: Restart openbao
+
+- name: "OpenBao | Fix raft data permissions (vault.db, keys, certs sensitive)"
+  ansible.builtin.file:
+    path: /home/mkanavi/docker/iacgenie/openbao_raft
+    owner: mkanavi
+    group: mkanavi
+    mode: "0750"
+    recurse: true
+  ignore_errors: yes
+
+- name: "OpenBao | Fix init_keys.json permissions (if exists)"
+  ansible.builtin.file:
+    path: /home/mkanavi/docker/iacgenie/openbao_raft/init_keys.json
     mode: "0600"
-  notify: Reload docker compose
+    owner: mkanavi
+    group: mkanavi
+  ignore_errors: yes
+
+- name: "OpenBao | Deploy backup script"
+  ansible.builtin.copy:
+    src: ../../../scripts/backup_openbao.py
+    dest: /home/mkanavi/docker/iacgenie/scripts/backup_openbao.py
+    owner: mkanavi
+    group: mkanavi
+    mode: "0755"
+  notify: Restart openbao
+
+- name: "OpenBao | Create systemd watchdog timer for OpenBao health"
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/openbao-health-check.service
+    content: |
+      [Unit]
+      Description=OpenBao Health Check Watchdog
+      After=docker.service
+      Wants=docker.service
+
+      [Service]
+      Type=oneshot
+      User=mkanavi
+      ExecStart=/bin/bash -c '\
+        STATUS=$(docker inspect --format="{{.State.Status}}" iacgenie_openbao 2>/dev/null || echo "stopped"); \
+        if [ "$STATUS" != "running" ]; then \
+          echo "$(date) OpenBao is $STATUS, restarting..."; \
+          docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.yml restart openbao; \
+        fi \
+      '
+
+      [Install]
+      WantedBy=multi-user.target
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: "OpenBao | Create systemd watchdog timer unit"
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/openbao-health-check.timer
+    content: |
+      [Unit]
+      Description=Run OpenBao health check every 5 minutes
+      Requires=openbao-health-check.service
+
+      [Timer]
+      OnBootSec=2min
+      OnUnitActiveSec=5min
+      RandomizedDelaySec=30s
+      Unit=openbao-health-check.service
+
+      [Install]
+      WantedBy=timers.target
+
+- name: "OpenBao | Enable and start health check timer"
+  ansible.builtin.systemd:
+    name: openbao-health-check.timer
+    state: started
+    enabled: yes
+    daemon_reload: yes
 
 - name: "OpenBao | Verify OpenBao container is running"
-  ansible.builtin.command: docker ps -a --filter "name=iacgenie-openbao" --format "{{ '{{.Names}}' }}"
+  ansible.builtin.command: docker ps --filter "name=iacgenie_openbao" --format "{{ '{{.Names}}:{{.Status}}' }}"
   register: openbao_status
   changed_when: false
   failed_when: false
 
 - name: "OpenBao | Show OpenBao status"
   ansible.builtin.debug:
-    var: openbao_status.stdout_lines | default(['N/A - managed by docker-compose-generator'])
+    var: openbao_status.stdout
