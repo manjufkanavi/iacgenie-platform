@@ -1,31 +1,20 @@
 #!/usr/bin/env python3
-"""
-fetch-openbao-env.py
-====================
-Runtime script deployed by Ansible.
-Queries OpenBao KV v2 at all seeded paths and generates a unified .env file
-at /home/mkanavi/docker/iacgenie/.env for Docker Compose to consume.
-
-All secrets are retrieved from OpenBao using the admin token stored
-in the init_keys.json or from environment variable OPENBAO_TOKEN.
-
-Usage: python3 fetch-openbao-env.py
-"""
-
+"""Fetch secrets from OpenBao KV v2 and generate a .env file."""
 import json
 import os
-import sys
+import ssl
 import urllib.request
 import urllib.error
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 # =====================
 # Configuration
 # =====================
-OPENBAO_ADDR = os.getenv("OPENBAO_ADDR", "http://127.0.0.1:8200")
+OPENBAO_ADDR = os.getenv("OPENBAO_ADDR", "https://127.0.0.1:8200")
 OUTPUT_PATH = "/home/mkanavi/docker/iacgenie/.env"
-TOKEN_PATH = "/home/mkanavi/docker/iacgenie/data/openbao_raft/init_keys.json"
+TOKEN_PATH = "/home/mkanavi/docker/iacgenie/openbao_raft/init_keys.json"
+SSL_SKIP_VERIFY = True
 
 # All KV paths to fetch (matching openbao-secrets role)
 KV_PATHS = [
@@ -63,12 +52,21 @@ def get_token():
         return None
 
 
-def read_kv(path, token):
+def build_ssl_context():
+    """Build SSL context, optionally skipping verification."""
+    if SSL_SKIP_VERIFY:
+        return ssl._create_unverified_context()
+    return ssl.create_default_context()
+
+
+def read_kv(engine, path, token):
     """Read a secret from OpenBao KV v2."""
-    url = f"{OPENBAO_ADDR}/v1/{path}"
+    ctx = build_ssl_context()
+    # KV v2 requires: /v1/{engine}/data/{path}
+    url = f"{OPENBAO_ADDR}/v1/{engine}/data/{path}"
     req = urllib.request.Request(url, headers={"X-Vault-Token": token})
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with urllib.request.urlopen(req, context=ctx, timeout=10) as resp:
             data = json.loads(resp.read().decode())
             return data.get("data", {}).get("data", {})
     except urllib.error.HTTPError as e:
@@ -81,73 +79,122 @@ def read_kv(path, token):
         return None
 
 
-def build_database_url(postgres_data):
+def build_database_url(pg):
     """Build DATABASE_URL from postgres KV data."""
-    user = postgres_data.get("POSTGRES_USER", "iacgenie_pg")
-    password = postgres_data.get("POSTGRES_PASSWORD", "")
-    db = postgres_data.get("POSTGRES_DB", "iacgenie")
-    return f"postgresql://{user}:{password}@postgres:5432/{db}"
+    return f"postgresql://{pg.get('POSTGRES_USER', 'iacgenie_pg')}:{pg.get('POSTGRES_PASSWORD', '')}@postgres:5432/{pg.get('POSTGRES_DB', 'iacgenie')}"
 
 
 def generate_env(token):
-    """Generate the unified .env file from OpenBao KV."""
+    """Generate the unified .env content."""
     env_vars = {}
+    fetched_paths = []
 
     print(f"[INFO] Fetching secrets from OpenBao at {OPENBAO_ADDR}")
 
-    for kv_path in KV_PATHS:
-        data = read_kv(kv_path, token)
+    # iacgenie KV paths
+    for path in [
+        "kv/data/postgres",
+        "kv/data/redis",
+        "kv/data/minio",
+        "kv/data/keycloak_admin",
+        "kv/data/keycloak_db",
+        "kv/data/gitea_db",
+        "kv/data/gitea_admin",
+        "kv/data/lightserp",
+        "kv/data/jwt",
+        "kv/data/cloudflare",
+        "kv/data/grafana",
+        "kv/data/searxng",
+        "kv/data/nsqd",
+        "kv/data/smtp",
+    ]:
+        data = read_kv("iacgenie", path, token)
         if data:
-            print(f"[OK] {kv_path}")
-            # Flatten nested data to ENV vars
-            for key, value in data.items():
-                env_vars[key] = str(value)
+            env_vars.update(data)
+            fetched_paths.append(path)
+            print(f"[OK] iacgenie/{path}")
         else:
-            print(f"[SKIP] {kv_path} (not found or unreadable)")
+            print(f"[SKIP] iacgenie/{path} (not found or unreadable)")
 
-    # Build database URL from postgres data
+    # lightserp KV paths
+    for path in [
+        "data/config/lightserp_database_url",
+        "data/config/lightserp_api_secret",
+        "data/config/lightserp_keycloak_client_secret",
+        "data/config/redis_url",
+        "data/config/minio_access_key",
+        "data/config/minio_secret_key",
+    ]:
+        data = read_kv("lightserp", path, token)
+        if data:
+            # Map to env var names
+            env_vars[data.get("key", path).replace("data/config/", "").replace("_", "").upper()] = data.get("value", "")
+            fetched_paths.append(path)
+            print(f"[OK] lightserp/{path}")
+        else:
+            print(f"[SKIP] lightserp/{path} (not found or unreadable)")
+
+    # Build composite URLs
     if "POSTGRES_USER" in env_vars:
         pg_data = env_vars
-        env_vars["DATABASE_URL"] = build_database_url(env_vars)
+        env_vars["DATABASE_URL"] = build_database_url(pg_data)
 
-    # Build redis URL
     if "REDIS_PASSWORD" in env_vars:
         env_vars["REDIS_URL"] = f"redis://:${env_vars['REDIS_PASSWORD']}@redis:6379/0"
 
-    # Write .env file
-    try:
-        with open(OUTPUT_PATH, "w") as f:
-            f.write(f"# Unified environment — generated by fetch-openbao-env.py at {datetime.utcnow().isoformat()}\n")
-            f.write(f"# Managed by Ansible — do not edit manually\n")
-            f.write(f"# All secrets from OpenBao KV\n\n")
+    # Add OpenBao address
+    env_vars["OPENBAO_ADDR"] = OPENBAO_ADDR
 
-            for key in sorted(env_vars.keys()):
-                value = env_vars[key]
-                f.write(f"{key}={value}\n")
-
-        print(f"\n[OK] .env written to {OUTPUT_PATH} ({len(env_vars)} variables)")
-
-        # Set restrictive permissions
-        os.chmod(OUTPUT_PATH, 0o600)
-        print(f"[OK] File permissions set to 0600")
-
-    except IOError as e:
-        print(f"[ERROR] Failed to write {OUTPUT_PATH}: {e}")
-        sys.exit(1)
-
+    print(f"\n[FETCHED] {len(fetched_paths)}/{len(KV_PATHS)} paths from OpenBao")
     return env_vars
+
+
+def write_env(env_vars):
+    """Write the .env file."""
+    timestamp = datetime.now(timezone.utc).isoformat()
+    lines = [
+        "# Unified environment — generated by fetch-openbao-env.py",
+        f"# Generated at: {timestamp}",
+        "# WARNING: This file is auto-generated. Do not edit manually.",
+        "# Regenerate by running: python3 fetch-openbao-env.py",
+        "#",
+        "",
+    ]
+
+    # Sort keys for consistency
+    for key in sorted(env_vars.keys()):
+        value = env_vars[key]
+        if value:  # Skip empty values
+            lines.append(f"{key}={value}")
+        else:
+            lines.append(f"{key}=")
+
+    content = "\n".join(lines) + "\n"
+
+    # Write file with restricted permissions
+    fd = os.open(OUTPUT_PATH, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    try:
+        os.write(fd, content.encode())
+    finally:
+        os.close(fd)
+
+    return len(env_vars)
 
 
 def main():
     token = get_token()
     if not token:
         print("[ERROR] No OpenBao token available. Cannot fetch secrets.")
-        sys.exit(1)
+        exit(1)
 
     env_vars = generate_env(token)
     if not env_vars:
         print("[ERROR] No secrets fetched from OpenBao.")
-        sys.exit(1)
+        exit(1)
+
+    count = write_env(env_vars)
+    print(f"[OK] .env written to {OUTPUT_PATH} ({count} variables)")
+    print(f"[OK] File permissions set to 0600")
 
 
 if __name__ == "__main__":

@@ -15,7 +15,7 @@
     openbao_raft_dir: /home/mkanavi/docker/iacgenie/openbao_raft
     openbao_docker_compose: /home/mkanavi/docker/iacgenie
     openbao_hcl_dest: /home/mkanavi/docker/iacgenie/data/openbao/openbao-prod.hcl
-    openbao_hcl_dest_alt: /home/mkanavi/docker/iacgenie/data/openbao_raft/openbao-prod.hcl
+    openbao_hcl_dest_alt: /home/mkanavi/docker/iacgenie/openbao_raft/openbao-prod.hcl
     openbao_tls_cert: /etc/letsencrypt/live/vault.iacgenie.com/fullchain.pem
     openbao_tls_key: /etc/letsencrypt/live/vault.iacgenie.com/privkey.pem
 
@@ -52,7 +52,7 @@
 
     - name: "Phase 1 | Restart OpenBao container"
       ansible.builtin.command:
-        cmd: docker compose up -d iacgenie_openbao
+        cmd: docker compose up -d openbao
       args:
         chdir: "{{ openbao_docker_compose }}"
       when: tls_cert_status.results[0].stat.exists | default(false)
@@ -71,6 +71,7 @@
       ansible.builtin.command: >
         docker exec iacgenie_openbao bao status
         --address={{ openbao_addr }}
+        -tls-skip-verify
       register: bao_health
       retries: 20
       delay: 5
@@ -82,6 +83,7 @@
       ansible.builtin.command: >
         docker exec iacgenie_openbao bao status
         --address={{ openbao_addr }}
+        -tls-skip-verify
       register: bao_init_check
       changed_when: false
       ignore_errors: true
@@ -143,14 +145,21 @@
       ansible.builtin.command: >
         docker exec iacgenie_openbao bao secrets enable
         --address={{ openbao_addr }}
-        -path=iacgenie kv
+        -path=iacgenie kv-v2
       changed_when: true
 
     - name: "Phase 4 | Enable KV v2 secret engine (lightserp)"
       ansible.builtin.command: >
         docker exec iacgenie_openbao bao secrets enable
         --address={{ openbao_addr }}
-        -path=lightserp kv
+        -path=lightserp kv-v2
+      changed_when: true
+
+    - name: "Phase 4 | Enable KV v2 secret engine (terraform)"
+      ansible.builtin.command: >
+        docker exec iacgenie_openbao bao secrets enable
+        --address={{ openbao_addr }}
+        -path=terraform kv-v2
       changed_when: true
 
     - name: "Phase 4 | Enable Transit secret engine"
@@ -237,10 +246,11 @@
         docker exec iacgenie_openbao bao write
         --address={{ openbao_addr }}
         auth/approle/role/iacgenie-backend-svc
-        secret_id_ttl=0
+        secret_id_ttl=24h
         token_num_uses=0
         token_ttl=2h
         token_max_ttl=4h
+        token_bound_cidrs={{ vm_subnet | default('192.168.0.0/24') }}
         policies=iacgenie-backend-svc
       changed_when: true
 
@@ -249,10 +259,11 @@
         docker exec iacgenie_openbao bao write
         --address={{ openbao_addr }}
         auth/approle/role/lightserp-api-svc
-        secret_id_ttl=0
+        secret_id_ttl=24h
         token_num_uses=0
         token_ttl=2h
         token_max_ttl=4h
+        token_bound_cidrs={{ vm_subnet | default('192.168.0.0/24') }}
         policies=lightserp-api-svc
       changed_when: true
 
@@ -261,16 +272,17 @@
         docker exec iacgenie_openbao bao write
         --address={{ openbao_addr }}
         auth/approle/role/openbao-backup
-        secret_id_ttl=0
+        secret_id_ttl=24h
         token_num_uses=0
         token_ttl=1h
         token_max_ttl=2h
+        token_bound_cidrs={{ vm_subnet | default('192.168.0.0/24') }}
         policies=openbao-backup
       changed_when: true
 
     - name: "Phase 7 | Create AppRole credential dir on host"
       ansible.builtin.file:
-        path: "{{ openbao_docker_compose }}/openbao-appprope"
+        path: "{{ openbao_docker_compose }}/openbao-approle"
         state: directory
         owner: mkanavi
         group: mkanavi
@@ -315,7 +327,7 @@
     - name: "Phase 7 | Write iacgenie-backend AppRole credentials"
       ansible.builtin.copy:
         content: "{{ svc_backend_role_id.stdout | from_json | json_query('data.role_id') }}\n{{ svc_backend_secret_id.stdout | from_json | json_query('data.secret_id') }}\n"
-        dest: "{{ openbao_docker_compose }}/openbao-appprope/iacgenie-backend-creds.txt"
+        dest: "{{ openbao_docker_compose }}/openbao-approle/iacgenie-backend-creds.txt"
         owner: mkanavi
         group: mkanavi
         mode: "0600"
@@ -323,76 +335,56 @@
     - name: "Phase 7 | Write lightserp-api AppRole credentials"
       ansible.builtin.copy:
         content: "{{ svc_lightserp_role_id.stdout | from_json | json_query('data.role_id') }}\n{{ svc_lightserp_secret_id.stdout | from_json | json_query('data.secret_id') }}\n"
-        dest: "{{ openbao_docker_compose }}/openbao-appprope/lightserp-api-creds.txt"
+        dest: "{{ openbao_docker_compose }}/openbao-approle/lightserp-api-creds.txt"
         owner: mkanavi
         group: mkanavi
         mode: "0600"
 
     - name: "Phase 7 | Set credential file permissions"
       ansible.builtin.file:
-        path: "{{ openbao_docker_compose }}/openbao-appprope"
+        path: "{{ openbao_docker_compose }}/openbao-approle"
         owner: mkanavi
         group: mkanavi
         mode: "0750"
 
     # ── Phase 7.5: Store all service secrets in OpenBao ─────────────────
-    - name: "Phase 7.5 | Store iacgenie backend secrets in OpenBao"
-      ansible.builtin.command: >
-        docker exec iacgenie_openbao bao write
-        --address={{ openbao_addr }}
-        -format=json
-        iacgenie/data/config/platform/{{ item.path }}
-        {{ item.env }}={{ env[item.env] }}
-      loop:
-        - { path: "database_url", env: "DATABASE_URL" }
-        - { path: "redis_url", env: "REDIS_URL" }
-        - { path: "jwt_secret", env: "JWT_SECRET" }
-        - { path: "openbao_addr", env: "OPENBAO_ADDR" }
-      register: iacgenie_secrets
-      changed_when: "'data' in (iacgenie_secrets.results | last | default({}))"
+    # Deploy scripts
+    - name: "Phase 7.5 | Deploy env parser script"
+      ansible.builtin.copy:
+        src: roles/openbao/files/parse_env.py
+        dest: /tmp/parse_env.py
+        mode: "0755"
 
-    - name: "Phase 7.5 | Store iacgenie Keycloak admin secrets in OpenBao"
-      ansible.builtin.command: >
-        docker exec iacgenie_openbao bao write
-        --address={{ openbao_addr }}
-        -format=json
-        iacgenie/data/config/keycloak/{{ item.path }}
-        {{ item.env }}={{ env[item.env] }}
-      loop:
-        - { path: "kc_admin_user", env: "KEYCLOAK_ADMIN_USER" }
-        - { path: "kc_admin_password", env: "KEYCLOAK_ADMIN_PASSWORD" }
-      register: kc_secrets
-      changed_when: "'data' in (kc_secrets.results | last | default({}))"
+    - name: "Phase 7.5 | Deploy seed script"
+      ansible.builtin.copy:
+        src: roles/openbao/files/seed_openbao_kv.py
+        dest: /tmp/seed_openbao_kv.py
+        mode: "0755"
 
-    - name: "Phase 7.5 | Store iacgenie MinIO secrets in OpenBao"
+    # Parse .env file
+    - name: "Phase 7.5 | Parse .env file into dict"
       ansible.builtin.command: >
-        docker exec iacgenie_openbao bao write
-        --address={{ openbao_addr }}
-        -format=json
-        iacgenie/data/config/minio/{{ item.path }}
-        {{ item.env }}={{ env[item.env] }}
-      loop:
-        - { path: "minio_root_user", env: "MINIO_ROOT_USER" }
-        - { path: "minio_root_password", env: "MINIO_ROOT_PASSWORD" }
-      register: minio_secrets
-      changed_when: "'data' in (minio_secrets.results | last | default({}))"
+        python3 /tmp/parse_env.py {{ openbao_docker_compose }}/.env
+      register: _parsed_env
+      changed_when: false
 
-    - name: "Phase 7.5 | Store LightSerp secrets in OpenBao"
-      ansible.builtin.command: >
-        docker exec iacgenie_openbao bao write
-        --address={{ openbao_addr }}
-        -format=json
-        lightserp/data/config/{{ item.path }}
-        {{ item.env }}={{ env[item.env] }}
-      loop:
-        - { path: "lightserp_database_url", env: "LIGHTSERP_DATABASE_URL" }
-        - { path: "lightserp_api_secret", env: "LIGHTSERP_API_SECRET" }
-        - { path: "lightserp_keycloak_client_secret", env: "LIGHTSERP_KEYCLOAK_CLIENT_SECRET" }
-        - { path: "redis_url", env: "LIGHTSERP_REDIS_URL" }
-        - { path: "minio_access_key", env: "LIGHTSERP_MINIO_ACCESS_KEY" }
-        - { path: "minio_secret_key", env: "LIGHTSERP_MINIO_SECRET_KEY" }
-      register: lightserp_secrets
-      changed_when: "'data' in (lightserp_secrets.results | last | default({}))"
+    - name: "Phase 7.5 | Set parsed env fact"
+      ansible.builtin.set_fact:
+        env: "{{ _parsed_env.stdout | from_json }}"
+      changed_when: false
+
+    # Seed all secrets using Python script (handles special chars safely)
+    - name: "Phase 7.5 | Deploy seed script to VM"
+      ansible.builtin.copy:
+        src: roles/openbao/files/seed_openbao_kv.py
+        dest: /tmp/seed_openbao_kv.py
+        mode: "0755"
+
+    - name: "Phase 7.5 | Seed all secrets into OpenBao KV v2"
+      ansible.builtin.command: python3 /tmp/seed_openbao_kv.py
+      environment:
+        OPENBAO_ADDR: "{{ openbao_addr }}"
+      changed_when: true
 
     # ── Phase 8: Deploy scripts & configs ────────────────────────────────
     - name: "Phase 8 | Deploy backup script"
