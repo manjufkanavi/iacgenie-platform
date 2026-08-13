@@ -27,13 +27,16 @@
   loop_control:
     label: "{{ item.path }}"
 
-- name: "OpenBao | Deploy OpenBao HCL config"
+- name: "OpenBao | Deploy OpenBao HCL config (both paths for compatibility)"
   ansible.builtin.copy:
     src: prod.hcl
-    dest: /home/mkanavi/docker/iacgenie/openbao_raft/openbao-prod.hcl
+    dest: "{{ item }}"
     owner: mkanavi
     group: mkanavi
     mode: "0644"
+  loop:
+    - /home/mkanavi/docker/iacgenie/openbao_raft/openbao-prod.hcl
+    - /home/mkanavi/docker/iacgenie/data/openbao_raft/openbao-prod.hcl
   notify: Restart openbao
 
 - name: "OpenBao | Fix raft data permissions (vault.db, keys, certs sensitive)"
