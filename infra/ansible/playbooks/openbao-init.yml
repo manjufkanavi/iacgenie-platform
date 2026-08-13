@@ -1,34 +1,105 @@
 ---
 # Initialize and configure OpenBao after first deploy
 # Run once to bootstrap: init, unseal, enable engines, create policies
+#
+# Usage:
+#   ansible-playbook -i hosts infra/ansible/playbooks/openbao-init.yml
+#   ansible-playbook -i hosts infra/ansible/playbooks/openbao-init.yml --skip-tasks=init
+#
 - hosts: iacgenie-server
   become: true
   vars:
-    openbao_addr: "http://127.0.0.1:8200"
+    # TLS: OpenBao now uses HTTPS directly
+    openbao_addr: "https://127.0.0.1:8200"
+    openbao_skip_tls_verify: true
     openbao_raft_dir: /home/mkanavi/docker/iacgenie/openbao_raft
+    openbao_docker_compose: /home/mkanavi/docker/iacgenie
+    openbao_hcl_dest: /home/mkanavi/docker/iacgenie/data/openbao/openbao-prod.hcl
+    openbao_hcl_dest_alt: /home/mkanavi/docker/iacgenie/data/openbao_raft/openbao-prod.hcl
+    openbao_tls_cert: /etc/letsencrypt/live/vault.iacgenie.com/fullchain.pem
+    openbao_tls_key: /etc/letsencrypt/live/vault.iacgenie.com/privkey.pem
 
   tasks:
-    - name: "OpenBao Init | Wait for container to be ready"
+    # ── Phase 1: Config deployment ───────────────────────────────────────
+    - name: "Phase 1 | Deploy OpenBao HCL config"
+      ansible.builtin.copy:
+        src: roles/openbao/files/prod.hcl
+        dest: "{{ openbao_hcl_dest }}"
+        owner: mkanavi
+        group: mkanavi
+        mode: "0644"
+
+    - name: "Phase 1 | Deploy OpenBao HCL config (alt path for compose)"
+      ansible.builtin.copy:
+        src: roles/openbao/files/prod.hcl
+        dest: "{{ openbao_hcl_dest_alt }}"
+        owner: mkanavi
+        group: mkanavi
+        mode: "0644"
+
+    - name: "Phase 1 | Ensure TLS certs exist"
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - "{{ openbao_tls_cert }}"
+        - "{{ openbao_tls_key }}"
+      register: tls_cert_status
+
+    - name: "Phase 1 | Show TLS cert status"
+      ansible.builtin.debug:
+        msg: "TLS cert at {{ item.item }}: {{ item.stat.exists | default(false) }}"
+      loop: "{{ tls_cert_status.results }}"
+
+    - name: "Phase 1 | Restart OpenBao container"
+      ansible.builtin.command:
+        cmd: docker compose up -d iacgenie_openbao
+      args:
+        chdir: "{{ openbao_docker_compose }}"
+      when: tls_cert_status.results[0].stat.exists | default(false)
+
+    # ── Phase 2: Wait for OpenBao to be ready ────────────────────────────
+    - name: "Phase 2 | Wait for OpenBao container to be running"
       ansible.builtin.command: >
         docker inspect --format='{{ '{{' }}.State.Status{{ '}}' }}'
         iacgenie_openbao
-      register: bao_status
+      register: bao_container_status
       retries: 12
       delay: 5
-      until: bao_status.stdout == 'running'
+      until: bao_container_status.stdout == 'running'
 
-    - name: "OpenBao Init | Initialize OpenBao (3 shares, threshold 2)"
+    - name: "Phase 2 | Wait for OpenBao API to respond"
+      ansible.builtin.command: >
+        docker exec iacgenie_openbao bao status
+        --address={{ openbao_addr }}
+      register: bao_health
+      retries: 20
+      delay: 5
+      until: bao_health.rc == 0
+      changed_when: false
+
+    # ── Phase 3: Initialize (only if not already) ─────────────────────────
+    - name: "Phase 3 | Check if OpenBao is already initialized"
+      ansible.builtin.command: >
+        docker exec iacgenie_openbao bao status
+        --address={{ openbao_addr }}
+      register: bao_init_check
+      changed_when: false
+      ignore_errors: true
+
+    - name: "Phase 3 | Initialize OpenBao (3 shares, threshold 2)"
       ansible.builtin.command: >
         docker exec iacgenie_openbao bao operator init
-        -address={{ openbao_addr }}
+        --address={{ openbao_addr }}
         -key-shares=3
         -key-threshold=2
         -format=json
       register: init_result
-      changed_when: init_result.stdout is not search('Initialized')
-      failed_when: false
+      when:
+        - init_result is not defined
+        - '"sealed" not in (bao_init_check.stdout | default(""))'
+      changed_when: init_result is succeeded and not ("Already Initialized" in init_result.stdout)
 
-    - name: "OpenBao Init | Save unseal keys and root token"
+    - name: "Phase 3 | Save unseal keys and root token"
       ansible.builtin.copy:
         content: "{{ init_result.stdout }}"
         dest: "{{ item }}"
@@ -38,98 +109,109 @@
       loop:
         - "{{ openbao_raft_dir }}/init_keys.json"
         - /home/mkanavi/docker/iacgenie/data/openbao_raft/init_keys.json
-      when: init_result.stdout is not search('Already Initialized')
-      notify: Restart openbao
+      when:
+        - init_result is succeeded
+        - not ("Already Initialized" in init_result.stdout)
 
-    - name: "OpenBao Init | Extract unseal keys"
+    - name: "Phase 3 | Extract unseal keys"
       ansible.builtin.set_fact:
         openbao_unseal_keys: "{{ init_result.stdout | from_json | json_query('unseal_keys_b64') }}"
-      when: init_result.stdout is not search('Already Initialized')
+      when:
+        - init_result is succeeded
+        - not ("Already Initialized" in init_result.stdout)
 
-    - name: "OpenBao Init | Unseal key 1/3"
+    - name: "Phase 3 | Unseal key 1/3"
       ansible.builtin.command: >
         docker exec iacgenie_openbao bao operator unseal
         --address={{ openbao_addr }}
         {{ openbao_unseal_keys[0] }}
-      when: openbao_unseal_keys is defined
+      when:
+        - openbao_unseal_keys is defined
+        - init_result is succeeded
 
-    - name: "OpenBao Init | Unseal key 2/3"
+    - name: "Phase 3 | Unseal key 2/3"
       ansible.builtin.command: >
         docker exec iacgenie_openbao bao operator unseal
         --address={{ openbao_addr }}
         {{ openbao_unseal_keys[1] }}
-      when: openbao_unseal_keys is defined
+      when:
+        - openbao_unseal_keys is defined
+        - init_result is succeeded
 
-    - name: "OpenBao Init | Enable KV v2 secret engine (iacgenie)"
+    # ── Phase 4: Enable secret engines ───────────────────────────────────
+    - name: "Phase 4 | Enable KV v2 secret engine (iacgenie)"
       ansible.builtin.command: >
         docker exec iacgenie_openbao bao secrets enable
-        -address={{ openbao_addr }}
+        --address={{ openbao_addr }}
         -path=iacgenie kv
       changed_when: true
 
-    - name: "OpenBao Init | Enable KV v2 secret engine (lightserp)"
+    - name: "Phase 4 | Enable KV v2 secret engine (lightserp)"
       ansible.builtin.command: >
         docker exec iacgenie_openbao bao secrets enable
-        -address={{ openbao_addr }}
+        --address={{ openbao_addr }}
         -path=lightserp kv
       changed_when: true
 
-    - name: "OpenBao Init | Enable Transit secret engine"
+    - name: "Phase 4 | Enable Transit secret engine"
       ansible.builtin.command: >
         docker exec iacgenie_openbao bao secrets enable
-        -address={{ openbao_addr }}
+        --address={{ openbao_addr }}
         transit
       changed_when: true
 
-    - name: "OpenBao Init | Enable Database secret engine"
+    - name: "Phase 4 | Enable Database secret engine"
       ansible.builtin.command: >
         docker exec iacgenie_openbao bao secrets enable
-        -address={{ openbao_addr }}
+        --address={{ openbao_addr }}
         database
       changed_when: true
 
-    - name: "OpenBao Init | Enable SSH secret engine"
+    - name: "Phase 4 | Enable SSH secret engine"
       ansible.builtin.command: >
         docker exec iacgenie_openbao bao secrets enable
-        -address={{ openbao_addr }}
+        --address={{ openbao_addr }}
         ssh
       changed_when: true
 
-    - name: "OpenBao Init | Enable AppRole auth method"
+    # ── Phase 5: Enable AppRole auth ─────────────────────────────────────
+    - name: "Phase 5 | Enable AppRole auth method"
       ansible.builtin.command: >
         docker exec iacgenie_openbao bao auth enable
-        -address={{ openbao_addr }}
+        --address={{ openbao_addr }}
         approle
       changed_when: true
 
-    - name: "OpenBao Init | Deploy iacgenie-backend policy"
+    # ── Phase 6: Deploy policies ─────────────────────────────────────────
+    - name: "Phase 6 | Deploy iacgenie-backend policy"
       ansible.builtin.copy:
-        src: roles/openbao/files/policies/iacgenie-backend.hcl
+        content: "{{ lookup('file', 'roles/openbao/files/policies/iacgenie-backend.hcl') }}"
         dest: /tmp/iacgenie-backend-policy.hcl
 
-    - name: "OpenBao Init | Apply iacgenie-backend policy"
+    - name: "Phase 6 | Apply iacgenie-backend policy"
       ansible.builtin.command: >
         docker exec iacgenie_openbao bao policy write
-        -address={{ openbao_addr }}
+        --address={{ openbao_addr }}
         iacgenie-backend /tmp/iacgenie-backend-policy.hcl
       changed_when: true
 
-    - name: "OpenBao Init | Deploy lightserp policy"
+    - name: "Phase 6 | Deploy lightserp policy"
       ansible.builtin.copy:
-        src: roles/openbao/files/policies/lightserp.hcl
+        content: "{{ lookup('file', 'roles/openbao/files/policies/lightserp.hcl') }}"
         dest: /tmp/lightserp-policy.hcl
 
-    - name: "OpenBao Init | Apply lightserp policy"
+    - name: "Phase 6 | Apply lightserp policy"
       ansible.builtin.command: >
         docker exec iacgenie_openbao bao policy write
-        -address={{ openbao_addr }}
+        --address={{ openbao_addr }}
         lightserp /tmp/lightserp-policy.hcl
       changed_when: true
 
-    - name: "OpenBao Init | Create AppRole for iacgenie-backend"
+    # ── Phase 7: Create AppRole roles ────────────────────────────────────
+    - name: "Phase 7 | Create AppRole for iacgenie-backend"
       ansible.builtin.command: >
         docker exec iacgenie_openbao bao write
-        -address={{ openbao_addr }}
+        --address={{ openbao_addr }}
         auth/approle/role/iacgenie-backend
         secret_id_ttl=0
         token_num_uses=0
@@ -138,10 +220,10 @@
         policies=iacgenie-backend
       changed_when: true
 
-    - name: "OpenBao Init | Create AppRole for LightSerp"
+    - name: "Phase 7 | Create AppRole for LightSerp"
       ansible.builtin.command: >
         docker exec iacgenie_openbao bao write
-        -address={{ openbao_addr }}
+        --address={{ openbao_addr }}
         auth/approle/role/lightserp
         secret_id_ttl=0
         token_num_uses=0
@@ -150,13 +232,30 @@
         policies=lightserp
       changed_when: true
 
-    - name: "OpenBao Init | Verify OpenBao is unsealed"
+    # ── Phase 8: Deploy backup script ────────────────────────────────────
+    - name: "Phase 8 | Deploy backup script"
+      ansible.builtin.copy:
+        src: roles/openbao/files/backup_openbao.py
+        dest: /home/mkanavi/docker/iacgenie/scripts/backup_openbao.py
+        owner: mkanavi
+        group: mkanavi
+        mode: "0755"
+
+    - name: "Phase 8 | Configure backup cron (every 6 hours)"
+      ansible.builtin.cron:
+        name: "OpenBao Raft snapshot backup"
+        minute: "0"
+        hour: "0,6,12,18"
+        job: "python3 /home/mkanavi/docker/iacgenie/scripts/backup_openbao.py >> /var/log/openbao-backup.log 2>&1"
+
+    # ── Phase 9: Verify ──────────────────────────────────────────────────
+    - name: "Phase 9 | Final OpenBao status"
       ansible.builtin.command: >
         docker exec iacgenie_openbao bao status
         --address={{ openbao_addr }}
       register: bao_final
       changed_when: false
 
-    - name: "OpenBao Init | Show final status"
+    - name: "Phase 9 | Show final status"
       ansible.builtin.debug:
         var: bao_final.stdout_lines

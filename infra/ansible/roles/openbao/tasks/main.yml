@@ -58,7 +58,7 @@
 
 - name: "OpenBao | Deploy backup script"
   ansible.builtin.copy:
-    src: ../../../scripts/backup_openbao.py
+    src: files/backup_openbao.py
     dest: /home/mkanavi/docker/iacgenie/scripts/backup_openbao.py
     owner: mkanavi
     group: mkanavi

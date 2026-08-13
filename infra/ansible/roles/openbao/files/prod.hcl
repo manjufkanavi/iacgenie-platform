@@ -17,15 +17,17 @@ telemetry {
   disable_hostname          = true
 }
 
-# === Listener (HTTP for Nginx proxy termination) ===
-# Nginx handles TLS, OpenBao serves plain HTTP
+# === Listener (TLS directly — Let's Encrypt certs mounted via Docker) ===
 listener "tcp" {
   address     = "0.0.0.0:8200"
-  tls_disable = 1
+  tls_disable = 0
+
+  tls_cert_file = "/etc/openbao/tls/fullchain.pem"
+  tls_key_file  = "/etc/openbao/tls/privkey.pem"
 }
 
-# === Cluster address (internal, TLS disabled for single-node) ===
-cluster_addr = "http://127.0.0.1:8201"
+# === Cluster address (TLS for single-node) ===
+cluster_addr = "https://127.0.0.1:8201"
 
 # === Storage (Raft) ===
 storage "raft" {
@@ -50,8 +52,8 @@ storage "raft" {
 default_lease_ttl = "768h"
 max_lease_ttl     = "768h"
 
-# === API Addr (for cluster discovery) ===
-api_addr = "http://127.0.0.1:8200"
+# === API Addr (for cluster discovery — TLS) ===
+api_addr = "https://127.0.0.1:8200"
 
 # === Log level ===
 # NOTE: Log level is controlled via OPENBAO_LOG_LEVEL env var

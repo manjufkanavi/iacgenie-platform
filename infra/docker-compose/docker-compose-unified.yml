@@ -136,8 +136,8 @@ services:
     command: bao server -config=/openbao/storage/openbao-prod.hcl
     user: 0:0
     environment:
-      OPENBAO_ADDR: http://127.0.0.1:8200
-      OPENBAO_CLUSTER_ADDR: http://127.0.0.1:8201
+      OPENBAO_ADDR: https://127.0.0.1:8200
+      OPENBAO_CLUSTER_ADDR: https://127.0.0.1:8201
       OPENBAO_UI: 'true'
       OPENBAO_LOG_LEVEL: info
       BAO_SKIP_DROP_ROOT: 'true'
@@ -156,7 +156,7 @@ services:
       - /usr/bin/bao
       - status
       - --address
-      - http://127.0.0.1:8200
+      - https://127.0.0.1:8200
       interval: 30s
       timeout: 10s
       retries: 3
