@@ -1,5 +1,8 @@
----
+# =============================================================================
 # Nginx role - Main entry point
+# Deploy unified reverse proxy config with security headers and vault.vHost
+# =============================================================================
+
 - name: "Nginx | Ensure Nginx is installed"
   ansible.builtin.apt:
     name: nginx
@@ -23,6 +26,15 @@
     mode: "0644"
   notify: Restart nginx
 
+- name: "Nginx | Deploy OpenBao vHost configuration"
+  ansible.builtin.copy:
+    src: vault-iacgenie.conf
+    dest: /etc/nginx/conf.d/vault-iacgenie.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart nginx
+
 - name: "Nginx | Remove stale unified config files"
   ansible.builtin.file:
     path: "{{ item }}"
@@ -38,8 +50,8 @@
   changed_when: false
   failed_when: false
 
-- name: "Nginx | Ensure Nginx is running"
+- name: "Nginx | Stop and disable Nginx host service"
   ansible.builtin.service:
     name: nginx
-    state: started
-    enabled: yes
+    state: stopped
+    enabled: no

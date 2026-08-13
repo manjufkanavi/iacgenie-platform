@@ -1,11 +1,5 @@
 ---
-# Nginx role - Handlers
+# Handlers for nginx role
 - name: Restart nginx
-  ansible.builtin.systemd:
-    name: nginx
-    state: restarted
-    daemon_reload: yes
-
-- name: Test nginx config
-  ansible.builtin.command: nginx -t
-  changed_when: false
+  ansible.builtin.command: docker restart iacgenie-nginx
+  ignore_errors: yes
