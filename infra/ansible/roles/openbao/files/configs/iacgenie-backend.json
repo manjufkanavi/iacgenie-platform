@@ -1,0 +1,14 @@
+{
+  "secret_paths": {
+    "DATABASE_URL": "iacgenie/data/config/platform/database_url",
+    "REDIS_URL": "iacgenie/data/config/platform/redis_url",
+    "MINIO_ACCESS_KEY": "iacgenie/data/config/minio/minio_root_user",
+    "MINIO_SECRET_KEY": "iacgenie/data/config/minio/minio_root_password",
+    "JWT_SECRET": "iacgenie/data/config/platform/jwt_secret",
+    "OPENBAO_ADDR": "iacgenie/data/config/platform/openbao_addr",
+    "KC_BOOTSTRAP_ADMIN_USERNAME": "iacgenie/data/config/keycloak/kc_admin_user",
+    "KC_BOOTSTRAP_ADMIN_PASSWORD": "iacgenie/data/config/keycloak/kc_admin_password"
+  },
+  "openbao_addr": "http://openbao:8200",
+  "approle_cred_file": "/var/run/approle/iacgenie-backend-svc-creds.txt"
+}

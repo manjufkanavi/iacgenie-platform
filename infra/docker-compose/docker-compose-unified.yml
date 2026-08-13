@@ -145,6 +145,7 @@ services:
     - /home/mkanavi/docker/iacgenie/data/openbao:/openbao/storage
     - /home/mkanavi/docker/iacgenie/data/openbao_raft:/openbao/raft
     - /etc/letsencrypt:/etc/letsencrypt
+    - openbao-appprope:/var/run/approle
     ports:
     - 127.0.0.1:8200:8200
     - 127.0.0.1:8201:8201
@@ -305,6 +306,7 @@ services:
     - minio
     - nsqd
     - searxng
+    - openbao
     deploy:
       resources:
         limits:
@@ -314,6 +316,15 @@ services:
     - no-new-privileges:true
     cap_drop:
     - ALL
+    volumes:
+    - ../ansible/roles/openbao/files/inject-secrets.sh:/usr/local/bin/inject-secrets.sh:ro
+    - ../ansible/roles/openbao/files/openbao_injector.py:/usr/local/bin/openbao_injector.py:ro
+    - ../ansible/roles/openbao/files/configs:/etc/openbao-config:ro
+    - openbao-appprope:/var/run/approle
+    entrypoint:
+    - /usr/local/bin/inject-secrets.sh
+    - lightserp-api
+    - --
   lightserp-webui:
     image: lightserp-lightserp-webui:latest
     container_name: iacgenie_lightserp_webui
@@ -450,6 +461,7 @@ services:
     - redis
     - nsqd
     - keycloak
+    - openbao
     deploy:
       resources:
         limits:
@@ -459,6 +471,15 @@ services:
     - no-new-privileges:true
     cap_drop:
     - ALL
+    volumes:
+    - ../ansible/roles/openbao/files/inject-secrets.sh:/usr/local/bin/inject-secrets.sh:ro
+    - ../ansible/roles/openbao/files/openbao_injector.py:/usr/local/bin/openbao_injector.py:ro
+    - ../ansible/roles/openbao/files/configs:/etc/openbao-config:ro
+    - openbao-appprope:/var/run/approle
+    entrypoint:
+    - /usr/local/bin/inject-secrets.sh
+    - iacgenie-backend
+    - --
   iacgenie-frontend:
     image: iacgenie-frontend:latest
     container_name: iacgenie_frontend
@@ -535,8 +556,7 @@ services:
     image: cloudflare/cloudflared:latest
     container_name: iacgenie_cloudflared
     restart: unless-stopped
-    command: tunnel --no-autoupdate --credentials-file /etc/cloudflared/cert.json
-      run iacgenie-pi
+    command: tunnel --no-autoupdate --credentials-file /etc/cloudflared/cert.json run iacgenie-pi
     environment: {}
     networks:
     - iacgenie-frontend
@@ -684,17 +704,15 @@ services:
           memory: 256m
     security_opt:
     - no-new-privileges:true
-
   nginx:
     image: nginx:1.25-alpine
     container_name: iacgenie-nginx
     restart: unless-stopped
-    network_mode: "host"
+    network_mode: host
     volumes:
     - /etc/nginx/conf.d:/etc/nginx/conf.d:ro
     - /etc/letsencrypt:/etc/letsencrypt:ro
     - /etc/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-
 networks:
   iacgenie-frontend:
     driver: bridge
@@ -702,3 +720,5 @@ networks:
     driver: bridge
   iacgenie-messaging:
     driver: bridge
+volumes:
+  openbao-appprope: null

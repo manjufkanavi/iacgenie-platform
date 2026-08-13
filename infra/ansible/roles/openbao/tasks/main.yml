@@ -65,6 +65,49 @@
     mode: "0755"
   notify: Restart openbao
 
+- name: "OpenBao | Deploy OpenBao injector script"
+  ansible.builtin.copy:
+    src: files/openbao_injector.py
+    dest: /home/mkanavi/docker/iacgenie/scripts/openbao_injector.py
+    owner: mkanavi
+    group: mkanavi
+    mode: "0755"
+
+- name: "OpenBao | Deploy injector entrypoint wrapper"
+  ansible.builtin.copy:
+    src: files/inject-secrets.sh
+    dest: /home/mkanavi/docker/iacgenie/scripts/inject-secrets.sh
+    owner: mkanavi
+    group: mkanavi
+    mode: "0755"
+
+- name: "OpenBao | Deploy service config files"
+  ansible.builtin.copy:
+    src: "files/configs/{{ item }}"
+    dest: "/home/mkanavi/docker/iacgenie/openbao-configs/{{ item }}"
+    owner: mkanavi
+    group: mkanavi
+    mode: "0644"
+  loop:
+    - iacgenie-backend.json
+    - lightserp-api.json
+
+- name: "OpenBao | Create config symlink dir"
+  ansible.builtin.file:
+    path: /home/mkanavi/docker/iacgenie/openbao-configs
+    state: directory
+    owner: mkanavi
+    group: mkanavi
+    mode: "0755"
+
+- name: "OpenBao | Create AppRole credential dir"
+  ansible.builtin.file:
+    path: /home/mkanavi/docker/iacgenie/openbao-appprope
+    state: directory
+    owner: mkanavi
+    group: mkanavi
+    mode: "0750"
+
 - name: "OpenBao | Create systemd watchdog timer for OpenBao health"
   ansible.builtin.copy:
     dest: /etc/systemd/system/openbao-health-check.service

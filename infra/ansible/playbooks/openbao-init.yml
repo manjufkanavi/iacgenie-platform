@@ -232,11 +232,164 @@
         policies=lightserp
       changed_when: true
 
-    # ── Phase 8: Deploy backup script ────────────────────────────────────
+    - name: "Phase 7 | Create AppRole for iacgenie-backend service"
+      ansible.builtin.command: >
+        docker exec iacgenie_openbao bao write
+        --address={{ openbao_addr }}
+        auth/approle/role/iacgenie-backend-svc
+        secret_id_ttl=0
+        token_num_uses=0
+        token_ttl=24h
+        token_max_ttl=48h
+        policies=iacgenie-backend
+      changed_when: true
+
+    - name: "Phase 7 | Create AppRole for lightserp-api service"
+      ansible.builtin.command: >
+        docker exec iacgenie_openbao bao write
+        --address={{ openbao_addr }}
+        auth/approle/role/lightserp-api-svc
+        secret_id_ttl=0
+        token_num_uses=0
+        token_ttl=24h
+        token_max_ttl=48h
+        policies=lightserp
+      changed_when: true
+
+    - name: "Phase 7 | Create AppRole credential dir on host"
+      ansible.builtin.file:
+        path: "{{ openbao_docker_compose }}/openbao-appprope"
+        state: directory
+        owner: mkanavi
+        group: mkanavi
+        mode: "0750"
+
+    - name: "Phase 7 | Get iacgenie-backend AppRole role_id"
+      ansible.builtin.command: >
+        docker exec iacgenie_openbao bao read
+        --address={{ openbao_addr }}
+        -format=json
+        auth/approle/role/iacgenie-backend-svc/role-id
+      register: svc_backend_role_id
+      changed_when: false
+
+    - name: "Phase 7 | Get lightserp-api AppRole role_id"
+      ansible.builtin.command: >
+        docker exec iacgenie_openbao bao read
+        --address={{ openbao_addr }}
+        -format=json
+        auth/approle/role/lightserp-api-svc/role-id
+      register: svc_lightserp_role_id
+      changed_when: false
+
+    - name: "Phase 7 | Get iacgenie-backend AppRole secret_id"
+      ansible.builtin.command: >
+        docker exec iacgenie_openbao bao write
+        --address={{ openbao_addr }}
+        -format=json
+        auth/approle/role/iacgenie-backend-svc/secret-id
+      register: svc_backend_secret_id
+      changed_when: true
+
+    - name: "Phase 7 | Get lightserp-api AppRole secret_id"
+      ansible.builtin.command: >
+        docker exec iacgenie_openbao bao write
+        --address={{ openbao_addr }}
+        -format=json
+        auth/approle/role/lightserp-api-svc/secret-id
+      register: svc_lightserp_secret_id
+      changed_when: true
+
+    - name: "Phase 7 | Write iacgenie-backend AppRole credentials"
+      ansible.builtin.copy:
+        content: "{{ svc_backend_role_id.stdout | from_json | json_query('data.role_id') }}\n{{ svc_backend_secret_id.stdout | from_json | json_query('data.secret_id') }}\n"
+        dest: "{{ openbao_docker_compose }}/openbao-appprope/iacgenie-backend-creds.txt"
+        owner: mkanavi
+        group: mkanavi
+        mode: "0600"
+
+    - name: "Phase 7 | Write lightserp-api AppRole credentials"
+      ansible.builtin.copy:
+        content: "{{ svc_lightserp_role_id.stdout | from_json | json_query('data.role_id') }}\n{{ svc_lightserp_secret_id.stdout | from_json | json_query('data.secret_id') }}\n"
+        dest: "{{ openbao_docker_compose }}/openbao-appprope/lightserp-api-creds.txt"
+        owner: mkanavi
+        group: mkanavi
+        mode: "0600"
+
+    - name: "Phase 7 | Set credential file permissions"
+      ansible.builtin.file:
+        path: "{{ openbao_docker_compose }}/openbao-appprope"
+        owner: mkanavi
+        group: mkanavi
+        mode: "0750"
+
+    # ── Phase 7.5: Store missing service secrets in OpenBao ─────────────────
+    - name: "Phase 7.5 | Store KC admin username secret"
+      ansible.builtin.command: >
+        docker exec iacgenie_openbao bao write
+        --address={{ openbao_addr }}
+        -format=json
+        iacgenie/data/config/keycloak/kc_admin_user
+        KC_BOOTSTRAP_ADMIN_USERNAME={{ env.KEYCLOAK_ADMIN_USER }}
+      register: kc_user_result
+      changed_when: "'data' in (kc_user_result.stdout | default('{}') | from_json)"
+
+    - name: "Phase 7.5 | Store KC admin password secret"
+      ansible.builtin.command: >
+        docker exec iacgenie_openbao bao write
+        --address={{ openbao_addr }}
+        -format=json
+        iacgenie/data/config/keycloak/kc_admin_password
+        KC_BOOTSTRAP_ADMIN_PASSWORD={{ env.KEYCLOAK_ADMIN_PASSWORD }}
+      register: kc_pass_result
+      changed_when: "'data' in (kc_pass_result.stdout | default('{}') | from_json)"
+
+    - name: "Phase 7.5 | Store KC admin secret versions"
+      ansible.builtin.debug:
+        msg: >-
+          KC_ADMIN_USER version: {{ kc_user_result.stdout | from_json | json_query('data.version') | default('new') }},
+          KC_ADMIN_PASSWORD version: {{ kc_pass_result.stdout | from_json | json_query('data.version') | default('new') }}
+
+    # ── Phase 8: Deploy scripts & configs ────────────────────────────────
     - name: "Phase 8 | Deploy backup script"
       ansible.builtin.copy:
         src: roles/openbao/files/backup_openbao.py
         dest: /home/mkanavi/docker/iacgenie/scripts/backup_openbao.py
+        owner: mkanavi
+        group: mkanavi
+        mode: "0755"
+
+    - name: "Phase 8 | Deploy OpenBao injector script"
+      ansible.builtin.copy:
+        src: roles/openbao/files/openbao_injector.py
+        dest: /home/mkanavi/docker/iacgenie/scripts/openbao_injector.py
+        owner: mkanavi
+        group: mkanavi
+        mode: "0755"
+
+    - name: "Phase 8 | Deploy injector entrypoint wrapper"
+      ansible.builtin.copy:
+        src: roles/openbao/files/inject-secrets.sh
+        dest: /home/mkanavi/docker/iacgenie/scripts/inject-secrets.sh
+        owner: mkanavi
+        group: mkanavi
+        mode: "0755"
+
+    - name: "Phase 8 | Deploy service config files"
+      ansible.builtin.copy:
+        src: "roles/openbao/files/configs/{{ item }}"
+        dest: "/home/mkanavi/docker/iacgenie/openbao-configs/{{ item }}"
+        owner: mkanavi
+        group: mkanavi
+        mode: "0644"
+      loop:
+        - iacgenie-backend.json
+        - lightserp-api.json
+
+    - name: "Phase 8 | Create config symlink dir"
+      ansible.builtin.file:
+        path: /home/mkanavi/docker/iacgenie/openbao-configs
+        state: directory
         owner: mkanavi
         group: mkanavi
         mode: "0755"
