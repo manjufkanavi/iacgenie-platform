@@ -24,6 +24,25 @@
     - /home/mkanavi/docker/iacgenie/data/keycloak
     - /home/mkanavi/docker/iacgenie/data/gitea
     - /home/mkanavi/docker/iacgenie/data/nsqd
+    
+    - /home/mkanavi/docker/iacgenie/data/grafana
+    - /home/mkanavi/docker/iacgenie/data/prometheus
+
+- name: "Compose Gen | Fix data directory permissions"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    recurse: true
+    owner: mkanavi
+    group: mkanavi
+    mode: "0755"
+  loop:
+    - /home/mkanavi/docker/iacgenie/data/postgres
+    - /home/mkanavi/docker/iacgenie/data/redis
+    - /home/mkanavi/docker/iacgenie/data/minio
+    - /home/mkanavi/docker/iacgenie/data/nsqd
+    
+    - /home/mkanavi/docker/iacgenie/data/grafana
+    - /home/mkanavi/docker/iacgenie/data/prometheus
 
 - name: "Compose Gen | Fix OpenBao raft data ownership"
   ansible.builtin.file:
@@ -52,3 +71,10 @@
 - name: "Compose Gen | Show compose file location"
   ansible.builtin.debug:
     msg: "docker-compose.yml deployed to /home/mkanavi/docker/iacgenie/"
+- name: "Compose Gen | Fix SearXNG data ownership (UID 977)"
+  ansible.builtin.file:
+    path: /home/mkanavi/docker/iacgenie/data/searxng
+    owner: "977"
+    group: "977"
+    mode: "0755"
+    recurse: true
