@@ -1,6 +1,17 @@
 ---
 # Services playbook: deploy all Docker services
-# Phase 10: Multi-Tenant & RBAC + Production Readiness
+# Updated flow: OpenBao first → fetch secrets → deploy services
+#
+# SEQUENCE:
+# 1. common/docker/user_management/ntp_config — Foundation
+# 2. postgresql/redis/minio — Core services (no secrets needed)
+# 3. openbao — Start OpenBao container
+# 4. openbao-secrets — Unseal + seed KV data
+# 5. deploy-env — Fetch all KV secrets → write unified .env
+# 6. docker-compose-generator — Generate docker-compose.yml + deploy
+# 7. remaining services — keycloak, gitea, lightserp, etc.
+# 8. nginx/cloudflare_tunnel — Edge layer
+
 - hosts: all
   become: true
   become_method: sudo
@@ -12,43 +23,47 @@
     - role: user_management
     - role: ntp_config
 
-    # Phase 2: Core Infrastructure Services
+    # Phase 2: Core Infrastructure Services (no external secrets)
     - role: postgresql
     - role: redis
     - role: minio
-    - role: openbao
-    - role: keycloak
 
-    # Phase 3: Application Services
+    # Phase 3: OpenBao — MUST come before other services
+    - role: openbao
+
+    # Phase 4: Unseal OpenBao and seed KV
+    - role: openbao-secrets
+
+    # Phase 5: Fetch all secrets from OpenBao → write unified .env
+    - role: deploy-env
+
+    # Phase 6: Generate and deploy docker-compose.yml
+    - role: docker-compose-generator
+
+    # Phase 7: Remaining application services
+    - role: keycloak
     - role: gitea
     - role: lightserp
     - role: searxng
     - role: nsqd
     - role: pagezen
 
-    # Phase 4: Edge & Access Layer
-    - role: docker-compose-generator
-    - role: docker-compose-service
+    # Phase 8: Edge & Access Layer
     - role: nginx
     - role: cloudflare_tunnel
 
-    # Phase 5: Secrets & Security
+    # Phase 9: Secrets & Security
     - role: backup
 
-    # Phase 6: Resilience & Operations
+    # Phase 10: Resilience & Operations
     - role: monitoring
-
-    # Phase 7: Logging
     - role: logging_stack
 
-    # Phase 8: Multi-Tenant & RBAC (Phase 10.3)
+    # Phase 11: Multi-Tenant & RBAC
     - role: keycloak_realm
     - role: gitea_orgs
 
-    # Phase 9: Production Ready (Phase 10.4)
-    # Managed via post-deploy and validate playbooks
-
-  # Post-deploy: wait for containers, unseal OpenBao, check readiness
+  # Post-deploy tasks
   tasks:
     - name: "Import OpenBao unseal tasks"
       ansible.builtin.import_tasks:
@@ -56,15 +71,13 @@
       when:
         - not openbao_skip_unseal | default(false) | bool
 
-    # Phase 10.3: Keycloak multi-tenant realm (10.11)
-    - name: "Import Keycloak realm provisioning (10.11)"
+    - name: "Import Keycloak realm provisioning"
       ansible.builtin.import_tasks:
         file: ../roles/keycloak_realm/tasks/main.yml
       when:
         - keycloak_provision_realm | default(true) | bool
 
-    # Phase 10.3: Project-based Gitea (10.12)
-    - name: "Import Gitea org provisioning (10.12)"
+    - name: "Import Gitea org provisioning"
       ansible.builtin.import_tasks:
         file: ../roles/gitea_orgs/tasks/main.yml
       when:

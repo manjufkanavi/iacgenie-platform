@@ -1,0 +1,71 @@
+---
+# openbao-secrets role: Seed KV data into OpenBao
+# This runs AFTER openbao role (which starts the container)
+
+- name: "OpenBao Secrets | Wait for OpenBao container to be ready"
+  ansible.builtin.command: >
+    docker inspect --format='{{ "{{".State.Health.Status "}}" }}' iacgenie_openbao
+  register: _openbao_health
+  retries: 20
+  delay: 15
+  until: _openbao_health.stdout == 'healthy'
+  changed_when: false
+  failed_when: false
+
+- name: "OpenBao Secrets | Check if already initialized"
+  ansible.builtin.command: >
+    docker exec iacgenie_openbao bao secrets list
+  register: _openbao_list
+  changed_when: false
+  failed_when: false
+  ignore_errors: true
+
+- name: "OpenBao Secrets | Read root token"
+  ansible.builtin.slurp:
+    src: "{{ openbao_raft_data_dir | default('/home/mkanavi/docker/iacgenie/data/openbao_raft') }}/init_keys.json"
+  register: _openbao_keys
+  failed_when: false
+
+- name: "OpenBao Secrets | Set root token fact"
+  ansible.builtin.set_fact:
+    openbao_root_token: "{{ _openbao_keys.content | b64decode | from_json | json_query('root_token') }}"
+  when: _openbao_keys.content is defined and _openbao_keys.content | b64decode | from_json | length > 0
+
+- name: "OpenBao Secrets | Skip if OpenBao not initialized"
+  ansible.builtin.debug:
+    msg: "OpenBao not yet initialized. Run openbao role first to create init_keys.json."
+  when: openbao_root_token is not defined
+
+- name: "OpenBao Secrets | Create admin token for KV operations"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/auth/token/create"
+    method: POST
+    body_format: json
+    body:
+      policies: root
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+    status_code: 200
+    validate_certs: no
+  register: _admin_token
+  when: openbao_root_token is defined
+
+- name: "OpenBao Secrets | Set admin token"
+  ansible.builtin.set_fact:
+    openbao_admin_token: "{{ _admin_token.json.auth.client_token | default(openbao_root_token) }}"
+  when: openbao_root_token is defined
+
+- name: "OpenBao Secrets | Seed KV mount"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/sys/mounts/iacgenie/kv"
+    method: PUT
+    body_format: json
+    body:
+      type: kv
+      options:
+        version: "2"
+    headers:
+      X-Vault-Token: "{{ openbao_admin_token | default(openbao_root_token) }}"
+    status_code: [200, 400]  # 400 = already exists
+    validate_certs: no
+  when: openbao_root_token is defined

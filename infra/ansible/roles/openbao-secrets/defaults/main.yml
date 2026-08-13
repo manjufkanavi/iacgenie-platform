@@ -1,0 +1,4 @@
+---
+# defaults
+openbao_secrets_backup_dir: /home/mkanavi/docker/iacgenie/data/openbao_raft
+openbao_raft_data_dir: /home/mkanavi/docker/iacgenie/data/openbao_raft

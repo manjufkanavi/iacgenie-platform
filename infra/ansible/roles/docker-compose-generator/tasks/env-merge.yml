@@ -1,30 +1,9 @@
 ---
-# Docker Compose Generator - Merge individual .env.<service> files into unified .env
-# Note: Path changed from /home/mkanavi/docker/iacgenie/ to /home/mkanavi/docker/iacgenie/
+# Docker Compose Generator - Env merge step
+# DISABLED: We now use unified .env from OpenBao (fetch-openbao-env.py)
+# Per-service .env.<service> files are no longer generated or needed.
+# The unified .env is deployed directly by the deploy-env role.
 
-- name: "Compose Gen | Merge .env.* files into unified .env"
-  ansible.builtin.shell: |
-    set -euo pipefail
-    cd /home/mkanavi/docker/iacgenie
-    {
-      echo "# Unified environment file"
-      echo "# Managed by Ansible - DO NOT EDIT MANUALLY"
-      echo "# Merged from individual service .env.<service> files"
-      for f in .env.postgres .env.redis .env.minio .env.openbao .env.keycloak .env.gitea .env.lightserp .env.searxng .env.nsqd .env.pagezen; do
-        if [ -f "$f" ]; then
-          grep -v '^#' "$f" | grep -v '^$'
-        fi
-      done
-    } > .env.new
-    if ! diff -q .env.new .env > /dev/null 2>&1; then
-      mv .env.new .env
-      echo "MERGED"
-    else
-      rm -f .env.new
-      echo "UNCHANGED"
-    fi
-  register: env_merged
-  args:
-    executable: /bin/bash
-  notify: Reload docker compose
-  changed_when: "'MERGED' in env_merged.stdout"
+- name: "Compose Gen | Skip env merge (using OpenBao unified .env)"
+  ansible.builtin.debug:
+    msg: "Env merge skipped. Unified .env provided by OpenBao deploy-env role."
