@@ -103,13 +103,7 @@ services:
     image: nginx:1.27-alpine
     container_name: iacgenie-nginx
     restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    networks:
-      - iacgenie-frontend
-      - iacgenie-backend
-      - iacgenie-messaging
+    network_mode: host
     volumes:
       - /etc/letsencrypt:/etc/letsencrypt:ro
       - /etc/nginx/conf.d:/etc/nginx/conf.d:ro
@@ -154,7 +148,7 @@ services:
       - start
       - --http-enabled=true
       - --http-port=8080
-      - --http-admin-port=9000
+      - --http-management-port=9000
       - --proxy-address-forwarding
       - --db-url-host=postgres
       - --db-url-port=5432
@@ -249,6 +243,7 @@ services:
 
   # =====================
   # Shared Auth Wrapper — unified auth gateway for ClamAV/CrowdSec/PageGen
+  # Single port 9091 mapped to internal 9096. Nginx sends X-Service header for routing.
   # =====================
   auth_wrapper:
     build:
@@ -256,6 +251,11 @@ services:
       dockerfile: Dockerfile
     container_name: iacgenie_auth_wrapper
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9096/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     environment:
       AUTH_KEYCLOAK_URL: "http://keycloak:8080"
       AUTH_REALM: "iacgenie"
@@ -266,10 +266,9 @@ services:
       AUTH_USER_HEADER: "X-Auth-User"
       AUTH_CROWDSEC_API_KEY: "${CROWDSEC_API_KEY}"
     ports:
-      - "127.0.0.1:9091:9090"
-      - "127.0.0.1:9092:9090"
-      - "127.0.0.1:9093:9090"
+      - "127.0.0.1:9091:9096"
     networks:
+      - iacgenie-frontend
       - iacgenie-backend
     deploy:
       resources:
@@ -486,6 +485,78 @@ services:
       resources:
         limits:
           memory: "{{ service_memory_defaults.grafana }}"
+
+  # =====================
+  # ClamAV Engine (virus scanning)
+  # =====================
+  clamav:
+    image: clamav/clamav:latest
+    container_name: iacgenie_clamav_engine
+    restart: unless-stopped
+    networks:
+      - iacgenie-backend
+    deploy:
+      resources:
+        limits:
+          memory: "{{ service_memory_defaults.clamav }}"
+
+  # ClamAV Web Client (proxied through auth_wrapper)
+  clamav-backend:
+    image: rguziy/clamav-web-client:latest
+    container_name: iacgenie_clamav_web
+    restart: unless-stopped
+    environment:
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: 3310
+    ports:
+      - "127.0.0.1:9092:80"
+    networks:
+      - iacgenie-frontend
+    depends_on:
+      - clamav
+    deploy:
+      resources:
+        limits:
+          memory: "{{ service_memory_defaults.clamav }}"
+
+  # =====================
+  # CrowdSec (security)
+  # =====================
+  crowdsec-backend:
+    image: crowdsecurity/crowdsec:latest
+    container_name: iacgenie_crowdsec
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3033:8080"
+    networks:
+      - iacgenie-frontend
+    volumes:
+      - ./data/crowdsec:/etc/crowdsec
+    deploy:
+      resources:
+        limits:
+          memory: "{{ service_memory_defaults.crowdsec }}"
+
+  # =====================
+  # PageGen (AI page generator)
+  # =====================
+  pagegen:
+    image: lightserp-pagegen:latest
+    container_name: iacgenie_pagegen
+    restart: unless-stopped
+    environment:
+      LIGHTSERP_API_URL: http://lightserp-api:8000
+      LIGHTSERP_API_SECRET: "${LIGHTSERP_API_SECRET}"
+    ports:
+      - "127.0.0.1:3032:3031"
+    networks:
+      - iacgenie-frontend
+    depends_on:
+      - lightserp-api
+    deploy:
+      resources:
+        limits:
+          memory: "{{ service_memory_defaults.pagegen }}"
 
 # =====================
 # Docker Network Segmentation (Phase 10.7)

@@ -275,19 +275,18 @@ server {
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
     location / {
-        proxy_pass http://127.0.0.1:9091;
+        proxy_pass http://127.0.0.1:9092;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Service "clamav-service:8080";
         proxy_read_timeout 300;
         proxy_redirect off;
         proxy_hide_header X-Powered-By;
     }
 }
 
-# CrowdSec (security) — routed through shared-auth-wrapper
+# CrowdSec (security) — direct proxy to backend
 server {
     listen 80;
     server_name crowdsec.iacgenie.com;
@@ -299,19 +298,18 @@ server {
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
     location / {
-        proxy_pass http://127.0.0.1:9092;
+        proxy_pass http://127.0.0.1:3033;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Service "crowdsec-service:8080";
         proxy_read_timeout 300;
         proxy_redirect off;
         proxy_hide_header X-Powered-By;
     }
 }
 
-# PageGen (AI page generator) — routed through shared-auth-wrapper
+# PageGen (AI page generator) — direct proxy to backend
 server {
     listen 80;
     server_name pagegen.iacgenie.com;
@@ -323,12 +321,28 @@ server {
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
     location / {
-        proxy_pass http://127.0.0.1:9093;
+        proxy_pass http://127.0.0.1:3032;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Service "pagegen-service:3031";
+        proxy_read_timeout 300;
+        proxy_redirect off;
+        proxy_hide_header X-Powered-By;
+    }
+}
+
+# Auth-Wrapper Dashboard — authentication gateway
+server {
+    listen 80;
+    server_name _;
+
+    location /auth {
+        proxy_pass http://127.0.0.1:9091;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
         proxy_read_timeout 300;
         proxy_redirect off;
         proxy_hide_header X-Powered-By;
@@ -755,19 +769,18 @@ server {
     limit_req zone=general burst=20 nodelay;
 
     location / {
-        proxy_pass http://127.0.0.1:9091;
+        proxy_pass http://127.0.0.1:9092;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Service "clamav-service:8080";
         proxy_read_timeout 300;
         proxy_redirect off;
         proxy_hide_header X-Powered-By;
     }
 }
 
-# CrowdSec (security) — routed through shared-auth-wrapper
+# CrowdSec (security) — direct proxy to backend
 server {
     listen 443 ssl http2;
     server_name crowdsec.iacgenie.com;
@@ -794,19 +807,18 @@ server {
     limit_req zone=general burst=20 nodelay;
 
     location / {
-        proxy_pass http://127.0.0.1:9092;
+        proxy_pass http://127.0.0.1:3033;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Service "crowdsec-service:8080";
         proxy_read_timeout 300;
         proxy_redirect off;
         proxy_hide_header X-Powered-By;
     }
 }
 
-# PageGen (AI page generator) — routed through shared-auth-wrapper
+# PageGen (AI page generator) — direct proxy to backend
 server {
     listen 443 ssl http2;
     server_name pagegen.iacgenie.com;
@@ -833,12 +845,11 @@ server {
     limit_req zone=general burst=20 nodelay;
 
     location / {
-        proxy_pass http://127.0.0.1:9093;
+        proxy_pass http://127.0.0.1:3032;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Service "pagegen-service:3031";
         proxy_read_timeout 300;
         proxy_redirect off;
         proxy_hide_header X-Powered-By;
