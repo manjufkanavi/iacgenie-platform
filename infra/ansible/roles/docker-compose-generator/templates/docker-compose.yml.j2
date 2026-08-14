@@ -266,7 +266,7 @@ services:
       AUTH_USER_HEADER: "X-Auth-User"
       AUTH_CROWDSEC_API_KEY: "${CROWDSEC_API_KEY}"
     ports:
-      - "127.0.0.1:9091:9096"
+      - "127.0.0.1:9096:9096"
     networks:
       - iacgenie-frontend
       - iacgenie-backend
@@ -500,8 +500,8 @@ services:
         limits:
           memory: "{{ service_memory_defaults.clamav }}"
 
-  # ClamAV Web Client (proxied through auth_wrapper)
-  clamav-backend:
+  # ClamAV Web Client (proxied through nginx)
+  clamav-web-client:
     image: rguziy/clamav-web-client:latest
     container_name: iacgenie_clamav_web
     restart: unless-stopped
@@ -509,7 +509,7 @@ services:
       CLAMAV_HOST: clamav
       CLAMAV_PORT: 3310
     ports:
-      - "127.0.0.1:9092:80"
+      - "127.0.0.1:9092:8080"
     networks:
       - iacgenie-frontend
     depends_on:
@@ -557,6 +557,38 @@ services:
       resources:
         limits:
           memory: "{{ service_memory_defaults.pagegen }}"
+
+  # =====================
+  # IacGenie Platform Frontend (React SPA) — proxy target: 3002
+  # Build context: platform/ directory, Dockerfile at frontend/Dockerfile
+  # =====================
+  iacgenie-frontend:
+    build:
+      context: ./platform
+      dockerfile: frontend/Dockerfile
+    container_name: iacgenie_frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3002:80"
+    networks:
+      - iacgenie-frontend
+
+  # =====================
+  # IacGenie Platform Backend (FastAPI) — proxy target: 3003
+  # =====================
+  iacgenie-backend:
+    build:
+      context: ./platform/backend
+      dockerfile: Dockerfile
+    container_name: iacgenie_backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "${IACGENIE_DB_URL}"
+      JWT_SECRET: "${IACGENIE_JWT_SECRET}"
+    ports:
+      - "127.0.0.1:3003:8000"
+    networks:
+      - iacgenie-backend
 
 # =====================
 # Docker Network Segmentation (Phase 10.7)

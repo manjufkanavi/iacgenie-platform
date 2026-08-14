@@ -1,6 +1,62 @@
 ---
 # Docker Compose Generator - Deploy and verify
 # Note: Path changed from /home/mkanavi/docker/iacgenie/ to /home/mkanavi/docker/iacgenie/
+
+# --- Copy platform frontend/backend code for build contexts ---
+- name: "Compose Gen | Ensure platform source dirs exist"
+  ansible.builtin.file:
+    path: "/home/mkanavi/docker/iacgenie/{{ item }}"
+    state: directory
+    owner: mkanavi
+    group: mkanavi
+    mode: "0755"
+  loop:
+    - platform/frontend
+    - platform/backend
+
+- name: "Compose Gen | Copy platform shared files to compose root"
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "/home/mkanavi/docker/iacgenie/{{ item }}"
+    owner: mkanavi
+    group: mkanavi
+    mode: "0644"
+  loop:
+    - platform/App.tsx
+    - platform/types.ts
+    - platform/constants.ts
+
+- name: "Compose Gen | Copy frontend source and Dockerfile"
+  ansible.builtin.copy:
+    src: "platform/frontend/"
+    dest: "/home/mkanavi/docker/iacgenie/platform/frontend/"
+    owner: mkanavi
+    group: mkanavi
+    mode: "0644"
+
+- name: "Compose Gen | Copy platform backend Dockerfile and code"
+  ansible.builtin.copy:
+    src: "/Users/manjunathkanavi/iacgenie-platform/platform/backend/"
+    dest: "/home/mkanavi/docker/iacgenie/platform/backend/"
+    owner: mkanavi
+    group: mkanavi
+    mode: "0644"
+
+# --- Clean up orphan containers not in compose ---
+- name: "Compose Gen | Remove unused nginx container (orphan)"
+  ansible.builtin.command: docker rm -f iacgenie-nginx
+  changed_when: true
+  failed_when: false
+
+- name: "Compose Gen | Remove orphan containers"
+  ansible.builtin.command: docker rm -f "{{ item }}"
+  changed_when: true
+  failed_when: false
+  loop:
+    - iacgenie_frontend
+    - iacgenie_backend
+
+# --- Check if containers are running and deploy ---
 - name: "Compose Gen | Check if containers are running"
   ansible.builtin.command: docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.yml -p iacgenie ps --format json
   register: compose_running
