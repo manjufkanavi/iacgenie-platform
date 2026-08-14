@@ -28,7 +28,9 @@ http {
     client_max_body_size {{ nginx_client_max_body_size | default('64m') }};
 
     # Rate limiting
-    limit_req_zone $binary_remote_addr zone=api:{{ nginx_rate_limit_zone | default('10m') }} rate={{ nginx_rate_limit_rate | default('10r/s') }};
+    limit_req_zone $binary_remote_addr zone=general:10m rate=10r/s;
+    limit_req_zone $binary_remote_addr zone=auth:10m rate=3r/m;
+    limit_req_zone $binary_remote_addr zone=api:10m rate=30r/s;
 
     include /etc/nginx/conf.d/*.conf;
 }

@@ -1,0 +1,33 @@
+---
+# Auth Wrapper role - Main entry point
+# Deploys shared-auth-wrapper service configuration
+
+- name: "Auth Wrapper | Ensure shared-auth-wrapper directory exists"
+  ansible.builtin.file:
+    path: "{{ docker_compose_dir }}/shared-auth-wrapper"
+    state: directory
+    owner: mkanavi
+    group: mkanavi
+    mode: "0755"
+
+- name: "Auth Wrapper | Deploy Dockerfile"
+  ansible.builtin.copy:
+    content: |
+      FROM python:3.11-slim
+      RUN pip install --no-cache-dir fastapi uvicorn pyjwt httpx
+      WORKDIR /app
+      COPY server.py /app/
+      EXPOSE 9090
+      CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "9090"]
+    dest: "{{ docker_compose_dir }}/shared-auth-wrapper/Dockerfile"
+    owner: mkanavi
+    group: mkanavi
+    mode: "0644"
+
+- name: "Auth Wrapper | Deploy server"
+  ansible.builtin.copy:
+    src: server.py
+    dest: "{{ docker_compose_dir }}/shared-auth-wrapper/server.py"
+    owner: mkanavi
+    group: mkanavi
+    mode: "0644"

@@ -10,7 +10,7 @@ cloudflared_enabled_services:
   search: true        # search.iacgenie.com → SearXNG
   api: true           # api.iacgenie.com → LightSerp API
   app: true           # app.iacgenie.com → LightSerp WebUI
-  git: true           # git.iacgenie.com → Gitea
+  gitea: true        # gitea.iacgenie.com → Gitea
   page: true          # page.iacgenie.com → PageZen
   platform: true      # platform.iacgenie.com → IacGenie Platform
   lightserp: true     # lightserp.iacgenie.com → LightSerp

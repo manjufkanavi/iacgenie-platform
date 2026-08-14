@@ -1,39 +1,14 @@
 ---
-# User management role - Main entry point
-- name: "User Management | Create deploy user"
-  ansible.builtin.user:
-    name: "{{ deploy_username | default('deploy') }}"
-    comment: "Ansible deployment user"
-    shell: /bin/bash
-    create_home: yes
-    group: sudo
-    state: present
+# User management role — DEPRECATED (2026-08-12)
+# Replaced by common role which now handles Option B: Split Roles
+# (mkanavi admin user + deploy automation user).
+#
+# DO NOT add this role to site.yml.
+# To configure users, edit roles/common/tasks/users.yml and defaults.
 
-- name: "User Management | Configure sudo access"
-  ansible.builtin.lineinfile:
-    path: /etc/sudoers.d/{{ deploy_username | default('deploy') }}
-    line: "{{ deploy_username | default('deploy') }} ALL=(ALL) NOPASSWD: ALL"
-    owner: root
-    group: root
-    mode: "0440"
-    create: yes
-    validate: "visudo -cf %s"
-
-- name: "User Management | Create SSH directory"
-  ansible.builtin.file:
-    path: "/home/{{ deploy_username | default('deploy') }}/.ssh"
-    owner: "{{ deploy_username | default('deploy') }}"
-    group: "{{ deploy_username | default('deploy') }}"
-    mode: "0700"
-    state: directory
-
-- name: "User Management | Add SSH public keys"
-  ansible.posix.authorized_key:
-    user: "{{ deploy_username | default('deploy') }}"
-    key: "{{ item }}"
-  loop: "{{ ssh_public_keys | default([]) }}"
-  when: item | length > 0 and not item.startswith('REPLACE_')
-
-- name: "User Management | Verify user setup"
+- name: "User Management | DEPRECATED — skipped, see common role"
   ansible.builtin.debug:
-    msg: "Deploy user {{ deploy_username | default('deploy') }} configured successfully"
+    msg: >-
+      The user_management role is deprecated. User provisioning is now
+      handled by the common role with Option B: Split Roles.
+      See roles/common/tasks/users.yml and defaults/main.yml.

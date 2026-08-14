@@ -1,6 +1,7 @@
 ---
 # Cloudflare Tunnel role - Main entry point
-# Automatically handles tunnel login and creation if credentials are missing
+# Deploys config files and manages tunnel via Docker container
+# Cloudflared runs as: docker compose service iacflared
 
 - name: "Cloudflare | Ensure Cloudflare config directory exists"
   ansible.builtin.file:
@@ -9,42 +10,6 @@
     owner: root
     group: root
     mode: "0755"
-
-# ========================
-# Cloudflared binary installation
-# ========================
-- name: "Cloudflare | Check if cloudflared binary exists"
-  ansible.builtin.stat:
-    path: /usr/bin/cloudflared
-  register: cloudflared_binary
-  failed_when: false
-
-- name: "Cloudflare | Download cloudflared binary"
-  ansible.builtin.get_url:
-    url: "https://github.com/cloudflare/cloudflared/releases/download/{{ cloudflared_version | default('2025.6.0') }}/cloudflared-linux-amd64"
-    dest: /tmp/cloudflared
-    mode: "0755"
-  when:
-    - ansible_architecture == "x86_64"
-    - cloudflared_binary.stat.exists | default(false) == false
-
-- name: "Cloudflare | Install cloudflared binary"
-  ansible.builtin.copy:
-    src: /tmp/cloudflared
-    dest: /usr/bin/cloudflared
-    mode: "0755"
-    remote_src: yes
-  when:
-    - ansible_architecture == "x86_64"
-    - cloudflared_binary.stat.exists | default(false) == false
-  notify: Restart cloudflared
-
-- name: "Cloudflare | Reload systemd daemon"
-  ansible.builtin.systemd:
-    daemon_reload: yes
-  when:
-    - ansible_architecture == "x86_64"
-    - cloudflared_binary.stat.exists | default(false) == false
 
 - name: "Cloudflare | Ensure user cloudflared dir exists"
   ansible.builtin.file:
@@ -57,11 +22,6 @@
 # ========================
 # Tunnel auto-provisioning
 # ========================
-
-# Handle legacy argotunnel.json migration (pre-2025.3 format)
-# The old format stored credentials directly in argotunnel.json without cert.pem.
-# New format requires cloudflared tunnel login to generate cert.pem.
-# If argotunnel.json exists but cert.pem doesn't, we need to complete the login process.
 
 - name: "Cloudflare | Check if origin cert (cert.pem) exists"
   ansible.builtin.stat:
@@ -84,28 +44,14 @@
   changed_when: true
 
 # ========================
-# Tunnel login (requires Cloudflare API Token or Tunnel credentials)
+# Tunnel login
 # ========================
-# cloudflared tunnel login generates:
-#   1. ~/.cloudflared/cert.pem (origin certificate)
-#   2. Updates tunnel credentials if API token has tunnel scope
-#
-# API Token required at: https://dash.cloudflare.com/profile/api-tokens
-# Permissions needed: Zone.Zone > Read, Cloudflare Tunnel > Manage
-# If you only have a Universal API Key (cfk_*), create an API Token instead.
-#
-# The existing tunnel credentials are at:
-#   ~/.cloudflared/argotunnel.json (user dir)
-#   /etc/cloudflared/iacgenie-tunnel.json (system dir)
-# The origin cert cert.pem was deleted — it must be regenerated.
 
 - name: "Cloudflare | Check for missing cert.pem and attempt login"
   ansible.builtin.shell: |
     set -euo pipefail
-    # Try Cloudflare API Token first (preferred)
     if [ -n "{{ cloudflared_api_token | default('') }}" ] && [ "{{ cloudflared_api_token | default('') }}" != "CHANGE_ME_IN_VAULT" ]; then
       echo "CfApiToken={{ cloudflared_api_token }}" | cloudflared tunnel login
-    # Fall back to CF_API_KEY environment variable
     elif [ -n "{{ cloudflared_cf_api_key | default('') }}" ]; then
       CF_API_KEY="{{ cloudflared_cf_api_key }}" cloudflared tunnel login
     else
@@ -139,8 +85,9 @@
     - not cloudflared_cert.stat.exists
 
 # ========================
-# Tunnel creation (if not already created)
+# Tunnel creation
 # ========================
+
 - name: "Cloudflare | Check if tunnel credentials file exists"
   ansible.builtin.stat:
     path: /etc/cloudflared/{{ cloudflared_tunnel_name }}.json
@@ -173,8 +120,9 @@
   notify: Restart cloudflared
 
 # ========================
-# Config & service deployment
+# Config deployment
 # ========================
+
 - name: "Cloudflare | Deploy Cloudflare Tunnel configuration"
   ansible.builtin.template:
     src: cloudflared.yaml.j2
@@ -184,29 +132,11 @@
     mode: "0644"
   notify: Restart cloudflared
 
-- name: "Cloudflare | Deploy Cloudflare Tunnel service file"
-  ansible.builtin.template:
-    src: cloudflared.service.j2
-    dest: /etc/systemd/system/cloudflared.service
-    owner: root
-    group: root
-    mode: "0644"
-  notify: Restart cloudflared
-
-- name: "Cloudflare | Enable and start Cloudflare Tunnel service"
-  ansible.builtin.systemd:
-    name: cloudflared
-    state: started
-    enabled: yes
-    daemon_reload: yes
-  ignore_errors: true
-
-- name: "Cloudflare | Verify Cloudflare Tunnel is running"
-  ansible.builtin.command: systemctl is-active cloudflared
-  register: cloudflared_status
-  changed_when: false
-  failed_when: false
-
-- name: "Cloudflare | Show Cloudflare status"
-  ansible.builtin.debug:
-    var: cloudflared_status.stdout
+- name: "Cloudflare | Deploy tunnel credentials if needed"
+  ansible.builtin.command: >
+    docker compose -f /home/mkanavi/docker/iacgenie/docker-compose-unified.yml
+    restart cloudflared
+  when:
+    - cloudflared_creds.stat.exists | default(false)
+  changed_when: true
+  notify: Verify cloudflared status

@@ -1,48 +1,7 @@
 # Logging Stack — Docker Compose (Loki + Promtail)
 # Managed by Ansible
-
-services:
-  loki:
-    image: {{ loki_image }}
-    container_name: {{ loki_container_name }}
-    restart: unless-stopped
-    networks:
-      - iacgenie-backend
-    ports:
-      - 127.0.0.1:{{ loki_port }}:{{ loki_port }}
-    volumes:
-      - /home/mkanavi/docker/iacgenie/loki/loki-config.yaml:/etc/loki/local-config.yaml:ro
-      - {{ loki_data_dir }}:/loki
-    command: -config.file=/etc/loki/local-config.yaml
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:{{ loki_port }}/ready"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-          cpus: '0.5'
-
-  promtail:
-    image: {{ promtail_image }}
-    container_name: {{ promtail_container_name }}
-    restart: unless-stopped
-    networks:
-      - iacgenie-backend
-      - iacgenie-frontend
-    volumes:
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
-      - /var/log:/var/log:ro
-      - /home/mkanavi/docker/iacgenie/promtail/promtail-config.yaml:/etc/promtail/config.yml:ro
-      - {{ promtail_positions_dir }}:/tmp
-    command: -config.file=/etc/promtail/config.yml
-    depends_on:
-      - loki
-
-networks:
-  iacgenie-backend:
-    external: true
-  iacgenie-frontend:
-    external: true
+# NOTE: Loki and Promtail are defined in the unified docker-compose.yml
+# This file is kept for backward compatibility — does NOT deploy conflicting services
+---
+# Loki and Promtail removed from this template — use unified docker-compose.yml
+# This file is a no-op to prevent duplicate deployments

@@ -1,0 +1,13 @@
+---
+# Auth Wrapper role defaults
+
+# Base docker directory
+docker_compose_dir: /home/mkanavi/docker/iacgenie
+
+# Shared auth wrapper build path
+shared_auth_wrapper_path: /home/mkanavi/docker/iacgenie/shared-auth-wrapper
+
+# Auth wrapper configuration
+auth_wrapper_auth_url: "http://keycloak:8080"
+auth_wrapper_realm: "iacgenie"
+auth_wrapper_client_id: "auth-wrapper"

@@ -1,6 +1,8 @@
 ---
 # Monitoring Role — Phase 10.18
 # Prometheus + Grafana dashboards for service health
+# NOTE: All services are now managed by the unified docker-compose.yml.
+# This role only generates configs and restarts the main compose.
 
 - name: "10.18 | Monitoring | Ensure monitoring data directories"
   ansible.builtin.file:
@@ -20,7 +22,7 @@
     owner: mkanavi
     group: mkanavi
     mode: "0644"
-  notify: Restart prometheus
+  notify: Restart main compose
 
 - name: "10.18 | Monitoring | Generate Grafana datasources"
   ansible.builtin.template:
@@ -29,7 +31,7 @@
     owner: mkanavi
     group: mkanavi
     mode: "0644"
-  notify: Restart grafana
+  notify: Restart main compose
 
 - name: "10.18 | Monitoring | Generate Grafana dashboards"
   ansible.builtin.template:
@@ -38,20 +40,11 @@
     owner: mkanavi
     group: mkanavi
     mode: "0644"
-  notify: Restart grafana
+  notify: Restart main compose
 
-- name: "10.18 | Monitoring | Deploy monitoring stack"
-  ansible.builtin.template:
-    src: docker-compose.monitoring.yml.j2
-    dest: /home/mkanavi/docker/iacgenie/docker-compose.monitoring.yml
-    owner: mkanavi
-    group: mkanavi
-    mode: "0644"
-  notify: Start monitoring stack
-
-- name: "10.18 | Monitoring | Start monitoring services"
+- name: "10.18 | Monitoring | Restart main compose to pick up config changes"
   ansible.builtin.command:
-    cmd: docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.monitoring.yml up -d
+    cmd: docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.yml up -d prometheus grafana
   args:
     chdir: /home/mkanavi/docker/iacgenie
   changed_when: true

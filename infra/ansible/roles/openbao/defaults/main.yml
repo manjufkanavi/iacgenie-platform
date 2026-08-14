@@ -97,3 +97,11 @@ openbao_ig_pagezen_port: "8081"
 openbao_ig_nsqd_data_path: /nsq/data
 openbao_ig_nsqd_tcp_port: "4150"
 openbao_ig_nsqd_http_port: "4151"
+
+# ── Service Admin Credentials (for auth-protected services) ──────────────
+# These are stored in OpenBao KV and consumed by the shared-auth-wrapper
+openbao_svc_clamav_admin_password: "{{ openbao_svc_clamav_password | default('CHANGE_ME') }}"
+openbao_svc_crowdsec_api_key: "{{ crowdsec_api_key | default('CHANGE_ME') }}"
+openbao_svc_pagegen_api_key: "{{ openbao_svc_pagegen_api_key | default('CHANGE_ME') }}"
+openbao_svc_auth_wrapper_internal_token: "{{ auth_wrapper_internal_token | default('CHANGE_ME') }}"
+openbao_svc_auth_wrapper_client_secret: "{{ auth_wrapper_secret | default('CHANGE_ME') }}"

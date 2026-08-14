@@ -3,15 +3,20 @@
 
 - name: Restart prometheus
   ansible.builtin.command:
-    cmd: docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.monitoring.yml restart prometheus
+    cmd: docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.yml restart prometheus
   changed_when: true
 
 - name: Restart grafana
   ansible.builtin.command:
-    cmd: docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.monitoring.yml restart grafana
+    cmd: docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.yml restart grafana
+  changed_when: true
+
+- name: Restart main compose
+  ansible.builtin.command:
+    cmd: docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.yml restart
   changed_when: true
 
 - name: Start monitoring stack
   ansible.builtin.command:
-    cmd: docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.monitoring.yml up -d
+    cmd: docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.yml up -d
   changed_when: true

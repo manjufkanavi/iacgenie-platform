@@ -15,7 +15,8 @@ service_memory_defaults:
   cloudflared: "256m"
   lightserp: "512m"
   pagezen: "512m"
-  loki: "1g"
+  loki: "512m"
+  promtail: "256m"
   prometheus: "1g"
   grafana: "512m"
   auth_wrapper: "256m"
@@ -23,6 +24,8 @@ service_memory_defaults:
   crowdsec: "512m"
   pagegen: "512m"
   searxng: "512m"
+
+# Phase 10.7: Service network assignments
 service_networks:
   postgres:
     - iacgenie-backend

@@ -1,5 +1,4 @@
 ---
 - name: Reload nginx
-  ansible.builtin.systemd:
-    name: nginx
-    state: reloaded
+  ansible.builtin.command: docker restart iacgenie-nginx
+  ignore_errors: yes

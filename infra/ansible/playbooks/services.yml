@@ -64,10 +64,11 @@
     - role: searxng
     - role: nsqd
     - role: pagezen
+    - role: auth-wrapper
 
     # Phase 8: Edge & security
     - role: nginx
-    # - role: cloudflare_tunnel
+    - role: cloudflare_tunnel
     - role: backup
     - role: monitoring
     - role: logging_stack

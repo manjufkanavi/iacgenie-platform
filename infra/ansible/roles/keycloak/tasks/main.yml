@@ -42,6 +42,31 @@
   changed_when: false
   failed_when: false
 
+- name: "Keycloak | Deploy client setup script"
+  ansible.builtin.copy:
+    src: files/keycloak_client_setup.py
+    dest: /home/mkanavi/docker/iacgenie/scripts/keycloak_client_setup.py
+    owner: mkanavi
+    group: mkanavi
+    mode: "0755"
+  ignore_errors: true
+
+- name: "Keycloak | Set up auth-wrapper client (if not exists)"
+  ansible.builtin.shell: |
+    /home/mkanavi/docker/iacgenie/scripts/keycloak_client_setup.py \
+      --kc-url http://127.0.0.1:8080 \
+      --realm iacgenie \
+      --admin-user {{ keycloak_admin_user | default('admin') }} \
+      --admin-password {{ keycloak_admin_password | default('CHANGE_ME_IN_VAULT') }} \
+      --client-id auth-wrapper \
+      --secret {{ auth_wrapper_secret | default('CHANGE_ME_IN_VAULT') }} \
+      --redirect-uris https://clamav.iacgenie.com/* https://crowdsec.iacgenie.com/* https://pagegen.iacgenie.com/*
+  register: kc_client_setup
+  changed_when: "'Updated' in kc_client_setup.stdout"
+  failed_when: false
+  environment:
+    PYTHONDONTWRITEBYTECODE: "1"
+
 - name: "Keycloak | Show Keycloak status"
   ansible.builtin.debug:
     var: keycloak_status.stdout_lines | default(['N/A - managed by docker-compose-generator'])

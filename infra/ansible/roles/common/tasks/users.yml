@@ -1,49 +1,97 @@
 ---
 # Common role - User management
+# Option B: Split Roles
+#   mkanavi    = OS admin (interactive, full sudo, SSH from Mac)
+#   deploy     = Automation user (Ansible/Cron/CI, restricted shell)
+#
 # CRITICAL: This role only ADDS users and keys. It never removes or overwrites
 # existing users or their SSH keys, which would cause lockout.
 
-- name: "Common | Ensure deploy user exists"
+# ─── Admin User (mkanavi) ────────────────────────────────────────────────────
+# Existing OS root user — created during provisioning.
+# This task ONLY adds SSH keys and docker group membership.
+# It never changes the username, shell, or removes existing keys.
+
+- name: "Common | Ensure admin user exists"
   ansible.builtin.user:
-    name: "{{ deploy_username | default('mkanavi') }}"
+    name: "{{ admin_username | default('mkanavi') }}"
     comment: "Infrastructure admin user"
     shell: /bin/bash
     create_home: yes
     state: present
 
-- name: "Common | Ensure deploy user has sudo access"
+- name: "Common | Ensure admin user has sudo access"
   ansible.builtin.lineinfile:
-    path: /etc/sudoers.d/deploy
-    line: "{{ deploy_username | default('mkanavi') }} ALL=(ALL) NOPASSWD: ALL"
+    path: /etc/sudoers.d/{{ admin_username | default('mkanavi') }}
+    line: "{{ admin_username | default('mkanavi') }} ALL=(ALL) NOPASSWD: ALL"
     owner: root
     group: root
     mode: "0440"
     create: yes
     validate: "visudo -cf %s"
 
-- name: "Common | Create .ssh directory for deploy user"
+- name: "Common | Create .ssh directory for admin user"
   ansible.builtin.file:
-    path: "/home/{{ deploy_username | default('mkanavi') }}/.ssh"
-    owner: "{{ deploy_username | default('mkanavi') }}"
-    group: "{{ deploy_username | default('mkanavi') }}"
+    path: "/home/{{ admin_username | default('mkanavi') }}/.ssh"
+    owner: "{{ admin_username | default('mkanavi') }}"
+    group: "{{ admin_username | default('mkanavi') }}"
     mode: "0700"
     state: directory
 
-- name: "Common | Add SSH public keys for deploy user"
+- name: "Common | Add SSH public keys for admin user"
   ansible.builtin.authorized_key:
-    user: "{{ deploy_username | default('mkanavi') }}"
+    user: "{{ admin_username | default('mkanavi') }}"
     key: "{{ item }}"
     state: present
   loop: "{{ ssh_public_keys | default([]) }}"
   when:
     - item | length > 0
     - not item.startswith('REPLACE_')
-  # CRITICAL: state=present only ADDS keys, never removes existing ones.
-  # This prevents lockout if the playbook runs without ssh_public_keys defined.
+  # state=present only ADDS keys, never removes existing ones.
+  # Prevents lockout if playbook runs without ssh_public_keys defined.
+
+- name: "Common | Ensure admin user is in docker group"
+  ansible.builtin.user:
+    name: "{{ admin_username | default('mkanavi') }}"
+    groups: docker
+    append: yes
+  when: admin_username | default('mkanavi') != 'root'
+
+# ─── Deploy/Automation User ──────────────────────────────────────────────────
+# Dedicated user for Ansible, CI/CD, cron jobs, and other automation.
+# Has restricted shell (/usr/sbin/nologin) — cannot interactively log in.
+# Docker group access allows `docker compose` commands from automation.
+# SSH keys added for programmatic access (no sudo by default).
+
+- name: "Common | Ensure deploy user exists"
+  ansible.builtin.user:
+    name: "{{ deploy_username | default('deploy') }}"
+    comment: "Automation/deployment user"
+    shell: /usr/sbin/nologin
+    create_home: yes
+    state: present
 
 - name: "Common | Ensure deploy user is in docker group"
   ansible.builtin.user:
-    name: "{{ deploy_username | default('mkanavi') }}"
+    name: "{{ deploy_username | default('deploy') }}"
     groups: docker
     append: yes
-  when: deploy_username | default('mkanavi') != 'root'
+  when: deploy_username | default('deploy') != 'root'
+
+- name: "Common | Create .ssh directory for deploy user"
+  ansible.builtin.file:
+    path: "/home/{{ deploy_username | default('deploy') }}/.ssh"
+    owner: "{{ deploy_username | default('deploy') }}"
+    group: "{{ deploy_username | default('deploy') }}"
+    mode: "0700"
+    state: directory
+
+- name: "Common | Add SSH public keys for deploy user"
+  ansible.builtin.authorized_key:
+    user: "{{ deploy_username | default('deploy') }}"
+    key: "{{ item }}"
+    state: present
+  loop: "{{ deploy_ssh_public_keys | default([]) }}"
+  when:
+    - item | length > 0
+    - not item.startswith('REPLACE_')

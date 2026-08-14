@@ -1,12 +1,10 @@
+---
 # =============================================================================
 # Nginx role - Main entry point
-# Deploy unified reverse proxy config with security headers and vault.vHost
+# Deploy unified reverse proxy config with security headers
+# Nginx runs as Docker container (iacgenie-nginx) in host network mode
+# Config files are written to host paths and mounted into container
 # =============================================================================
-
-- name: "Nginx | Ensure Nginx is installed"
-  ansible.builtin.apt:
-    name: nginx
-    state: present
 
 - name: "Nginx | Deploy Nginx main configuration"
   ansible.builtin.template:
@@ -46,9 +44,3 @@
   ansible.builtin.command: nginx -t
   changed_when: false
   failed_when: false
-
-- name: "Nginx | Enable and start systemd nginx"
-  ansible.builtin.service:
-    name: nginx
-    state: started
-    enabled: yes

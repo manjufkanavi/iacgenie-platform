@@ -20,14 +20,18 @@ fail2ban_admin_ips:
   - "192.168.0.101"   # Mac dev machine (mkanavi)
   # Add any CI/CD jump-box IPs here
 
-# ─── deploy user ─────────────────────────────────────────────────────────────
-deploy_username: mkanavi
+# ─── Option B: Split Roles ──────────────────────────────────────────────────
+# admin_username = interactive admin (SSH from Mac, full sudo, root privileges)
+# deploy_username = automation user (Ansible, CI/CD, cron, restricted shell)
+admin_username: mkanavi
+deploy_username: deploy
 
-# SSH public keys to add/keep — must include the admin user's key
-# Use ansible-vault to encrypt real keys; placeholder format:
-# ssh_public_keys:
-#   - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... mkanavi@mac"
+# SSH public keys for the admin user (mkanavi)
 ssh_public_keys: []
+
+# SSH public keys for the deploy/automation user
+# Use these for Ansible tower, CI runners, automation scripts
+deploy_ssh_public_keys: []
 
 # Safely apply SSH changes without restarting sshd
 # (avoids lockout if config is wrong)

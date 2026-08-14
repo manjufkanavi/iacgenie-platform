@@ -1,9 +1,9 @@
 keycloak_version: "26.0"
 keycloak_port: 8083
 keycloak_admin_user: admin
-keycloak_admin_password: "{{ lookup('env', 'KEYCLOAK_ADMIN_PASSWORD') | default('CHANGE_ME_IN_VAULT') }}"
+keycloak_admin_password: "{{ keycloak_pass | default('CHANGE_ME_IN_VAULT') }}"
 keycloak_realm: iacgenie
-keycloak_db_host: 127.0.0.1
+keycloak_db_host: postgres
 keycloak_db_port: 5432
 keycloak_db_name: keycloak
 keycloak_admin_url: "http://127.0.0.1:{{ keycloak_port }}"
@@ -40,6 +40,12 @@ iacgenie_clients:
     secret: "{{ searxng_secret }}"
     redirect_uris:
       - "https://search.iacgenie.com/*"
+  auth-wrapper:
+    secret: "{{ auth_wrapper_secret }}"
+    redirect_uris:
+      - "https://clamav.iacgenie.com/*"
+      - "https://crowdsec.iacgenie.com/*"
+      - "https://pagegen.iacgenie.com/*"
 
 # Keycloak roles
 keycloak_roles:

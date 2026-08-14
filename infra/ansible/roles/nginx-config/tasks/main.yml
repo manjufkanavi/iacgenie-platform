@@ -1,7 +1,6 @@
 ---
 # =============================================================================
 # nginx-config role — tasks
-# Phase 10.23: Idempotency Hardening
 # =============================================================================
 
 - name: Ensure nginx configuration directory exists
@@ -9,15 +8,6 @@
     path: /etc/nginx/conf.d
     state: directory
     mode: "0755"
-  check_mode: false
-
-- name: Check current nginx configuration syntax
-  ansible.builtin.command:
-    cmd: nginx -t
-  register: nginx_test
-  changed_when: false
-  check_mode: false
-  always_run: true
 
 - name: Deploy nginx unified configuration
   ansible.builtin.template:
@@ -25,29 +15,8 @@
     dest: /etc/nginx/conf.d/iacgenie.conf
     mode: "0644"
     backup: true
-    validate: "nginx -t -c %s"
   notify: reload nginx
 
-- name: Verify TLS certificate paths exist
-  ansible.builtin.stat:
-    path: "/etc/letsencrypt/live/{{ item }}/fullchain.pem"
-  loop: "{{ tls_cert_domains | default(['iacgenie.local', 'lightsrp.local', 'infra.local']) }}"
-  register: cert_stat
+- name: Validate full nginx configuration
+  ansible.builtin.command: nginx -t
   changed_when: false
-  check_mode: false
-  always_run: true
-
-- name: Check nginx module availability
-  ansible.builtin.command:
-    cmd: nginx -V
-  register: nginx_modules
-  changed_when: false
-  check_mode: false
-  always_run: true
-  failed_when: false
-
-- name: Report nginx configuration status
-  ansible.builtin.debug:
-    msg: >-
-      Nginx config validated: {{ 'OK' if nginx_test.rc == 0 else 'FAIL' }}.
-      TLS certs checked for {{ tls_cert_domains | default([]) | length }} domains.

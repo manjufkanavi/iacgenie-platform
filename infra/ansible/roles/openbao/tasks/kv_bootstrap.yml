@@ -347,6 +347,80 @@
   register: openbao_ig_cloudflare
   failed_when: false
 
+# ── Step 2f: Seed Auth-Protected Service Credentials (iacgenie) ────────────
+
+- name: "OpenBao KV Bootstrap | Seed clamav (iacgenie)"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/clamav"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      data:
+        password: "{{ openbao_svc_clamav_admin_password }}"
+        port: "8080"
+    validate_certs: false
+    status_code: [200, 201]
+    timeout: 10
+  register: openbao_ig_clamav
+  failed_when: false
+
+- name: "OpenBao KV Bootstrap | Seed crowdsec (iacgenie)"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/crowdsec"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      data:
+        api_key: "{{ openbao_svc_crowdsec_api_key }}"
+        port: "8080"
+    validate_certs: false
+    status_code: [200, 201]
+    timeout: 10
+  register: openbao_ig_crowdsec
+  failed_when: false
+
+- name: "OpenBao KV Bootstrap | Seed pagegen (iacgenie)"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/pagegen"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      data:
+        api_key: "{{ openbao_svc_pagegen_api_key }}"
+        port: "3031"
+    validate_certs: false
+    status_code: [200, 201]
+    timeout: 10
+  register: openbao_ig_pagegen
+  failed_when: false
+
+- name: "OpenBao KV Bootstrap | Seed auth_wrapper (iacgenie)"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/auth-wrapper"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      data:
+        internal_token: "{{ openbao_svc_auth_wrapper_internal_token }}"
+        client_secret: "{{ openbao_svc_auth_wrapper_client_secret }}"
+    validate_certs: false
+    status_code: [200, 201]
+    timeout: 10
+  register: openbao_ig_auth_wrapper
+  failed_when: false
+
 # ── Step 3: Seed LightSerp Secrets ────────────────────────────────────────
 
 - name: "OpenBao KV Bootstrap | Seed postgres (lightserp)"
@@ -560,6 +634,6 @@
       - "  iacgenie/kv     ({{ 'enabled' if openbao_ig_kv_mount['status'] | default(409) in [200,201] else 'exists' }})"
       - "  lightserp/kv    ({{ 'enabled' if openbao_ls_kv_mount['status'] | default(409) in [200,201] else 'exists' }})"
       - "  terraform/kv    ({{ 'enabled' if openbao_tf_kv_mount['status'] | default(409) in [200,201] else 'exists' }}"
-      - "Secrets written to iacgenie/kv: postgres, redis, minio, keycloak, gitea, openbao, searxng, lightserp, pagezen, nsqd, smtp, llm, jwt, cloudflare"
+      - "Secrets written to iacgenie/kv: postgres, redis, minio, keycloak, gitea, openbao, searxng, lightserp, pagezen, nsqd, smtp, llm, jwt, cloudflare, clamav, crowdsec, pagegen, auth-wrapper"
       - "Secrets written to lightserp/kv: postgres, redis, minio, searxng, api, keycloak, smtp, jwt"
       - "Secrets written to terraform/kv: postgres, openbao"

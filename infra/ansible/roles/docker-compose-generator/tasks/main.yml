@@ -1,45 +1,13 @@
-# =============================================================================
+---
 # Docker Compose Generator role - Main entry point
-# Deploys docker-compose.yml from unified template
-# =============================================================================
+- name: "Compose Gen | Generate Docker network"
+  ansible.builtin.import_tasks: network.yml
 
-- name: "Compose Gen | Ensure base directory and permissions"
+- name: "Compose Gen | Generate docker-compose.yml"
   ansible.builtin.import_tasks: compose.yml
 
 - name: "Compose Gen | Merge .env.* service files"
   ansible.builtin.import_tasks: env-merge.yml
 
 - name: "Compose Gen | Deploy compose file to target"
-  ansible.builtin.copy:
-    src: ../../../docker-compose/docker-compose-unified.yml
-    dest: /home/mkanavi/docker/iacgenie/docker-compose.yml
-    owner: mkanavi
-    group: mkanavi
-    mode: "0644"
-  register: compose_file
-
-- name: "Compose Gen | Verify compose file syntax"
-  ansible.builtin.command: docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.yml config
-  changed_when: false
-  register: compose_check
-  failed_when: false
-
-- name: "Compose Gen | Check running containers"
-  ansible.builtin.command: docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.yml ps --format "{{ '{{.Name}}' }}"
-  register: running_containers
-  changed_when: false
-  failed_when: false
-
-- name: "Compose Gen | Deploy if file changed or containers not running"
-  ansible.builtin.command: "docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.yml up -d"
-  when: compose_file.changed or running_containers.stdout_lines | length == 0
-  notify: Wait for containers to be healthy
-
-- name: "Compose Gen | Show deployment summary"
-  ansible.builtin.command: "docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.yml ps"
-  register: compose_summary
-  changed_when: false
-
-- name: "Compose Gen | Show summary"
-  ansible.builtin.debug:
-    var: compose_summary.stdout
+  ansible.builtin.import_tasks: deploy.yml

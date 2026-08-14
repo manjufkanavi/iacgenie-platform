@@ -24,8 +24,8 @@ ingress:
   - hostname: app.iacgenie.com
     service: http://127.0.0.1:80
 {% endif %}
-{% if cloudflared_enabled_services.git|default(true) %}
-  - hostname: git.iacgenie.com
+{% if cloudflared_enabled_services.gitea|default(true) %}
+  - hostname: gitea.iacgenie.com
     service: http://127.0.0.1:80
 {% endif %}
 {% if cloudflared_enabled_services.page|default(true) %}

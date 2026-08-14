@@ -1,61 +1,58 @@
+---
 # =============================================================================
 # Ansible Site Playbook — IacGenie Platform Infrastructure
 # Installs & configures ALL services: Docker, nginx, cloudflared,
 # OpenBao, Gitea, Keycloak, Postgres, Redis, MinIO, NSQD, SearXNG,
-# LightSerp, Monitoring stack (Prometheus, Loki, Grafana, Falco, Falcosidekick)
+# LightSerp, Monitoring stack (Prometheus, Loki, Grafana), Security
 # =============================================================================
 
-- name: Bootstrap base system
-  hosts: iacgenie-vm
+- name: Configure system hardening and users
+  hosts: iacgenie-server
   become: true
   roles:
-    - bootstrap
+    - common
 
 - name: Install base infrastructure services
-  hosts: iacgenie-vm
+  hosts: iacgenie-server
   become: true
   roles:
-    - nginx
-    - cloudflare_tunnel
-    - docker
     - nginx-config
+    - cloudflare_tunnel
+
+- name: Generate .env from OpenBao secrets
+  hosts: iacgenie-server
+  become: true
+  roles:
+    - deploy-env
 
 - name: Deploy unified infrastructure services
-  hosts: iacgenie-vm
+  hosts: iacgenie-server
   become: true
   roles:
-    - postgres
-    - redis
-    - minio
     - openbao
-    - keycloak
-    - keycloak_realm
-    - nsqd
-    - searxng
-    - lightserp
-    - gitea
+    - docker-compose-generator
+    - security
+
+- name: Deploy logging stack (Loki + Promtail)
+  hosts: iacgenie-server
+  become: true
+  roles:
+    - logging_stack
 
 - name: Deploy monitoring stack
-  hosts: iacgenie-vm
+  hosts: iacgenie-server
   become: true
   roles:
     - monitoring
 
-- name: Deploy security stack
-  hosts: iacgenie-vm
+- name: Configure user management
+  hosts: iacgenie-server
   become: true
   roles:
-    - falco
-    - falcosidekick
-
-- name: Configure auto-start services
-  hosts: iacgenie-vm
-  become: true
-  roles:
-    - auto-start
+    - user_management
 
 - name: Configure backup & restore
-  hosts: iacgenie-vm
+  hosts: iacgenie-server
   become: true
   roles:
     - backup

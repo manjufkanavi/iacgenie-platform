@@ -2,11 +2,20 @@
 # Phase 10.3: Multi-Tenant & RBAC — Keycloak Realm Provisioning
 # Handles: iacgenie realm + lightserp realm + openbao OIDC integration
 
+- name: "10.3 | Keycloak | Read admin password from .env"
+  ansible.builtin.shell: grep KEYCLOAK_ADMIN_PASSWORD /home/mkanavi/docker/iacgenie/.env | head -1 | cut -d= -f2
+  register: _kc_admin_pass_raw
+  changed_when: false
+
+- name: "10.3 | Keycloak | Set admin password"
+  ansible.builtin.set_fact:
+    keycloak_admin_password: "{{ _kc_admin_pass_raw.stdout | trim }}"
+
 - name: "10.3 | Keycloak | Wait for Keycloak to be ready"
   ansible.builtin.uri:
-    url: "http://127.0.0.1:{{ keycloak_port }}/health/ready"
+    url: "http://127.0.0.1:{{ keycloak_port }}/realms/master"
     method: GET
-    status_code: [200, 503]
+    status_code: [200, 500]
   register: kc_health
   retries: 30
   delay: 5
@@ -18,14 +27,14 @@
   ansible.builtin.uri:
     url: "http://127.0.0.1:{{ keycloak_port }}/admin/realms/master/protocol/openid-connect/token"
     method: POST
-    body_format: urlencoded
+    body_format: form-urlencoded
     body:
       grant_type: password
       username: "{{ keycloak_admin_user }}"
       password: "{{ keycloak_admin_password }}"
       client_id: admin-cli
     status_code: 200
-    return_contents: yes
+    return_content: yes
   changed_when: false
   register: kc_token_response
   when:

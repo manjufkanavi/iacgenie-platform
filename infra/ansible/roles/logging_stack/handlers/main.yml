@@ -3,15 +3,15 @@
 
 - name: Restart loki
   ansible.builtin.command:
-    cmd: docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.logging.yml restart loki
+    cmd: docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.yml restart loki
   changed_when: true
 
 - name: Restart promtail
   ansible.builtin.command:
-    cmd: docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.logging.yml restart promtail
+    cmd: docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.yml restart promtail
   changed_when: true
 
 - name: Start logging stack
   ansible.builtin.command:
-    cmd: docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.logging.yml up -d
+    cmd: docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.yml up -d
   changed_when: true

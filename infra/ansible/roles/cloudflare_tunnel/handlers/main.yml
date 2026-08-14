@@ -1,13 +1,13 @@
 ---
 # Cloudflare Tunnel role - Handlers
 - name: Restart cloudflared
-  ansible.builtin.systemd:
-    name: cloudflared
-    state: restarted
-    daemon_reload: yes
+  ansible.builtin.command: >
+    docker compose -f /home/mkanavi/docker/iacgenie/docker-compose-unified.yml
+    restart cloudflared
+  ignore_errors: yes
 
 - name: Verify cloudflared status
-  ansible.builtin.command: systemctl is-active cloudflared
+  ansible.builtin.command: docker ps --filter name=iacflared --format "{{ '{{.Status}}' }}"
   register: cf_status
   changed_when: false
   failed_when: false
