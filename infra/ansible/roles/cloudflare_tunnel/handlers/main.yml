@@ -1,10 +1,12 @@
 ---
 # Cloudflare Tunnel role - Handlers
+# Note: Cloudflared container is managed by docker-compose-generator
+# Handlers here are no-ops since compose deployment happens later in the playbook
+
 - name: Restart cloudflared
-  ansible.builtin.command: >
-    docker compose -f /home/mkanavi/docker/iacgenie/docker-compose-unified.yml
-    restart cloudflared
-  ignore_errors: yes
+  ansible.builtin.debug:
+    msg: "Cloudflared restart is handled by docker-compose-generator later in the playbook. No-op in this handler."
+  changed_when: false
 
 - name: Verify cloudflared status
   ansible.builtin.command: docker ps --filter name=iacflared --format "{{ '{{.Status}}' }}"

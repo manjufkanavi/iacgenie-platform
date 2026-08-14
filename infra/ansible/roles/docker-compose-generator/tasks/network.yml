@@ -1,19 +1,15 @@
 ---
 # Docker Compose Generator - Network setup
-# Docker replaces hyphens with underscores in network names
-- name: "Compose Gen | Check if Docker network exists"
-  ansible.builtin.command: "docker network inspect {{ docker_network_name | default('iacgenie-network') | replace('-', '_') }}"
+# Docker Compose manages its own networks automatically.
+# The compose project 'iacgenie' creates: iacgenie_iacgenie-backend, iacgenie_iacgenie-frontend, etc.
+# No manual network creation needed — Docker Compose handles it.
+
+- name: "Compose Gen | Check if Docker networks exist"
+  ansible.builtin.command: "docker network inspect iacgenie_iacgenie-backend"
   register: _net_check
   changed_when: false
   failed_when: false
 
-- name: "Compose Gen | Create Docker network"
-  community.docker.docker_network:
-    name: "{{ docker_network_name | default('iacgenie-network') }}"
-    driver: bridge
-    ipam_config:
-      - subnet: "{{ docker_network_subnet | default('172.29.0.0/16') }}"
-    state: present
-  when: _net_check.rc != 0
-  tags:
-    - docker-network
+- name: "Compose Gen | Network status"
+  ansible.builtin.debug:
+    msg: "Docker networks managed by compose project 'iacgenie' (iacgenie_iacgenie-backend, etc.)"

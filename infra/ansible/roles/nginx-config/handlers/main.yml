@@ -1,4 +1,4 @@
 ---
-- name: Reload nginx
+- name: reload nginx
   ansible.builtin.command: docker restart iacgenie-nginx
   ignore_errors: yes

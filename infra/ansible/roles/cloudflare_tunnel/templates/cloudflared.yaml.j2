@@ -1,67 +1,58 @@
-# Cloudflare Tunnel configuration
-# Managed by Ansible — all services proxy through nginx on port 80
-# nginx hostname-based routing → correct container ports
+# Cloudflare Tunnel Configuration
+# Managed by Ansible — all services proxy through Nginx on port 80
+# Nginx hostname-based routing → correct container ports
 
-tunnel: {{ cloudflared_tunnel_name | default('iacgenie-tunnel') }}
-credentials-file: /etc/cloudflared/{{ cloudflared_tunnel_name | default('iacgenie-tunnel') }}.json
+tunnel: {{ cloudflared_tunnel_name }}
+credentials-file: /etc/cloudflared/{{ cloudflared_tunnel_name }}.json
 no-autoupdate: true
 
-# Cloudflare handles SSL at edge. nginx on port 80 avoids redirect loop.
+# Cloudflare handles SSL at edge. Nginx on port 80 avoids redirect loop.
 ingress:
-{% if cloudflared_enabled_services.auth|default(true) %}
-  - hostname: auth.iacgenie.com
-    service: http://127.0.0.1:80
-{% endif %}
-{% if cloudflared_enabled_services.search|default(true) %}
-  - hostname: search.iacgenie.com
-    service: http://127.0.0.1:80
-{% endif %}
-{% if cloudflared_enabled_services.api|default(true) %}
-  - hostname: api.iacgenie.com
-    service: http://127.0.0.1:80
-{% endif %}
-{% if cloudflared_enabled_services.app|default(true) %}
-  - hostname: app.iacgenie.com
-    service: http://127.0.0.1:80
-{% endif %}
-{% if cloudflared_enabled_services.gitea|default(true) %}
-  - hostname: gitea.iacgenie.com
-    service: http://127.0.0.1:80
-{% endif %}
-{% if cloudflared_enabled_services.page|default(true) %}
-  - hostname: page.iacgenie.com
-    service: http://127.0.0.1:80
-{% endif %}
-{% if cloudflared_enabled_services.platform|default(true) %}
-  - hostname: platform.iacgenie.com
-    service: http://127.0.0.1:80
-{% endif %}
-{% if cloudflared_enabled_services.lightserp|default(true) %}
-  - hostname: lightserp.iacgenie.com
-    service: http://127.0.0.1:80
-{% endif %}
-{% if cloudflared_enabled_services.vault|default(true) %}
-  - hostname: vault.iacgenie.com
-    service: http://127.0.0.1:80
-{% endif %}
-{% if cloudflared_enabled_services.grafana|default(true) %}
-  - hostname: grafana.iacgenie.com
-    service: http://127.0.0.1:80
-{% endif %}
-{% if cloudflared_enabled_services.clamav|default(true) %}
-  - hostname: clamav.iacgenie.com
-    service: http://127.0.0.1:80
-{% endif %}
-{% if cloudflared_enabled_services.crowdsec|default(true) %}
-  - hostname: crowdsec.iacgenie.com
-    service: http://127.0.0.1:80
-{% endif %}
-{% if cloudflared_enabled_services.pagegen|default(true) %}
-  - hostname: pagegen.iacgenie.com
-    service: http://127.0.0.1:80
-{% endif %}
-{% if cloudflared_enabled_services.catch_all|default(true) %}
+{% for svc_name, enabled in cloudflared_enabled_services.items() %}
+{% if enabled %}
+{% if svc_name == 'catch_all' %}
   - hostname: '*.iacgenie.com'
-    service: http://127.0.0.1:80
+    service: http://{{ cloudflared_origin_host }}:{{ cloudflared_origin_port }}
+{% elif svc_name == 'auth' %}
+  - hostname: auth.iacgenie.com
+    service: http://{{ cloudflared_origin_host }}:{{ cloudflared_origin_port }}
+{% elif svc_name == 'search' %}
+  - hostname: search.iacgenie.com
+    service: http://{{ cloudflared_origin_host }}:{{ cloudflared_origin_port }}
+{% elif svc_name == 'api' %}
+  - hostname: api.iacgenie.com
+    service: http://{{ cloudflared_origin_host }}:{{ cloudflared_origin_port }}
+{% elif svc_name == 'app' %}
+  - hostname: app.iacgenie.com
+    service: http://{{ cloudflared_origin_host }}:{{ cloudflared_origin_port }}
+{% elif svc_name == 'gitea' %}
+  - hostname: gitea.iacgenie.com
+    service: http://{{ cloudflared_origin_host }}:{{ cloudflared_origin_port }}
+{% elif svc_name == 'page' %}
+  - hostname: page.iacgenie.com
+    service: http://{{ cloudflared_origin_host }}:{{ cloudflared_origin_port }}
+{% elif svc_name == 'platform' %}
+  - hostname: platform.iacgenie.com
+    service: http://{{ cloudflared_origin_host }}:{{ cloudflared_origin_port }}
+{% elif svc_name == 'lightserp' %}
+  - hostname: lightserp.iacgenie.com
+    service: http://{{ cloudflared_origin_host }}:{{ cloudflared_origin_port }}
+{% elif svc_name == 'vault' %}
+  - hostname: vault.iacgenie.com
+    service: http://{{ cloudflared_origin_host }}:{{ cloudflared_origin_port }}
+{% elif svc_name == 'grafana' %}
+  - hostname: grafana.iacgenie.com
+    service: http://{{ cloudflared_origin_host }}:{{ cloudflared_origin_port }}
+{% elif svc_name == 'clamav' %}
+  - hostname: clamav.iacgenie.com
+    service: http://{{ cloudflared_origin_host }}:{{ cloudflared_origin_port }}
+{% elif svc_name == 'crowdsec' %}
+  - hostname: crowdsec.iacgenie.com
+    service: http://{{ cloudflared_origin_host }}:{{ cloudflared_origin_port }}
+{% elif svc_name == 'pagegen' %}
+  - hostname: pagegen.iacgenie.com
+    service: http://{{ cloudflared_origin_host }}:{{ cloudflared_origin_port }}
 {% endif %}
+{% endif %}
+{% endfor %}
   - service: http_status:200

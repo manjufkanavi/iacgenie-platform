@@ -46,7 +46,7 @@
     - role: minio
 
     # Phase 3: OpenBao
-    # - role: openbao
+    - role: openbao
 
     # Phase 4: OpenBao secrets generation
     # - role: openbao-secrets

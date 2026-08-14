@@ -1,28 +1,149 @@
 ---
+# =============================================================================
 # OpenBao role - Main entry point
-- name: "OpenBao | Create data directory"
-  ansible.builtin.file:
-    path: "{{ openbao_data_dir }}"
-    owner: root
-    group: root
-    mode: "0700"
-    state: directory
+# Configures OpenBao (RAFT config, policies, service tokens) via Docker container
+# MANAGED BY DOCKER-COMPOSE — this role ONLY deploys config files and health check
+# CRITICAL: Never runs 'openbao init' — container must already exist from compose
+# =============================================================================
 
-- name: "OpenBao | Deploy environment file"
-  ansible.builtin.template:
-    src: .env.j2
-    dest: /home/mkanavi/docker/iacgenie/.env.openbao
+- name: "OpenBao | Create data directories with secure permissions"
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - path: /home/mkanavi/docker/iacgenie/openbao_raft
+      owner: mkanavi
+      group: mkanavi
+      mode: "0750"
+    - path: /home/mkanavi/docker/iacgenie/data/openbao
+      owner: mkanavi
+      group: mkanavi
+      mode: "0755"
+    - path: /home/mkanavi/docker/iacgenie/scripts
+      owner: mkanavi
+      group: mkanavi
+      mode: "0755"
+  loop_control:
+    label: "{{ item.path }}"
+
+- name: "OpenBao | Deploy OpenBao HCL config to data dir"
+  ansible.builtin.copy:
+    src: prod.hcl
+    dest: "{{ openbao_compose_dir }}/data/openbao/openbao-prod.hcl"
     owner: mkanavi
     group: mkanavi
+    mode: "0644"
+  notify: restart openbao
+
+- name: "OpenBao | Deploy OpenBao HCL config to raft dir"
+  ansible.builtin.copy:
+    src: prod.hcl
+    dest: "{{ openbao_raft_data_dir }}/openbao-prod.hcl"
+    owner: mkanavi
+    group: mkanavi
+    mode: "0644"
+  notify: restart openbao
+
+- name: "OpenBao | Fix raft data permissions for uid 1000"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: mkanavi
+    group: mkanavi
+    mode: "0755"
+  loop:
+    - "{{ openbao_raft_data_dir }}"
+    - "{{ openbao_raft_data_dir }}/raft"
+  ignore_errors: true
+
+- name: "OpenBao | Fix vault.db permissions (world-readable, owner-writable)"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    owner: mkanavi
+    group: mkanavi
+    mode: "0644"
+  loop:
+    - "{{ openbao_raft_data_dir }}/vault.db"
+    - "{{ openbao_raft_data_dir }}/raft/raft.db"
+  ignore_errors: true
+
+- name: "OpenBao | Fix init_keys.json permissions (if exists)"
+  ansible.builtin.file:
+    path: /home/mkanavi/docker/iacgenie/openbao_raft/init_keys.json
     mode: "0600"
-  notify: Reload docker compose
+    owner: mkanavi
+    group: mkanavi
+  ignore_errors: true
+
+- name: "OpenBao | Deploy backup script"
+  ansible.builtin.copy:
+    src: files/backup_openbao.py
+    dest: /home/mkanavi/docker/iacgenie/scripts/backup_openbao.py
+    owner: mkanavi
+    group: mkanavi
+    mode: "0755"
+  notify: restart openbao
+
+- name: "OpenBao | Deploy injector entrypoint wrapper"
+  ansible.builtin.copy:
+    src: files/inject-secrets.sh
+    dest: /home/mkanavi/docker/iacgenie/scripts/inject-secrets.sh
+    owner: mkanavi
+    group: mkanavi
+    mode: "0755"
+
+- name: "OpenBao | Deploy service config files"
+  ansible.builtin.copy:
+    src: "files/configs/{{ item }}"
+    dest: "/home/mkanavi/docker/iacgenie/openbao-configs/{{ item }}"
+    owner: mkanavi
+    group: mkanavi
+    mode: "0644"
+  loop:
+    - iacgenie-backend.json
+    - lightserp-api.json
+
+- name: "OpenBao | Create config symlink dir"
+  ansible.builtin.file:
+    path: /home/mkanavi/docker/iacgenie/openbao-configs
+    state: directory
+    owner: mkanavi
+    group: mkanavi
+    mode: "0755"
+
+- name: "OpenBao | Create AppRole credential dir"
+  ansible.builtin.file:
+    path: /home/mkanavi/docker/iacgenie/openbao-appprope
+    state: directory
+    owner: mkanavi
+    group: mkanavi
+    mode: "0750"
+
+- name: "OpenBao | Deploy health check cron script"
+  ansible.builtin.copy:
+    src: files/openbao-health-cron.sh
+    dest: /home/mkanavi/docker/iacgenie/scripts/openbao-health-cron.sh
+    owner: mkanavi
+    group: mkanavi
+    mode: "0755"
+
+- name: "OpenBao | Install Docker-based health check cron job"
+  ansible.builtin.cron:
+    name: "OpenBao health check - restart if stopped"
+    minute: "*/5"
+    job: /home/mkanavi/docker/iacgenie/scripts/openbao-health-cron.sh
+    user: mkanavi
+    state: present
 
 - name: "OpenBao | Verify OpenBao container is running"
-  ansible.builtin.command: docker ps -a --filter "name=iacgenie-openbao" --format "{{ '{{.Names}}' }}"
+  ansible.builtin.command: docker ps --filter "name=iacgenie_openbao" --format "{{ '{{.Names}}:{{.Status}}' }}"
   register: openbao_status
   changed_when: false
   failed_when: false
 
 - name: "OpenBao | Show OpenBao status"
   ansible.builtin.debug:
-    var: openbao_status.stdout_lines | default(['N/A - managed by docker-compose-generator'])
+    var: openbao_status.stdout

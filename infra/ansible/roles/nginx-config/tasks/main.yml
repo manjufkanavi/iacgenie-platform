@@ -3,6 +3,13 @@
 # nginx-config role — tasks
 # =============================================================================
 
+- name: Stop and disable host system Nginx (Docker Nginx handles all HTTP traffic)
+  ansible.builtin.systemd:
+    name: nginx
+    state: stopped
+    enabled: false
+  ignore_errors: true
+
 - name: Ensure nginx configuration directory exists
   ansible.builtin.file:
     path: /etc/nginx/conf.d

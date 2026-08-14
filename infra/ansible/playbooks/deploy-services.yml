@@ -1,0 +1,11 @@
+---
+# Minimal playbook to redeploy openbao, nginx, cloudflare, and docker-compose
+- hosts: iacgenie-server
+  become: true
+  serial: 1
+
+  roles:
+    - role: openbao
+    - role: nginx
+    - role: cloudflare_tunnel
+    - role: docker-compose-generator

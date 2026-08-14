@@ -23,7 +23,7 @@ openbao_unseal_keys:
   - "{{ openbao_unseal_key_3 }}"
 
 # ── Raft / data directory on host ─────────────────────────────────────────
-openbao_raft_data_dir: /home/mkanavi/docker/iacgenie/data/openbao_raft
+openbao_raft_data_dir: /home/mkanavi/docker/iacgenie/openbao_raft
 openbao_compose_dir: /home/mkanavi/docker/iacgenie
 
 # ── Bootstrap toggles ─────────────────────────────────────────────────────

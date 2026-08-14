@@ -122,23 +122,17 @@ services:
     image: openbao/openbao:2.6.0
     container_name: iacgenie_openbao
     restart: unless-stopped
+    network_mode: host
+    user: "1000:1000"
     command: bao server -config=/openbao/storage/openbao-prod.hcl
     environment:
       OPENBAO_ADDR: http://127.0.0.1:8200
       OPENBAO_CLUSTER_ADDR: http://127.0.0.1:8201
       OPENBAO_UI: "true"
-      OPENBAO_STORAGE_TYPE: raft
-      OPENBAO_STORAGE_PATH: /openbao/storage
       OPENBAO_LOG_LEVEL: info
     volumes:
       - /home/mkanavi/docker/iacgenie/openbao_raft:/openbao/raft
       - /home/mkanavi/docker/iacgenie/data/openbao:/openbao/storage
-      - /etc/letsencrypt:/etc/letsencrypt
-    ports:
-      - "127.0.0.1:8200:8200"
-      - "127.0.0.1:8201:8201"
-    networks:
-      - iacgenie-backend
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8200/v1/sys/health 2>&1"]
       interval: 30s

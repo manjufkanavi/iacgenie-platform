@@ -1,7 +1,5 @@
----
 # Cloudflare Tunnel role - Main entry point
-# Deploys config files and manages tunnel via Docker container
-# Cloudflared runs as: docker compose service iacflared
+# Deploys config files only. Container management handled by docker-compose-generator.
 
 - name: "Cloudflare | Ensure Cloudflare config directory exists"
   ansible.builtin.file:
@@ -117,7 +115,6 @@
   when:
     - not cloudflared_creds.stat.exists
     - cloudflared_user_creds.stat.exists | default(false)
-  notify: Restart cloudflared
 
 # ========================
 # Config deployment
@@ -130,13 +127,4 @@
     owner: root
     group: root
     mode: "0644"
-  notify: Restart cloudflared
 
-- name: "Cloudflare | Deploy tunnel credentials if needed"
-  ansible.builtin.command: >
-    docker compose -f /home/mkanavi/docker/iacgenie/docker-compose-unified.yml
-    restart cloudflared
-  when:
-    - cloudflared_creds.stat.exists | default(false)
-  changed_when: true
-  notify: Verify cloudflared status

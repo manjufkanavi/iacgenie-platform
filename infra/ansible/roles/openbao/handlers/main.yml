@@ -1,4 +1,8 @@
 ---
-- name: "Restart openbao service"
+# OpenBao handlers — container restart is managed by docker-compose-generator
+# These handlers are no-ops; restart comes from docker-compose-generator's deploy phase
+
+- name: restart openbao
   ansible.builtin.debug:
-    msg: "Container restart handled by docker-compose-generator. No separate restart needed."
+    msg: "OpenBao restart is handled by docker-compose-generator. No separate restart needed."
+  changed_when: false

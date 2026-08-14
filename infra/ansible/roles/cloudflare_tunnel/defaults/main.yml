@@ -3,6 +3,9 @@ cloudflared_version: "2025.6.0"
 cloudflared_tunnel_name: "iacgenie-tunnel"
 cloudflared_account_tag: ""
 cloudflared_api_token: "CHANGE_ME_IN_VAULT"
+# Origin host for tunnel — use VM IP since Nginx is in host network mode
+cloudflared_origin_host: "{{ ansible_default_ipv4.address | default('192.168.0.118') }}"
+cloudflared_origin_port: 80
 
 # Which services to enable in the tunnel ingress rules
 cloudflared_enabled_services:
