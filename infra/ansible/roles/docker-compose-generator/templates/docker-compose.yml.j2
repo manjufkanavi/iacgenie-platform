@@ -9,7 +9,7 @@ services:
   postgres:
     image: postgres:15-alpine
     container_name: iacgenie_postgres
-    restart: unless-stopped
+    restart: always
     environment:
       POSTGRES_USER: lightsrp
       POSTGRES_PASSWORD: "${PG_ROOT_PASSWORD}"
@@ -41,7 +41,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: iacgenie_redis
-    restart: unless-stopped
+    restart: always
     command: redis-server --appendonly yes --maxmemory {{ service_memory_defaults.redis | default('512m') }} --maxmemory-policy allkeys-lru
     volumes:
       - /home/mkanavi/docker/iacgenie/data/redis:/data
@@ -70,7 +70,7 @@ services:
   minio:
     image: minio/minio:RELEASE.2025-06-13T05-20-52Z
     container_name: iacgenie_minio
-    restart: unless-stopped
+    restart: always
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: "{{ minio_root_user | default('iacgenie') }}"
@@ -103,7 +103,7 @@ services:
   nginx:
     image: nginx:1.27-alpine
     container_name: iacgenie-nginx
-    restart: unless-stopped
+    restart: always
     network_mode: host
     volumes:
       - /etc/letsencrypt:/etc/letsencrypt:ro
@@ -123,7 +123,7 @@ services:
   cloudflared:
     image: cloudflare/cloudflared:2025.6.0
     container_name: iacgenie_cloudflared
-    restart: unless-stopped
+    restart: always
     command: tunnel --no-autoupdate --credentials-file /etc/cloudflared/cert.json run {{ cloudflared_tunnel_name }}
     networks:
       - iacgenie-frontend
@@ -145,7 +145,7 @@ services:
   openbao:
     image: openbao/openbao:2.6.0
     container_name: iacgenie_openbao
-    restart: unless-stopped
+    restart: always
     network_mode: host
     user: "1000:1000"
     command: bao server -config=/openbao/storage/openbao-prod.hcl
@@ -178,7 +178,7 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:26.0-pg
     container_name: iacgenie_keycloak
-    restart: unless-stopped
+    restart: always
     command:
       - start
       - --http-enabled=true
@@ -226,7 +226,7 @@ services:
   gitea:
     image: gitea/gitea:1.23.4-rootless
     container_name: iacgenie_gitea
-    restart: unless-stopped
+    restart: always
     environment:
       GITEA__database__DB_TYPE: postgres
       GITEA__database__HOST: postgres:5432
@@ -350,6 +350,12 @@ services:
       - minio
       - nsqd
       - searxng
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     deploy:
       resources:
         limits:
@@ -373,6 +379,12 @@ services:
       - iacgenie-frontend
     depends_on:
       - lightserp-api
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3070/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
     deploy:
       resources:
         limits:
@@ -581,6 +593,12 @@ services:
     restart: unless-stopped
     networks:
       - iacgenie-backend
+    healthcheck:
+      test: ["CMD-SHELL", "clamdscan --ping || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     deploy:
       resources:
         limits:
@@ -605,6 +623,12 @@ services:
       - iacgenie-frontend
     depends_on:
       - clamav
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9092/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
     deploy:
       resources:
         limits:
@@ -628,6 +652,12 @@ services:
       - iacgenie-frontend
     volumes:
       - ./data/crowdsec:/etc/crowdsec
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3033/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     deploy:
       resources:
         limits:
@@ -654,6 +684,12 @@ services:
       - iacgenie-frontend
     depends_on:
       - lightserp-api
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3032/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     deploy:
       resources:
         limits:
@@ -678,6 +714,12 @@ services:
       - "127.0.0.1:3002:80"
     networks:
       - iacgenie-frontend
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3002/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
     logging:
       driver: json-file
       options:
@@ -700,6 +742,12 @@ services:
       - "127.0.0.1:3003:8000"
     networks:
       - iacgenie-backend
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3003/docs || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     logging:
       driver: json-file
       options:
