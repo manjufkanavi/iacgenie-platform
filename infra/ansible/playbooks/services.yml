@@ -65,7 +65,6 @@
     - role: searxng
     - role: nsqd
     - role: pagezen
-    - role: auth-wrapper
 
     # Phase 8: Edge & security
     - role: nginx-config

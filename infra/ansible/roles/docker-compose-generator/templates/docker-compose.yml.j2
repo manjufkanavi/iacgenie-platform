@@ -68,7 +68,7 @@ services:
     volumes:
       - /home/mkanavi/docker/iacgenie/data/minio:/data
     ports:
-      - "127.0.0.1:9002:9000"
+      - "127.0.0.1:9002:9002"
     networks:
       - iacgenie-backend
     healthcheck:
@@ -110,6 +110,25 @@ services:
       - /etc/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
 
   # =====================
+
+  # =====================
+  # Cloudflare Tunnel (cloudflared container)
+  # =====================
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: iacgenie_cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --credentials-file /etc/cloudflared/cert.json run {{ cloudflared_tunnel_name }}
+    networks:
+      - iacgenie-frontend
+    deploy:
+      resources:
+        limits:
+          memory: "256m"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
   # OpenBao 2.6.0
   # =====================
   openbao:
@@ -147,7 +166,7 @@ services:
     command:
       - start
       - --http-enabled=true
-      - --http-port=8080
+      - --http-port=9002
       - --db=postgres
       - --hostname={{ keycloak_hostname | default('https://auth.iacgenie.com') }}
       - --hostname-admin={{ keycloak_hostname | default('https://auth.iacgenie.com') }}
@@ -165,7 +184,7 @@ services:
       - ./keycloak.conf:/opt/keycloak/conf/keycloak.conf:ro
     ports:
       - "127.0.0.1:8083:8080"
-      - "127.0.0.1:9002:9000"
+      - "127.0.0.1:9002:9002"
     networks:
       - iacgenie-backend
     depends_on:
