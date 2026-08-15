@@ -29,6 +29,11 @@ services:
       resources:
         limits:
           memory: "{{ service_memory_defaults.postgres }}"
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "3"
 
   # =====================
   # Redis 7
@@ -53,12 +58,17 @@ services:
       resources:
         limits:
           memory: "{{ service_memory_defaults.redis }}"
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "3"
 
   # =====================
   # MinIO (pinned for reproducibility)
   # =====================
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2025-06-13T05-20-52Z
     container_name: iacgenie_minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
@@ -68,7 +78,8 @@ services:
     volumes:
       - /home/mkanavi/docker/iacgenie/data/minio:/data
     ports:
-      - "127.0.0.1:9002:9002"
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
     networks:
       - iacgenie-backend
     healthcheck:
@@ -80,21 +91,11 @@ services:
       resources:
         limits:
           memory: "{{ service_memory_defaults.minio }}"
-
-  # MinIO Console — proxied via Nginx with auth for admin access only
-  minio-console:
-    image: nginx:1.27-alpine
-    container_name: iacgenie_minio_console_proxy
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:9001:9001"
-    networks:
-      - iacgenie-frontend
-      - iacgenie-backend
-    depends_on:
-      - minio
-    volumes:
-      - ./minio-nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "3"
 
   # =====================
   # Nginx Reverse Proxy (TLS termination)
@@ -108,6 +109,11 @@ services:
       - /etc/letsencrypt:/etc/letsencrypt:ro
       - /etc/nginx/conf.d:/etc/nginx/conf.d:ro
       - /etc/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "3"
 
   # =====================
 
@@ -115,7 +121,7 @@ services:
   # Cloudflare Tunnel (cloudflared container)
   # =====================
   cloudflared:
-    image: cloudflare/cloudflared:latest
+    image: cloudflare/cloudflared:2025.6.0
     container_name: iacgenie_cloudflared
     restart: unless-stopped
     command: tunnel --no-autoupdate --credentials-file /etc/cloudflared/cert.json run {{ cloudflared_tunnel_name }}
@@ -129,6 +135,11 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "3"
   # OpenBao 2.6.0
   # =====================
   openbao:
@@ -155,6 +166,11 @@ services:
       resources:
         limits:
           memory: "{{ service_memory_defaults.openbao }}"
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "3"
 
   # =====================
   # Keycloak 26.0 (PostgreSQL driver baked in)
@@ -198,6 +214,11 @@ services:
       resources:
         limits:
           memory: "{{ service_memory_defaults.keycloak }}"
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "3"
 
   # =====================
   # Gitea 1.23.4
@@ -253,6 +274,11 @@ services:
       resources:
         limits:
           memory: "{{ service_memory_defaults.gitea }}"
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "3"
 
   # =====================
   # Shared Auth Wrapper — unified auth gateway for ClamAV/CrowdSec/PageGen
@@ -283,6 +309,11 @@ services:
     networks:
       - iacgenie-frontend
       - iacgenie-backend
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "3"
     deploy:
       resources:
         limits:
@@ -292,7 +323,7 @@ services:
   # LightSerp API
   # =====================
   lightserp-api:
-    image: lightserp-lightserp-api:latest
+    image: lightserp-lightserp-api:v1.0.0
     container_name: iacgenie_lightserp_api
     restart: unless-stopped
     environment:
@@ -323,12 +354,17 @@ services:
       resources:
         limits:
           memory: "{{ service_memory_defaults.lightserp }}"
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "3"
 
   # =====================
   # LightSerp WebUI
   # =====================
   lightserp-webui:
-    image: lightserp-lightserp-webui:latest
+    image: lightserp-lightserp-webui:v1.0.0
     container_name: iacgenie_lightserp_webui
     restart: unless-stopped
     ports:
@@ -341,12 +377,17 @@ services:
       resources:
         limits:
           memory: "{{ service_memory_defaults.lightserp }}"
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "3"
 
   # =====================
   # SearXNG (pinned for reproducibility)
   # =====================
   searxng:
-    image: searxng/searxng:latest
+    image: searxng/searxng:1.0.0
     container_name: iacgenie_searxng
     restart: unless-stopped
     environment:
@@ -356,7 +397,6 @@ services:
       - "127.0.0.1:8082:8080"
     volumes:
       - /home/mkanavi/docker/iacgenie/data/searxng:/etc/searxng
-      - /home/mkanavi/docker/iacgenie/data/searxng:/usr/local/searxng/searxng
     networks:
       - iacgenie-frontend
     healthcheck:
@@ -368,12 +408,17 @@ services:
       resources:
         limits:
           memory: "512m"
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "3"
 
   # =====================
   # NSQD (pinned for reproducibility)
   # =====================
   nsqd:
-    image: nsqio/nsq:latest
+    image: nsqio/nsq:v1.3.0
     container_name: iacgenie_nsqd
     restart: unless-stopped
     command: nsqd --data-path=/nsq/data
@@ -393,12 +438,17 @@ services:
       resources:
         limits:
           memory: "256m"
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "3"
 
   # =====================
   # PageZen
   # =====================
   pagezen:
-    image: lightserp-pagezen:latest
+    image: lightserp-pagezen:v1.0.0
     container_name: iacgenie_pagezen
     restart: unless-stopped
     environment:
@@ -414,6 +464,11 @@ services:
       resources:
         limits:
           memory: "{{ service_memory_defaults.pagezen }}"
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "3"
 
   # =====================
   # Logging Stack (Loki + Promtail)
@@ -436,6 +491,11 @@ services:
       resources:
         limits:
           memory: "{{ service_memory_defaults.loki }}"
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "3"
 
   promtail:
     image: grafana/promtail:3.4.2
@@ -451,6 +511,11 @@ services:
       resources:
         limits:
           memory: "{{ service_memory_defaults.promtail }}"
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "3"
 
   # =====================
   # Monitoring Stack (Prometheus + Grafana)
@@ -459,7 +524,6 @@ services:
     image: prom/prometheus:v3.2.0
     container_name: iacgenie_prometheus
     restart: unless-stopped
-    user: "0"
     ports:
       - "127.0.0.1:9090:9090"
     networks:
@@ -477,6 +541,11 @@ services:
       resources:
         limits:
           memory: "{{ service_memory_defaults.prometheus }}"
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "3"
 
   grafana:
     image: grafana/grafana:11.5.0
@@ -497,12 +566,17 @@ services:
       resources:
         limits:
           memory: "{{ service_memory_defaults.grafana }}"
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "3"
 
   # =====================
   # ClamAV Engine (virus scanning)
   # =====================
   clamav:
-    image: clamav/clamav:latest
+    image: clamav/clamav:1.1.2
     container_name: iacgenie_clamav_engine
     restart: unless-stopped
     networks:
@@ -511,10 +585,15 @@ services:
       resources:
         limits:
           memory: "{{ service_memory_defaults.clamav }}"
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "3"
 
   # ClamAV Web Client (proxied through nginx)
   clamav-web-client:
-    image: rguziy/clamav-web-client:latest
+    image: rguziy/clamav-web-client:1.0.0
     container_name: iacgenie_clamav_web
     restart: unless-stopped
     environment:
@@ -530,12 +609,17 @@ services:
       resources:
         limits:
           memory: "{{ service_memory_defaults.clamav }}"
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "3"
 
   # =====================
   # CrowdSec (security)
   # =====================
   crowdsec-backend:
-    image: crowdsecurity/crowdsec:latest
+    image: crowdsecurity/crowdsec:2.2.0
     container_name: iacgenie_crowdsec
     restart: unless-stopped
     ports:
@@ -548,12 +632,17 @@ services:
       resources:
         limits:
           memory: "{{ service_memory_defaults.crowdsec }}"
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "3"
 
   # =====================
   # PageGen (AI page generator)
   # =====================
   pagegen:
-    image: lightserp-pagegen:latest
+    image: lightserp-pagegen:v1.0.0
     container_name: iacgenie_pagegen
     restart: unless-stopped
     environment:
@@ -569,6 +658,11 @@ services:
       resources:
         limits:
           memory: "{{ service_memory_defaults.pagegen }}"
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "3"
 
   # =====================
   # IacGenie Platform Frontend (React SPA) — proxy target: 3002
@@ -584,6 +678,11 @@ services:
       - "127.0.0.1:3002:80"
     networks:
       - iacgenie-frontend
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "3"
 
   # =====================
   # IacGenie Platform Backend (FastAPI) — proxy target: 3003
@@ -601,6 +700,11 @@ services:
       - "127.0.0.1:3003:8000"
     networks:
       - iacgenie-backend
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "3"
 
 # =====================
 # Docker Network Segmentation (Phase 10.7)
