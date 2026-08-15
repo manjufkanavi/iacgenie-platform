@@ -68,7 +68,7 @@ services:
     volumes:
       - /home/mkanavi/docker/iacgenie/data/minio:/data
     ports:
-      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9002:9000"
     networks:
       - iacgenie-backend
     healthcheck:
@@ -165,7 +165,7 @@ services:
       - ./keycloak.conf:/opt/keycloak/conf/keycloak.conf:ro
     ports:
       - "127.0.0.1:8083:8080"
-      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9002:9000"
     networks:
       - iacgenie-backend
     depends_on:
