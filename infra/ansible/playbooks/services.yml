@@ -53,6 +53,7 @@
 
     # Phase 5: Runtime environment generation
     - role: deploy-env
+    - role: auth-wrapper
 
     # Phase 6: Docker compose deployment
     - role: docker-compose-generator

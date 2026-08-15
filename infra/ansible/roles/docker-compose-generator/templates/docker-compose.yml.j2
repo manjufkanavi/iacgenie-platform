@@ -242,7 +242,7 @@ services:
   # =====================
   auth_wrapper:
     build:
-      context: ./shared-auth-wrapper
+      context: ./shared-auth-wrapper/auth_wrapper
       dockerfile: Dockerfile
     container_name: iacgenie_auth_wrapper
     restart: unless-stopped
