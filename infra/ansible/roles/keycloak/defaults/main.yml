@@ -8,7 +8,7 @@ keycloak_db_port: 5432
 keycloak_db_name: keycloak
 keycloak_admin_url: "http://127.0.0.1:{{ keycloak_port }}"
 
-# LightSerp realm clients
+# LightSerp realm clients (Keycloak admin API on port 9003)
 lightserp_realm_enabled: true
 lightserp_clients:
   lightserp-webui:

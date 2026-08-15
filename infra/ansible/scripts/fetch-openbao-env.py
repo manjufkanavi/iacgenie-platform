@@ -53,9 +53,7 @@ def get_token():
 
 
 def build_ssl_context():
-    """Build SSL context, optionally skipping verification."""
-    if SSL_SKIP_VERIFY:
-        return ssl._create_unverified_context()
+    """Build SSL context using system CA bundle (proper verification)."""
     return ssl.create_default_context()
 
 

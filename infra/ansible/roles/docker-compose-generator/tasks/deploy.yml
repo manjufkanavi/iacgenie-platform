@@ -16,19 +16,19 @@
 
 - name: "Compose Gen | Copy platform shared files to compose root"
   ansible.builtin.copy:
-    src: "{{ item }}"
+    src: "/Users/manjunathkanavi/iacgenie-platform/platform/{{ item }}"
     dest: "/home/mkanavi/docker/iacgenie/{{ item }}"
     owner: mkanavi
     group: mkanavi
     mode: "0644"
   loop:
-    - platform/App.tsx
-    - platform/types.ts
-    - platform/constants.ts
+    - App.tsx
+    - types.ts
+    - constants.ts
 
 - name: "Compose Gen | Copy frontend source and Dockerfile"
   ansible.builtin.copy:
-    src: "platform/frontend/"
+    src: "../../../platform/frontend/"
     dest: "/home/mkanavi/docker/iacgenie/platform/frontend/"
     owner: mkanavi
     group: mkanavi

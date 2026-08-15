@@ -29,11 +29,6 @@ Environment variables can override OpenBao settings:
 
 import json, os, sys, subprocess, ssl, urllib.request, urllib.error, time, signal
 
-# ── SSL Context (skip verification for local Docker network) ──
-_ssl_ctx = ssl.create_default_context()
-_ssl_ctx.check_hostname = False
-_ssl_ctx.verify_mode = ssl.CERT_NONE
-
 def log(msg):
     print(f"[openbao-injector] {msg}", flush=True)
 
@@ -48,7 +43,7 @@ def load_config(service_name):
         config = json.load(f)
 
     # Defaults
-    config.setdefault("openbao_addr", "http://openbao:8200")
+    config.setdefault("openbao_addr", "https://127.0.0.1:8200")
     config.setdefault("approle_role_id_path", "/var/run/approle/role_id")
     config.setdefault("approle_secret_id_path", "/var/run/approle/secret_id")
     config.setdefault("timeout", 30)
@@ -61,26 +56,6 @@ def read_file(path):
     """Read a file, return stripped content."""
     with open(path) as f:
         return f.read().strip()
-
-def load_token_from_init_keys(raft_dir="/openbao/raft"):
-    """Load root token from init_keys.json (fallback)."""
-    candidates = [
-        os.path.join(raft_dir, "init_keys.json"),
-        "/openbao/openbao-prod.hcl".replace("openbao-prod", "init_keys"),
-        "/tmp/init_keys.json",
-    ]
-    for path in candidates:
-        if not os.path.exists(path):
-            continue
-        try:
-            with open(path) as f:
-                data = json.load(f)
-            for key in ("root_token", "root_token_persisted", "new_root_token"):
-                if key in data and data[key]:
-                    return data[key]
-        except (json.JSONDecodeError, KeyError):
-            continue
-    return None
 
 def get_role_id_and_secret_id(config):
     """Get AppRole credentials from config paths or env vars."""
@@ -116,7 +91,7 @@ def get_role_id_and_secret_id(config):
 
     return role_id, secret_id
 
-def api_request(base_url, path, data=None, token=None):
+def api_request(base_url, path, data=None, token=None, ssl_ctx=None):
     """Make an API request to OpenBao."""
     url = f"{base_url}{path}"
     headers = {"Content-Type": "application/json"}
@@ -126,33 +101,35 @@ def api_request(base_url, path, data=None, token=None):
     body = json.dumps(data).encode() if data else None
     req = urllib.request.Request(url, data=body, headers=headers, method="POST" if data else "GET")
 
-    resp = urllib.request.urlopen(req, timeout=config["timeout"], context=_ssl_ctx)
+    # Use default SSL context (validates against system CA bundle)
+    ctx = ssl_ctx if ssl_ctx else ssl.create_default_context()
+    resp = urllib.request.urlopen(req, timeout=config["timeout"], context=ctx)
     raw = resp.read()
     if raw:
         return json.loads(raw)
     return {"success": True}
 
-def auth_approle(role_id, secret_id, addr):
+def auth_approle(role_id, secret_id, addr, ssl_ctx=None):
     """Authenticate using AppRole, return client token."""
     result = api_request(addr, "/v1/auth/approle/login", {
         "role_id": role_id,
         "secret_id": secret_id
-    })
+    }, ssl_ctx=ssl_ctx)
     token = result.get("auth", {}).get("client_token")
     if not token:
         log(f"ERROR: Failed to get token from AppRole login: {json.dumps(result)[:200]}")
         sys.exit(1)
     return token
 
-def fetch_secret(addr, token, path):
+def fetch_secret(addr, token, path, ssl_ctx=None):
     """Fetch a secret from KV v2."""
-    result = api_request(addr, f"/v1/{path}", token=token)
+    result = api_request(addr, f"/v1/{path}", token=token, ssl_ctx=ssl_ctx)
     if not isinstance(result, dict):
         raise ValueError(f"Unexpected response type: {type(result)}")
     data = result.get("data", {}).get("data", {})
     return data
 
-def inject_secrets(token, secret_paths, addr):
+def inject_secrets(token, secret_paths, addr, ssl_ctx=None):
     """Fetch and inject secrets as environment variables."""
     for env_var, vault_path in secret_paths.items():
         if env_var in os.environ:
@@ -160,7 +137,7 @@ def inject_secrets(token, secret_paths, addr):
             pass
 
         try:
-            secrets = fetch_secret(addr, token, vault_path)
+            secrets = fetch_secret(addr, token, vault_path, ssl_ctx)
             if env_var in secrets:
                 os.environ[env_var] = secrets[env_var]
                 log(f"  ✓ {env_var} injected from {vault_path}")
@@ -174,7 +151,7 @@ def inject_secrets(token, secret_paths, addr):
                 log(f"    Using fallback from existing env var")
 
 def main():
-    global config, _ssl_ctx
+    global config
 
     if len(sys.argv) < 2:
         print("Usage: openbao-injector <service-name> -- <command> [args...]", file=sys.stderr)
@@ -199,9 +176,8 @@ def main():
 
     # Load config
     config = load_config(service_name)
-    _ssl_ctx = ssl.create_default_context()
-    _ssl_ctx.check_hostname = False
-    _ssl_ctx.verify_mode = ssl.CERT_NONE
+    # Use default SSL context (validates against system CA bundle)
+    ssl_ctx = ssl.create_default_context()
 
     # Force HTTPS for all connections (OpenBao runs with TLS)
     addr = config["openbao_addr"]
@@ -217,7 +193,7 @@ def main():
     for attempt in range(config["retry_attempts"]):
         try:
             role_id, secret_id = get_role_id_and_secret_id(config)
-            token = auth_approle(role_id, secret_id, addr)
+            token = auth_approle(role_id, secret_id, addr, ssl_ctx)
             log("AppRole authentication: SUCCESS")
             break
         except urllib.error.HTTPError as e:
@@ -231,20 +207,12 @@ def main():
                 time.sleep(config["retry_delay"])
 
     if not token:
-        log("ERROR: All authentication attempts failed")
-        # Fallback: try root token
-        root_token = load_token_from_init_keys()
-        if root_token:
-            log("Falling back to root token...")
-            # Just inject without auth (no AppRole)
-            token = None  # Will use root-based approach
-            log("Using root token fallback mode")
-        else:
-            log("No fallback available. Service will use existing env vars.")
+        log("ERROR: All authentication attempts failed. No AppRole credentials available.")
+        log("Service will use existing environment variables (no OpenBao injection).")
 
     # Inject secrets
     if token:
-        inject_secrets(token, config["secret_paths"], addr)
+        inject_secrets(token, config["secret_paths"], addr, ssl_ctx)
     else:
         log("Skipping secret injection (no token available, using existing env vars)")
 

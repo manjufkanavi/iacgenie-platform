@@ -40,10 +40,8 @@ EMAIL_TO = os.getenv("BACKUP_EMAIL_TO", "")
 EMAIL_FROM = os.getenv("BACKUP_EMAIL_FROM", "openbao-backup@iacgenie.com")
 EMAIL_SMTP = os.getenv("BACKUP_EMAIL_SMTP", "smtp.gmail.com:587")
 
-# SSL context: disable verification for local connections (self-signed/virtual host cert)
+# SSL context: use default context (validates against system CA bundle)
 _ssl_ctx = ssl.create_default_context()
-_ssl_ctx.check_hostname = False
-_ssl_ctx.verify_mode = ssl.CERT_NONE
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 

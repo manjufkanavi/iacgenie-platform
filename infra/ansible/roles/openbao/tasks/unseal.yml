@@ -1,6 +1,6 @@
 ---
 # OpenBao auto-unseal task
-# Uses HTTP API (bao operator unseal removed in OpenBao 2.6.0)
+# Uses HTTPS API (TLS-enabled OpenBao)
 # Runs after docker-compose-generator starts the container
 #
 # REQUIRED: Environment variables OPENBAO_UNSEAL_KEY_1, 2, 3 must be set
@@ -8,7 +8,7 @@
 
 - name: "OpenBao | Wait for container to respond"
   ansible.builtin.command: >-
-    docker exec iacgenie_openbao wget -q -O - http://127.0.0.1:8200/v1/sys/health
+    docker exec iacgenie_openbao wget -q -O - https://127.0.0.1:8200/v1/sys/health --no-check-certificate
   register: openbao_early_health
   retries: 30
   delay: 5
@@ -16,9 +16,9 @@
   changed_when: false
   failed_when: false
 
-- name: "OpenBao | Check seal status via API"
+- name: "OpenBao | Check seal status via API (HTTPS)"
   ansible.builtin.uri:
-    url: "http://127.0.0.1:8200/v1/sys/health"
+    url: "https://127.0.0.1:8200/v1/sys/health"
     method: GET
     validate_certs: false
     status_code: [200]
@@ -49,9 +49,9 @@
     fail_msg: "OpenBao unseal keys not available from environment variables. Set OPENBAO_UNSEAL_KEY_1, OPENBAO_UNSEAL_KEY_2, OPENBAO_UNSEAL_KEY_3."
   when: openbao_unseal_needed | default(true) | bool
 
-- name: "OpenBao | Unseal via HTTP API (threshold 3/3 from env vars)"
+- name: "OpenBao | Unseal via HTTPS API (threshold 3/3 from env vars)"
   ansible.builtin.uri:
-    url: "http://127.0.0.1:8200/v1/sys/unseal"
+    url: "https://127.0.0.1:8200/v1/sys/unseal"
     method: PUT
     headers:
       X-Vault-Token: "{{ openbao_root_token }}"
@@ -77,9 +77,9 @@
     - openbao_unseal_needed | default(true) | bool
     - (openbao_unseal_result | default([])) | length > 0
 
-- name: "OpenBao | Verify unsealed state"
+- name: "OpenBao | Verify unsealed state (HTTPS)"
   ansible.builtin.uri:
-    url: "http://127.0.0.1:8200/v1/sys/health"
+    url: "https://127.0.0.1:8200/v1/sys/health"
     method: GET
     validate_certs: false
     status_code: [200]

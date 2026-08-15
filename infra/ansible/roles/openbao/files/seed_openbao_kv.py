@@ -68,7 +68,7 @@ def kv_put(engine, path, data, token):
         method="POST"
     )
     try:
-        resp = urllib.request.urlopen(req, context=ssl._create_unverified_context(), timeout=10)
+        resp = urllib.request.urlopen(req, context=ssl.create_default_context(), timeout=10)
         return True, resp.status
     except urllib.error.HTTPError as e:
         body = e.read().decode()

@@ -191,15 +191,12 @@ do_seed() {
     # --- Create admin user ---
     # Check if admin user exists
     if python3 -c "
-import urllib.request, urllib.error, ssl, json
-ctx = ssl.create_default_context()
-ctx.check_hostname = False
-ctx.verify_mode = ssl.CERT_NONE
+import urllib.request, urllib.error, ssl
 try:
     r = urllib.request.urlopen(urllib.request.Request(
         'https://127.0.0.1:8200/v1/auth/userpass/users/admin',
         headers={'X-Vault-Token': '$root_token'},
-        method='GET'), context=ctx)
+        method='GET'), context=ssl.create_default_context())
     json.loads(r.read())
 except:
     exit(1)

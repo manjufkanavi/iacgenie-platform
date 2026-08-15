@@ -139,15 +139,15 @@ services:
     user: "1000:1000"
     command: bao server -config=/openbao/storage/openbao-prod.hcl
     environment:
-      OPENBAO_ADDR: http://127.0.0.1:8200
-      OPENBAO_CLUSTER_ADDR: http://127.0.0.1:8201
+      OPENBAO_ADDR: https://127.0.0.1:8200
+      OPENBAO_CLUSTER_ADDR: https://127.0.0.1:8201
       OPENBAO_UI: "true"
       OPENBAO_LOG_LEVEL: info
     volumes:
       - /home/mkanavi/docker/iacgenie/openbao_raft:/openbao/raft
       - /home/mkanavi/docker/iacgenie/data/openbao:/openbao/storage
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8200/v1/sys/health 2>&1"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null https://127.0.0.1:8200/v1/sys/health --no-check-certificate 2>&1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -166,7 +166,7 @@ services:
     command:
       - start
       - --http-enabled=true
-      - --http-port=9002
+      - --http-port=9003
       - --db=postgres
       - --hostname={{ keycloak_hostname | default('https://auth.iacgenie.com') }}
       - --hostname-admin={{ keycloak_hostname | default('https://auth.iacgenie.com') }}
@@ -184,13 +184,13 @@ services:
       - ./keycloak.conf:/opt/keycloak/conf/keycloak.conf:ro
     ports:
       - "127.0.0.1:8083:8080"
-      - "127.0.0.1:9002:9002"
+      - "127.0.0.1:9003:9003"
     networks:
       - iacgenie-backend
     depends_on:
       - postgres
     healthcheck:
-      test: ["CMD-SHELL", "exec 6<>/dev/tcp/127.0.0.1/8080 && exec 6>&-"]
+      test: ["CMD-SHELL", "exec 6<>/dev/tcp/127.0.0.1/9003 && exec 6>&-"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -207,7 +207,6 @@ services:
     container_name: iacgenie_gitea
     restart: unless-stopped
     environment:
-      USER: root
       GITEA__database__DB_TYPE: postgres
       GITEA__database__HOST: postgres:5432
       GITEA__database__NAME: gitea
@@ -305,7 +304,6 @@ services:
       LIGHTSERP_PAGEZEN_API: "http://pagezen:8082"
       SEARXNG_URL: "http://searxng:8080"
       LIGHTSERP_S3_BASE: "iacgenie-lightserp"
-      LIGHTSERP_ALLOW_INSECURE: "true"
       REDIS_URL: "redis://:${REDIS_PASSWORD}@redis:6379/0"
       LIGHTSERP_API_SECRET: "${LIGHTSERP_API_SECRET}"
       LIGHTSERP_DATABASE_URL: "${LIGHTSERP_DATABASE_URL}"

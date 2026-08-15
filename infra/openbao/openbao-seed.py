@@ -18,8 +18,6 @@ if not TOKEN:
     sys.exit(1)
 
 ctx = ssl.create_default_context()
-ctx.check_hostname = False
-ctx.verify_mode = ssl.CERT_NONE
 
 def rand_password(length=24):
     chars = string.ascii_letters + string.digits + "!@#$%^&*"
