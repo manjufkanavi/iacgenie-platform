@@ -24,6 +24,49 @@ map $http_origin $cors_origin_header {
     default "";
 }
 
+# ====== Optimization: gzip compression ======
+gzip on;
+gzip_vary on;
+gzip_proxied any;
+gzip_comp_level 6;
+gzip_min_length 256;
+gzip_types
+    text/plain
+    text/css
+    text/xml
+    text/javascript
+    application/json
+    application/javascript
+    application/x-javascript
+    application/xml
+    application/xml+rss
+    application/vnd.ms-fontobject
+    application/x-font-ttf
+    font/opentype
+    image/svg+xml
+    image/x-icon;
+
+# ====== Optimization: proxy buffering ======
+proxy_buffering on;
+proxy_buffer_size 4k;
+proxy_buffers 8 4k;
+proxy_busy_buffers_size 8k;
+proxy_temp_file_write_size 64k;
+
+# ====== Optimization: static asset caching ======
+map $sent_http_content_type $expires {
+    default                    off;
+    text/html                  epoch;
+    text/css                   max;
+    application/javascript     max;
+    image/jpeg                 max;
+    image/png                  max;
+    image/gif                  max;
+    image/svg+xml              max;
+    application/font-woff      max;
+    application/font-woff2     max;
+}
+
 # ====== HTTP: Default redirect (external users, not cloudflared) ======
 server {
     listen 80 default_server;

@@ -10,6 +10,7 @@ pid /run/nginx.pid;
 
 events {
     worker_connections {{ nginx_worker_connections | default(1024) }};
+    multi_accept on;
 }
 
 http {
@@ -24,8 +25,38 @@ http {
 
     sendfile on;
     tcp_nopush on;
+    tcp_nodelay on;
     keepalive_timeout {{ nginx_keepalive_timeout | default(65) }};
     client_max_body_size {{ nginx_client_max_body_size | default('64m') }};
+
+    # ====== Optimization: gzip compression ======
+    gzip on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_min_length 256;
+    gzip_types
+        text/plain
+        text/css
+        text/xml
+        text/javascript
+        application/json
+        application/javascript
+        application/x-javascript
+        application/xml
+        application/xml+rss
+        application/vnd.ms-fontobject
+        application/x-font-ttf
+        font/opentype
+        image/svg+xml
+        image/x-icon;
+
+    # ====== Optimization: proxy buffering ======
+    proxy_buffering on;
+    proxy_buffer_size 4k;
+    proxy_buffers 8 4k;
+    proxy_busy_buffers_size 8k;
+    proxy_temp_file_write_size 64k;
 
     # Rate limiting
     limit_req_zone $binary_remote_addr zone=general:10m rate=10r/s;

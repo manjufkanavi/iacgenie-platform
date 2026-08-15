@@ -1,5 +1,12 @@
-# Build stage
-FROM node:22-slim AS builder
+# =============================================================================
+# LightSerp WebUI — Multi-Stage Docker Build
+# =============================================================================
+# Stage 1: Build Next.js app
+# Stage 2: Production — minimal Alpine runtime
+# =============================================================================
+
+# ---- Stage 1: Build ----
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 COPY package*.json ./
@@ -7,8 +14,8 @@ RUN npm install --no-audit --no-fund
 COPY . .
 RUN npm run build
 
-# Production stage
-FROM node:22-slim AS runner
+# ---- Stage 2: Production ----
+FROM node:22-alpine AS runner
 
 WORKDIR /app
 ENV NODE_ENV=production
@@ -25,8 +32,8 @@ COPY --from=builder /app/public ./public
 # Update package.json for standalone
 RUN node -e "const pkg=require('./package.json'); delete pkg.devDependencies; pkg.scripts={}; require('fs').writeFileSync('package.json', JSON.stringify(pkg,null,2))"
 
-# Create non-root user for running the application
-RUN groupadd -r appgroup && useradd -r -g appgroup -d /app -s /sbin/nologin appuser && \
+# Create non-root user
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup -h /app -s /sbin/nologin && \
     chown -R appuser:appgroup /app
 USER appuser
 
