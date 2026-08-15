@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 # =====================
 # Configuration
 # =====================
-OPENBAO_ADDR = os.getenv("OPENBAO_ADDR", "https://127.0.0.1:8200")
+OPENBAO_ADDR = os.getenv("OPENBAO_ADDR", "http://127.0.0.1:8200")
 OUTPUT_PATH = "/home/mkanavi/docker/iacgenie/.env"
 TOKEN_PATH = "/home/mkanavi/docker/iacgenie/openbao_raft/init_keys.json"
 SSL_SKIP_VERIFY = True

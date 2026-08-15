@@ -174,7 +174,7 @@ services:
           cpus: '0.5'
           memory: 1g
   keycloak:
-    image: quay.io/keycloak/keycloak:26.0
+    image: quay.io/keycloak/keycloak:26.0-pg
     container_name: iacgenie_keycloak
     restart: unless-stopped
     command:
@@ -182,34 +182,31 @@ services:
     - --http-enabled=true
     - --http-port=8080
     - --db=postgres
-    - --import-realm
     - --hostname=https://auth.iacgenie.com
     - --hostname-admin=https://auth.iacgenie.com
-    - --hostname-strict=false
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN_USER}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KC_DB_HOST: postgres
+      KC_DB_PORT: 5432
+      KC_DB_NAME: keycloak
       KC_DB_PASSWORD: ${KC_DB_PASSWORD}
     volumes:
     - /home/mkanavi/docker/iacgenie/data/keycloak:/opt/keycloak/data
     - ./keycloak.conf:/opt/keycloak/conf/keycloak.conf:ro
     ports:
     - 127.0.0.1:8083:8080
+    - 127.0.0.1:9000:9000
     networks:
     - iacgenie-backend
     depends_on:
     - postgres
     healthcheck:
       test:
-      - CMD
-      - wget
-      - --spider
-      - -q
-      - -T
-      - '2'
-      - http://127.0.0.1:8080/
+      - CMD-SHELL
+      - exec 6<>/dev/tcp/127.0.0.1/8080 && exec 6>&-
       interval: 30s
       timeout: 10s
       retries: 3
@@ -427,7 +424,7 @@ services:
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:***@postgres:5432/${POSTGRES_DB}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
@@ -529,8 +526,7 @@ services:
     image: cloudflare/cloudflared:latest
     container_name: iacgenie_cloudflared
     restart: unless-stopped
-    command: tunnel --no-autoupdate --credentials-file /etc/cloudflared/cert.json
-      run iacgenie-pi
+    command: tunnel --no-autoupdate --credentials-file /etc/cloudflared/cert.json run iacgenie-pi
     environment: {}
     networks:
     - iacgenie-frontend
@@ -545,6 +541,7 @@ services:
     - ALL
     volumes:
     - /home/mkanavi/docker/iacgenie/docker/cloudflared/auth.json:/etc/cloudflared/cert.json:ro
+    - /home/mkanavi/docker/iacgenie/docker/cloudflared/config.yml:/etc/cloudflared/config.yml:ro
   clamav-backend:
     image: rguziy/clamav-web-client:latest
     container_name: iacgenie_clamav

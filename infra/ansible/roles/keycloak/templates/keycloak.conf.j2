@@ -4,6 +4,9 @@
 
 # Database (PostgreSQL driver baked into image via 'kc.sh build --db postgres')
 db=postgres
+db-url-host={{ keycloak_db_host | default('postgres') }}
+db-url-port=5432
+db-url-database=keycloak
 
 # HTTP
 http-enabled=true

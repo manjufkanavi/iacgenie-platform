@@ -1,0 +1,35 @@
+tunnel: iacgenie-pi
+credentials-file: /etc/cloudflared/cert.json
+
+ingress:
+  - hostname: "auth.iacgenie.com"
+    service: http://127.0.0.1:80
+
+  - hostname: "platform.iacgenie.com"
+    service: http://127.0.0.1:80
+
+  - hostname: "iacgenie.com"
+    service: http://127.0.0.1:80
+
+  - hostname: "www.iacgenie.com"
+    service: http://127.0.0.1:80
+
+  - hostname: "clamav.iacgenie.com"
+    service: http://127.0.0.1:80
+
+  - hostname: "crowdsec.iacgenie.com"
+    service: http://127.0.0.1:80
+
+  - hostname: "pagegen.iacgenie.com"
+    service: http://127.0.0.1:80
+
+  - hostname: "search.iacgenie.com"
+    service: http://127.0.0.1:80
+
+  - hostname: "vault.iacgenie.com"
+    service: http://127.0.0.1:80
+
+  - hostname: "*.iacgenie.com"
+    service: http://127.0.0.1:80
+
+  - service: http_status:404

@@ -30,213 +30,22 @@ server {
     return 301 https://$host$request_uri;
 }
 
-# ====== HTTP: Cloudflare tunnel passthrough (no redirect) ======
-# cloudflared proxies to port 80 with the original Host header.
-# Each vHost is a separate server block to avoid duplicate location errors.
-# This prevents the redirect loop: cloudflared → nginx:80 → redirect → cloudflare → loop.
 
 # Keycloak (auth)
-server {
-    listen 80;
-    server_name auth.iacgenie.com;
-
-    # Security headers (Phase 10.8)
-    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-
-    location / {
-        proxy_pass http://127.0.0.1:8083;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_read_timeout 86400;
-        proxy_redirect off;
-        proxy_hide_header X-Powered-By;
-    }
-}
 
 # SearXNG (search)
-server {
-    listen 80;
-    server_name search.iacgenie.com;
-
-    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-
-    location / {
-        proxy_pass http://127.0.0.1:8082;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_redirect off;
-        proxy_hide_header X-Powered-By;
-    }
-}
 
 # LightSerp API (api) — root handler: return 405, backend API at /api/*
-server {
-    listen 80;
-    server_name api.iacgenie.com;
-
-    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-
-    # Root: return 405 (API has no root endpoint)
-    location = / {
-        return 405 '{"message":"API root not available — use /docs or specific endpoints"}';
-    }
-
-    # All other paths: proxy to backend API
-    location / {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_read_timeout 300;
-        proxy_redirect off;
-        proxy_hide_header X-Powered-By;
-    }
-}
 
 # LightSerp WebUI (app)
-server {
-    listen 80;
-    server_name app.iacgenie.com;
-
-    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-
-    location / {
-        proxy_pass http://127.0.0.1:3001;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_read_timeout 300;
-        proxy_redirect off;
-        proxy_hide_header X-Powered-By;
-    }
-}
 
 # Gitea (git)
-server {
-    listen 80;
-    server_name git.iacgenie.com;
-
-    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-
-    location / {
-proxy_pass http://127.0.0.1:3000;        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_redirect off;
-        proxy_hide_header X-Powered-By;
-    }
-}
 
 # PageZen (page) — root handler: redirect to main app
-server {
-    listen 80;
-    server_name page.iacgenie.com;
-
-    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-
-    # Root: redirect to main app
-    location = / {
-        return 302 https://app.iacgenie.com;
-    }
-
-    # All other paths: proxy to PageZn
-    location / {
-        proxy_pass http://127.0.0.1:8081;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_redirect off;
-        proxy_hide_header X-Powered-By;
-    }
-}
 
 # IacGenie Platform (platform) — UI proxy only, backend via api.iacgenie.com
-server {
-    listen 80;
-    server_name platform.iacgenie.com;
-
-    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-
-    location / {
-        proxy_pass http://127.0.0.1:3002;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_read_timeout 300;
-        proxy_redirect off;
-        proxy_hide_header X-Powered-By;
-    }
-}
 
 # LightSerp (lightserp) — UI proxy only, backend via api.iacgenie.com
-server {
-    listen 80;
-    server_name lightserp.iacgenie.com;
-
-    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-
-    location / {
-        proxy_pass http://127.0.0.1:3001;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_read_timeout 300;
-        proxy_redirect off;
-        proxy_hide_header X-Powered-By;
-    }
-}
 
 # ====== HTTPS: Full vHosts (for direct access, certbot) ======
 
@@ -281,14 +90,6 @@ server {
         proxy_hide_header X-Powered-By;
     }
 
-    location /login* {
-        limit_req zone=auth burst=3 nodelay;
-        proxy_pass http://127.0.0.1:8083;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
 }
 
 # SearXNG (search)
@@ -370,9 +171,6 @@ server {
     }
 
     # Handle CORS preflight
-    if ($request_method = 'OPTIONS') {
-        return 204;
-    }
 
     # All other paths: proxy to backend API
     location / {
@@ -586,36 +384,6 @@ server {
 # ====== OpenBao (vault) ======
 
 # HTTP: Cloudflare tunnel passthrough
-server {
-    listen 80;
-    server_name vault.iacgenie.com;
-
-    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
-    add_header X-Frame-Options "DENY" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-
-    location / {
-        proxy_pass http://127.0.0.1:8200;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 60s;
-        proxy_redirect off;
-        proxy_hide_header X-Powered-By;
-    }
-
-    location /v1/auth/ {
-        limit_req zone=auth burst=3 nodelay;
-        proxy_pass http://127.0.0.1:8200;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
 
 # HTTPS: Full vHost (direct access, certbot)
 server {
@@ -666,96 +434,12 @@ server {
 
 
 # Grafana (monitoring dashboards)
-server {
-    listen 80;
-    server_name grafana.iacgenie.com;
-
-    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-
-    location / {
-        proxy_pass http://127.0.0.1:3004;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 300;
-        proxy_redirect off;
-        proxy_hide_header X-Powered-By;
-    }
-}
 
 # ClamAV Web Client (virus scanning UI)
-server {
-    listen 80;
-    server_name clamav.iacgenie.com;
-
-    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-
-    location / {
-        proxy_pass http://127.0.0.1:9092;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 300;
-        proxy_redirect off;
-        proxy_hide_header X-Powered-By;
-    }
-}
 
 # CrowdSec (security monitoring)
-server {
-    listen 80;
-    server_name crowdsec.iacgenie.com;
-
-    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-
-    location / {
-        proxy_pass http://127.0.0.1:3033;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 300;
-        proxy_redirect off;
-        proxy_hide_header X-Powered-By;
-    }
-}
 
 # PageGen (AI page generator)
-server {
-    listen 80;
-    server_name pagegen.iacgenie.com;
-
-    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-
-    location / {
-        proxy_pass http://127.0.0.1:3032;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 300;
-        proxy_redirect off;
-        proxy_hide_header X-Powered-By;
-    }
-}
 
 # Grafana (monitoring dashboards)
 server {
