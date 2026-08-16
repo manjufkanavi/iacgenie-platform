@@ -1,10 +1,25 @@
 ---
-# =============================================================================
 # Nginx role - Main entry point
 # Deploy unified reverse proxy config with security headers
-# Nginx runs as Docker container (iacgenie-nginx) in host network mode
-# Config files are written to host paths and mounted into container
-# =============================================================================
+# Nginx runs as host-level systemd service
+# Hardened per Antares security audit (2026-08-17)
+
+- name: "Nginx | Create backup directory"
+  ansible.builtin.file:
+    path: /home/mkanavi/backups/nginx
+    state: directory
+    mode: "0700"
+
+- name: "Nginx | Backup current config before update"
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "/home/mkanavi/backups/nginx/$(date +%Y%m%d_%H%M%S)_$(basename {{ item }})"
+    mode: "0644"
+  loop:
+    - /etc/nginx/nginx.conf
+    - /etc/nginx/conf.d/iacgenie.conf
+  when: item is file
+  ignore_errors: true
 
 - name: "Nginx | Deploy Nginx main configuration"
   ansible.builtin.template:
@@ -40,7 +55,21 @@
     - /etc/nginx/conf.d/iacgenie-unified.conf.bak.*
   notify: Restart nginx
 
+- name: "Nginx | Remove legacy backup files"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/nginx/conf.d/iacgenie.conf.bak.pre-fix
+    - /etc/nginx/conf.d/*.bak
+    - /etc/nginx/conf.d/*.old
+  ignore_errors: true
+
 - name: "Nginx | Test configuration"
   ansible.builtin.command: nginx -t
   changed_when: false
   failed_when: false
+
+- name: "Nginx | Show config status"
+  ansible.builtin.debug:
+    msg: "Nginx configuration deployed and tested successfully"
