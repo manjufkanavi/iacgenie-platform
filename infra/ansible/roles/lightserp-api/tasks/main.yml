@@ -1,0 +1,107 @@
+---
+# LightSerp API role — Main entry point
+# Manages: API config, secrets, health monitoring
+# Hardened per Antares security audit (2026-08-17)
+
+# ========================
+# Secret File Creation
+# ========================
+
+- name: "LightSerp API | Create secrets directory"
+  ansible.builtin.file:
+    path: /run/secrets
+    state: directory
+    mode: "0700"
+
+- name: "LightSerp API | Create API secret file"
+  ansible.builtin.copy:
+    content: "{{ lightserp_api_secret }}"
+    dest: "{{ lightserp_api_secret_file }}"
+    owner: mkanavi
+    group: mkanavi
+    mode: "0600"
+  no_log: true
+
+- name: "LightSerp API | Create database URL file"
+  ansible.builtin.copy:
+    content: "{{ lightserp_database_url | default('CHANGE_ME') }}"
+    dest: "{{ lightserp_database_url_file }}"
+    owner: mkanavi
+    group: mkanavi
+    mode: "0600"
+  no_log: true
+
+- name: "LightSerp API | Create Keycloak client secret file"
+  ansible.builtin.copy:
+    content: "{{ lightserp_keycloak_client_secret }}"
+    dest: "{{ lightserp_keycloak_client_secret_file }}"
+    owner: mkanavi
+    group: mkanavi
+    mode: "0600"
+  no_log: true
+
+- name: "LightSerp API | Create Redis password file"
+  ansible.builtin.copy:
+    content: "{{ lightserp_redis_password }}"
+    dest: "{{ lightserp_redis_password_file }}"
+    owner: mkanavi
+    group: mkanavi
+    mode: "0600"
+  no_log: true
+
+# ========================
+# Backup Strategy
+# ========================
+
+- name: "LightSerp API | Create backup directory"
+  ansible.builtin.file:
+    path: "{{ lightserp_api_backup_dir }}"
+    state: directory
+    mode: "0700"
+
+- name: "LightSerp API | Deploy backup script"
+  ansible.builtin.copy:
+    content: |
+      #!/bin/bash
+      # LightSerp API backup script - managed by Ansible
+      BACKUP_DIR="{{ lightserp_api_backup_dir }}"
+      TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+      BACKUP_FILE="${BACKUP_DIR}/lightserp_api_backup_${TIMESTAMP}.tar.gz"
+
+      # Backup config
+      tar -czf "${BACKUP_FILE}" /etc/lightserp-api/ 2>/dev/null
+
+      # Remove backups older than {{ lightserp_api_backup_retention_days }} days
+      find "${BACKUP_DIR}" -name "lightserp_api_backup_*" -mtime +{{ lightserp_api_backup_retention_days }} -delete
+
+      echo "Backup completed: ${BACKUP_FILE}"
+    dest: /home/mkanavi/docker/iacgenie/scripts/lightserp_api_backup.sh
+    owner: mkanavi
+    group: mkanavi
+    mode: "0750"
+
+- name: "LightSerp API | Deploy backup cron job"
+  ansible.builtin.cron:
+    name: "LightSerp API daily backup"
+    minute: "0"
+    hour: "5"
+    job: "/home/mkanavi/docker/iacgenie/scripts/lightserp_api_backup.sh >> /var/log/lightserp_api_backup.log 2>&1"
+    user: mkanavi
+
+# ========================
+# Validation
+# ========================
+
+- name: "LightSerp API | Verify secret files exist"
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ lightserp_api_secret_file }}"
+    - "{{ lightserp_database_url_file }}"
+    - "{{ lightserp_keycloak_client_secret_file }}"
+    - "{{ lightserp_redis_password_file }}"
+  register: secret_files
+
+- name: "LightSerp API | Show secret file status"
+  ansible.builtin.debug:
+    var: secret_files.results | map(attribute='stat') | list

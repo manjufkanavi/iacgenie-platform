@@ -1,0 +1,49 @@
+---
+# LightSerp API role defaults
+# Hardened per Antares security audit (2026-08-17)
+
+lightserp_api_version: "latest"
+lightserp_api_port: 3000
+lightserp_api_exposed_port: 8000
+lightserp_api_image: "lightserp-lightserp-api:latest"
+
+# API secrets (should be encrypted with Ansible Vault)
+lightserp_api_secret: "{{ lightserp_api_secret | default('CHANGE_ME_IN_VAULT') }}"
+lightserp_api_secret_file: /run/secrets/lightserp_api_secret
+
+# Database URL (should use file-based secret)
+lightserp_database_url_file: /run/secrets/lightserp_database_url
+
+# Keycloak client secret
+lightserp_keycloak_client_secret: "{{ lightserp_keycloak_client_secret | default('CHANGE_ME_IN_VAULT') }}"
+lightserp_keycloak_client_secret_file: /run/secrets/lightserp_keycloak_client_secret
+
+# MinIO credentials (should use dedicated user, not root)
+lightserp_minio_access_key: "{{ lightserp_minio_access_key | default('CHANGE_ME') }}"
+lightserp_minio_secret_key: "{{ lightserp_minio_secret_key | default('CHANGE_ME') }}"
+lightserp_minio_endpoint: "minio:9000"
+lightserp_minio_secure: true
+
+# Redis URL (should use separate env vars, not embedded password)
+lightserp_redis_host: "redis"
+lightserp_redis_port: 6379
+lightserp_redis_password: "{{ lightserp_redis_password | default('CHANGE_ME') }}"
+lightserp_redis_password_file: /run/secrets/lightserp_redis_password
+lightserp_redis_url: "redis://:${REDIS_PASSWORD}@redis:6379/0"
+
+# Telemetry
+lightserp_logtide_url: "http://localhost:4318/v1/traces"
+lightserp_logtide_secure: false
+
+# Service URLs
+lightserp_pagezen_api: "http://pagezen:8082"
+lightserp_searxng_url: "http://searxng:8080"
+lightserp_s3_base: "iacgenie-lightserp"
+lightserp_nsqd_addr: "nsqd:4150"
+
+# Security
+lightserp_allow_insecure: false
+
+# Backup configuration
+lightserp_api_backup_dir: /home/mkanavi/backups/lightserp-api
+lightserp_api_backup_retention_days: 30
