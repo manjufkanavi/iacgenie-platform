@@ -1,6 +1,6 @@
 ---
 # Gitea role — Defaults
-# Updated for manjufkanavi admin, Actions enabled, pull mirrors
+# Hardened per Antares security audit (2026-08-17)
 
 gitea_version: "1.23.4-rootless"
 gitea_http_port: 3000
@@ -8,36 +8,50 @@ gitea_ssh_port: 2222
 gitea_admin_user: manjufkanavi
 gitea_admin_password: CHANGE_ME_IN_VAULT
 gitea_admin_email: manjufkanavi@iacgenie.com
-# 2FA enforcement (Phase 10.9)
-gitea_2fa_enforce: true
-# Database (used by .env.j2 template)
-gitea_db_host: 127.0.0.1
+gitea_db_host: postgres
 gitea_db_port: 5432
 gitea_db_name: gitea
+gitea_db_user: gitea
 gitea_db_password: CHANGE_ME_IN_VAULT
-# Security hardening (Phase 10.9)
+gitea_data_dir: /home/mkanavi/docker/iacgenie/data/gitea
+gitea_ssh_domain: git.iacgenie.com
+gitea_root_url: https://git.iacgenie.com
+
+# Security hardening
 gitea_disable_registration: true
 gitea_enable_notify_mail: true
 gitea_min_password_length: 12
+gitea_2fa_enforce: true
+gitea_require_signin: true
+gitea_mailer_enabled: true
+
 # SMTP config
 smtp_addr: mail.smtp2go.com
 smtp_port: "2525"
 smtp_user: CHANGE_ME_IN_VAULT
 smtp_pass: CHANGE_ME_IN_VAULT
 smtp_from: noreply@iacgenie.com
+
+# Gitea Actions
+gitea_actions_enabled: true
+
+# Backup configuration
+gitea_backup_dir: /home/mkanavi/backups/gitea
+gitea_backup_retention_days: 30
+
 # Rate limiting
 gitea_rate_limit_window: 15m
 gitea_rate_limit_high: 200
 gitea_rate_limit_low: 50
+
 # Keycloak vars
 keycloak_db_password: CHANGE_ME_IN_VAULT
 keycloak_db_host: 127.0.0.1
 keycloak_db_port: 5432
 keycloak_db_name: keycloak
+
 # GitHub PAT for pull mirrors
 gitea_github_pat: CHANGE_ME_IN_VAULT
-# GitHub owner for mirror URLs
 gitea_github_owner: manjufkanavi
-# Mirror sync interval in seconds (default: 1 hour)
 gitea_mirror_interval: 3600
 gitea_mirror_enable_prune: true

@@ -1,6 +1,25 @@
 ---
 # Gitea role — Main entry point
 # Manages: container health, Actions config, admin user, API tokens, runner status
+# Hardened per Antares security audit (2026-08-17)
+
+# ========================
+# Secret Generation
+# ========================
+
+- name: "Gitea | Generate JWT secret"
+  ansible.builtin.set_fact:
+    gitea_jwt_secret: "{{ lookup('password', '/dev/null length=64 chars=ascii_letters,digits') }}"
+  no_log: true
+
+- name: "Gitea | Generate internal token"
+  ansible.builtin.set_fact:
+    gitea_internal_token: "{{ lookup('password', '/dev/null length=64 chars=ascii_letters,digits') }}"
+  no_log: true
+
+# ========================
+# Data Directory Setup
+# ========================
 
 - name: "Gitea | Create data directory"
   ansible.builtin.file:
@@ -9,6 +28,58 @@
     group: "1000"
     mode: "0755"
     state: directory
+
+# ========================
+# Configuration Deployment
+# ========================
+
+- name: "Gitea | Deploy app.ini configuration"
+  ansible.builtin.template:
+    src: app.ini.j2
+    dest: "{{ gitea_data_dir | default('/home/mkanavi/docker/iacgenie/data/gitea') }}/app.ini"
+    owner: "1000"
+    group: "1000"
+    mode: "0640"
+  notify: Reload docker compose
+
+# ========================
+# Backup Strategy
+# ========================
+
+- name: "Gitea | Create backup directory"
+  ansible.builtin.file:
+    path: "{{ gitea_backup_dir | default('/home/mkanavi/backups/gitea') }}"
+    state: directory
+    mode: "0700"
+
+- name: "Gitea | Deploy backup script"
+  ansible.builtin.copy:
+    content: |
+      #!/bin/bash
+      # Gitea backup script - managed by Ansible
+      BACKUP_DIR="{{ gitea_backup_dir | default('/home/mkanavi/backups/gitea') }}"
+      TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+      BACKUP_FILE="${BACKUP_DIR}/gitea_backup_${TIMESTAMP}.tar.gz"
+
+      # Backup Gitea data directory
+      tar -czf "${BACKUP_FILE}" -C /home/mkanavi/docker/iacgenie/data gitea/ 2>/dev/null
+
+      # Remove backups older than {{ gitea_backup_retention_days | default(30) }} days
+      find "${BACKUP_DIR}" -name "gitea_backup_*" -mtime +{{ gitea_backup_retention_days | default(30) }} -delete
+
+      echo "Backup completed: ${BACKUP_FILE}"
+    dest: /home/mkanavi/docker/iacgenie/scripts/gitea_backup.sh
+    owner: mkanavi
+    group: mkanavi
+    mode: "0750"
+
+- name: "Gitea | Deploy backup cron job"
+  ansible.builtin.cron:
+    name: "Gitea daily backup"
+    minute: "0"
+    hour: "4"
+    job: "/home/mkanavi/docker/iacgenie/scripts/gitea_backup.sh >> /var/log/gitea_backup.log 2>&1"
+    user: mkanavi
 
 # ========================
 # Container Health Check
@@ -23,20 +94,6 @@
 - name: "Gitea | Show Gitea status"
   ansible.builtin.debug:
     var: gitea_running.stdout_lines | default(['N/A - managed by docker-compose-generator'])
-
-# ========================
-# Actions Configuration
-# ========================
-
-- name: "Gitea | Ensure app.ini has Actions enabled"
-  ansible.builtin.lineinfile:
-    path: "{{ gitea_data_dir | default('/home/mkanavi/docker/iacgenie/data/gitea') }}/app.ini"
-    insertafter: "\\[security\\]"
-    line: "[actions]\nENABLED = true"
-    create: yes
-    owner: "1000"
-    group: "1000"
-    mode: "0644"
 
 # ========================
 # Admin User Provisioning

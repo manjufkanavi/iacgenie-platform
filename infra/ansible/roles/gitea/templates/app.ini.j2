@@ -1,0 +1,98 @@
+# Gitea Configuration
+# Managed by Ansible - do not edit manually
+# Hardened per Antares security audit (2026-08-17)
+
+APP_NAME = Gitea: Git with a cup of tea
+RUN_USER = gitea
+RUN_MODE = prod
+WORK_PATH = /var/lib/gitea
+
+[repository]
+ROOT = /var/lib/gitea/git/repositories
+
+[repository.local]
+LOCAL_COPY_PATH = /tmp/gitea/local-repo
+
+[repository.upload]
+TEMP_PATH = /tmp/gitea/uploads
+
+[server]
+APP_DATA_PATH = /var/lib/gitea
+SSH_DOMAIN = {{ gitea_ssh_domain | default('git.iacgenie.com') }}
+HTTP_PORT = {{ gitea_http_port | default(3000) }}
+ROOT_URL = {{ gitea_root_url | default('https://git.iacgenie.com') }}
+DISABLE_SSH = false
+START_SSH_SERVER = true
+SSH_PORT = {{ gitea_ssh_port | default(2222) }}
+SSH_LISTEN_PORT = {{ gitea_ssh_port | default(2222) }}
+BUILTIN_SSH_SERVER_USER = gitea
+LFS_START_SERVER = false
+
+[database]
+PATH = /var/lib/gitea/data/gitea.db
+DB_TYPE = postgres
+HOST = {{ gitea_db_host | default('postgres') }}:{{ gitea_db_port | default(5432) }}
+NAME = {{ gitea_db_name | default('gitea') }}
+USER = {{ gitea_db_user | default('gitea') }}
+PASSWD = {{ gitea_db_password }}
+sslmode = verify-full
+
+[session]
+PROVIDER = file
+PROVIDER_CONFIG = /var/lib/gitea/data/sessions
+SESSION_LIFETIME = 3600
+COOKIE_SECURE = true
+
+[picture]
+AVATAR_UPLOAD_PATH = /var/lib/gitea/data/avatars
+REPOSITORY_AVATAR_UPLOAD_PATH = /var/lib/gitea/data/repo-avatars
+
+[attachment]
+PATH = /var/lib/gitea/data/attachments
+
+[log]
+ROOT_PATH = /var/lib/gitea/data/log
+MODE = file
+LEVEL = Info
+
+[security]
+DEFAULT_ENABLE_QUOTAS = true
+ENABLE_CAPTCHA = true
+MIN_PASSWORD_LENGTH = {{ gitea_min_password_length | default(12) }}
+DISABLE_REGISTRATION = true
+DEFAULT_ENABLE_2FA = true
+DISABLE_GRAVATAR = true
+INSTALL_LOCK = true
+INSTALL_LOCK = true
+INTERNAL_TOKEN = {{ gitea_internal_token | default('') }}
+
+[actions]
+ENABLED = {{ gitea_actions_enabled | default('true') }}
+DEFAULT_ENABLE_QUOTAS = true
+
+[service]
+DISABLE_REGISTRATION = true
+REQUIRE_SIGNIN_VIEW = {{ gitea_require_signin | default('true') }}
+REGISTER_EMAIL_CONFIRM = true
+ENABLE_NOTIFY_MAIL = true
+
+[lfs]
+PATH = /var/lib/gitea/git/lfs
+
+[mailer]
+ENABLED = {{ gitea_mailer_enabled | default('true') }}
+FROM = {{ smtp_from | default('noreply@iacgenie.com') }}
+SMTP_ADDR = {{ smtp_addr | default('mail.smtp2go.com') }}
+SMTP_PORT = {{ smtp_port | default(2525) }}
+USER = {{ smtp_user | default('admin@zencloudsec.com') }}
+PASSWD = {{ smtp_pass | default('') }}
+PROTO = smtps
+
+[oauth2]
+JWT_SECRET = {{ gitea_jwt_secret | default('') }}
+
+[admin]
+INIT_ROOT_USER_NAME = {{ gitea_admin_user | default('admin') }}
+
+[api]
+ENABLE_SWAGGER = false

@@ -240,30 +240,32 @@ services:
     container_name: iacgenie_gitea
     restart: unless-stopped
     environment:
-      USER: root
-      GITEA__database__DB_TYPE: sqlite3
-      GITEA__database__CONN_STRING: /var/lib/gitea/gitea.db
+      USER: gitea
+      GITEA__database__DB_TYPE: postgres
+      GITEA__database__CONN_STRING: postgresql://gitea:${GITEA_DB_PASS}@postgres:5432/gitea?sslmode=verify-full
       GITEA__admin__INIT_ROOT_USER_NAME: ${GITEA_ADMIN_USERNAME:-admin}
       GITEA__admin__INIT_ROOT_USER_PASSWORD: ${GITEA_ADMIN_PASSWORD}
       GITEA__security__INSTALL_LOCK: 'true'
       GITEA__security__DISABLE_REGISTRATION: 'true'
       GITEA__service__DISABLE_REGISTRATION: 'true'
-      GITEA__service__REGISTER_EMAIL_CONFIRM: 'false'
+      GITEA__service__REGISTER_EMAIL_CONFIRM: 'true'
       GITEA__service__ENABLE_NOTIFY_MAIL: 'true'
+      GITEA__service__REQUIRE_SIGNIN_VIEW: 'true'
       GITEA__mailer__ENABLED: 'true'
       GITEA__mailer__SMTP_ADDR: mail.smtp2go.com
       GITEA__mailer__SMTP_PORT: '2525'
       GITEA__mailer__USER: ${GITEA_SMTP_USER:-admin@zencloudsec.com}
       GITEA__mailer__PASSWD: ${GITEA_SMTP_PASS:-}
       GITEA__mailer__FROM: ${SMTP_FROM:-noreply@iacgenie.com}
+      GITEA__mailer__SMTP_PROTO: smtps
       GITEA__security__DISABLE_GRAVATAR: 'true'
       GITEA__security__ENABLE_CAPTCHA: 'true'
       GITEA__security__MIN_PASSWORD_LENGTH: 12
       GITEA__security__DEFAULT_ENABLE_2FA: 'true'
-      GITEA__session__SESSION_LIFETIME: 86400
+      GITEA__session__SESSION_LIFETIME: 3600
       GITEA__session__COOKIE_SECURE: 'true'
-      GITEA__security__DEFAULT_ENABLE_QUOTAS: 'false'
-      GITEA__api__ENABLE_SWAGGER: 'true'
+      GITEA__security__DEFAULT_ENABLE_QUOTAS: 'true'
+      GITEA__api__ENABLE_SWAGGER: 'false'
     volumes:
     - /home/mkanavi/docker/iacgenie/data/gitea:/var/lib/gitea
     - /home/mkanavi/docker/iacgenie/data/gitea:/etc/gitea
