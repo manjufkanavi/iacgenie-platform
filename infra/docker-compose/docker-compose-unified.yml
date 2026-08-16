@@ -697,80 +697,51 @@ services:
     volumes:
     - /home/mkanavi/docker/iacgenie/data/searxng:/etc/searxng
   auth-wrapper:
-    build:
-      context: ../shared-auth-wrapper/auth_wrapper2
-      dockerfile: Dockerfile
-    image: iacgenie/auth-wrapper:latest
+    image: iacgenie/auth-wrapper:v1.4.2
     container_name: iacgenie_auth_wrapper
     restart: unless-stopped
+    # Hardened per Antares security audit (2026-08-17)
+    ports:
+    - 127.0.0.1:9091:9096
     environment:
-      PORT: '9096'
+      PORT: 9096
       KEYCLOAK_URL: https://auth.iacgenie.com
       KEYCLOAK_REALM: iacgenie
       KEYCLOAK_CLIENT_ID: auth-wrapper
-      KEYCLOAK_CLIENT_SECRET: ${AUTH_WRAPPER_KC_SECRET}
-      SESSION_SECRET: ${AUTH_WRAPPER_SESSION_SECRET}
+      KEYCLOAK_CLIENT_SECRET_FILE: /run/secrets/auth_wrapper_kc_secret
+      SESSION_SECRET_FILE: /run/secrets/auth_wrapper_session_secret
       SERVICE_NAME: Auth-Wrapper
       SERVICE_TITLE: IaCGenie Services
       SERVICE_BACKENDS: clamav:9092,pagegen:3032,crowdsec:3033,searxng:8084,default:9090
-    ports:
-    - 127.0.0.1:9091:9096
-    networks:
-    - iacgenie-frontend
+      INSECURE_SKIP_VERIFY: "false"
+    secrets:
+    - auth_wrapper_kc_secret
+    - auth_wrapper_session_secret
+    # Read-only filesystem (antires: writable root)
+    read_only: true
+    tmpfs:
+    - /tmp:noexec,nosuid,size=50m
+    # Healthcheck (antires: no health monitoring)
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -f http://127.0.0.1:9096/health || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
     deploy:
       resources:
         limits:
           cpus: '0.25'
           memory: 256m
+          pids: 500
     security_opt:
     - no-new-privileges:true
     cap_drop:
     - ALL
-  loki:
-    image: grafana/loki:2.9.0
-    container_name: iacgenie_loki
-    restart: unless-stopped
-    command: -config.file=/etc/loki/local-config.yaml
-    volumes:
-    - /home/mkanavi/docker/iacgenie/loki:/loki
-    - /home/mkanavi/docker/iacgenie/loki/loki-config.yaml:/etc/loki/local-config.yaml:ro
-    ports:
-    - 127.0.0.1:3100:3100
-    networks:
-    - iacgenie-frontend
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 1g
-    security_opt:
-    - no-new-privileges:true
-  promtail:
-    image: grafana/promtail:2.9.0
-    container_name: iacgenie_promtail
-    restart: unless-stopped
-    volumes:
-    - /var/log:/var/log:ro
-    - /home/mkanavi/docker/iacgenie/promtail/positions:/etc/promtail
-    - /home/mkanavi/docker/iacgenie/promtail/promtail-config.yaml:/etc/promtail/config.yml:ro
-    networks:
-    - iacgenie-frontend
-    deploy:
-      resources:
-        limits:
-          cpus: '0.25'
-          memory: 256m
-    security_opt:
-    - no-new-privileges:true
-  nginx:
-    image: nginx:1.25-alpine
-    container_name: iacgenie-nginx
-    restart: unless-stopped
-    network_mode: host
-    volumes:
-    - /etc/nginx/conf.d:/etc/nginx/conf.d:ro
-    - /etc/letsencrypt:/etc/letsencrypt:ro
-    - /etc/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    cap_add: []
+
 networks:
   iacgenie-frontend:
     driver: bridge

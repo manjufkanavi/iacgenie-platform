@@ -1,6 +1,39 @@
 ---
 # Auth Wrapper role - Main entry point
 # Deploys shared-auth-wrapper service configuration
+# Hardened per Antares security audit (2026-08-17)
+
+# ========================
+# Secret File Creation
+# ========================
+
+- name: "Auth Wrapper | Create secrets directory"
+  ansible.builtin.file:
+    path: /run/secrets
+    state: directory
+    mode: "0700"
+
+- name: "Auth Wrapper | Create KC client secret file"
+  ansible.builtin.copy:
+    content: "{{ auth_wrapper_kc_secret | default('CHANGE_ME_IN_VAULT') }}"
+    dest: "{{ auth_wrapper_kc_secret_file }}"
+    owner: mkanavi
+    group: mkanavi
+    mode: "0600"
+  no_log: true
+
+- name: "Auth Wrapper | Create session secret file"
+  ansible.builtin.copy:
+    content: "{{ auth_wrapper_session_secret | default('CHANGE_ME_IN_VAULT') }}"
+    dest: "{{ auth_wrapper_session_secret_file }}"
+    owner: mkanavi
+    group: mkanavi
+    mode: "0600"
+  no_log: true
+
+# ========================
+# Shared Auth Wrapper Deployment
+# ========================
 
 - name: "Auth Wrapper | Ensure shared-auth-wrapper directory exists"
   ansible.builtin.file:
@@ -17,8 +50,8 @@
       RUN pip install --no-cache-dir fastapi uvicorn pyjwt httpx
       WORKDIR /app
       COPY server.py /app/
-      EXPOSE 9090
-      CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "9090"]
+      EXPOSE 9096
+      CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "9096"]
     dest: "{{ docker_compose_dir }}/shared-auth-wrapper/Dockerfile"
     owner: mkanavi
     group: mkanavi
@@ -31,3 +64,58 @@
     owner: mkanavi
     group: mkanavi
     mode: "0644"
+
+# ========================
+# Backup Strategy
+# ========================
+
+- name: "Auth Wrapper | Create backup directory"
+  ansible.builtin.file:
+    path: "{{ auth_wrapper_backup_dir }}"
+    state: directory
+    mode: "0700"
+
+- name: "Auth Wrapper | Deploy backup script"
+  ansible.builtin.copy:
+    content: |
+      #!/bin/bash
+      # Auth Wrapper backup script - managed by Ansible
+      BACKUP_DIR="{{ auth_wrapper_backup_dir }}"
+      TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+      BACKUP_FILE="${BACKUP_DIR}/auth_wrapper_backup_${TIMESTAMP}.tar.gz"
+
+      # Backup shared-auth-wrapper directory
+      tar -czf "${BACKUP_FILE}" -C {{ docker_compose_dir }} shared-auth-wrapper/ 2>/dev/null
+
+      # Remove backups older than {{ auth_wrapper_backup_retention_days }} days
+      find "${BACKUP_DIR}" -name "auth_wrapper_backup_*" -mtime +{{ auth_wrapper_backup_retention_days }} -delete
+
+      echo "Backup completed: ${BACKUP_FILE}"
+    dest: /home/mkanavi/docker/iacgenie/scripts/auth_wrapper_backup.sh
+    owner: mkanavi
+    group: mkanavi
+    mode: "0750"
+
+- name: "Auth Wrapper | Deploy backup cron job"
+  ansible.builtin.cron:
+    name: "Auth Wrapper daily backup"
+    minute: "0"
+    hour: "5"
+    job: "/home/mkanavi/docker/iacgenie/scripts/auth_wrapper_backup.sh >> /var/log/auth_wrapper_backup.log 2>&1"
+    user: mkanavi
+
+# ========================
+# Validation
+# ========================
+
+- name: "Auth Wrapper | Verify secret files exist"
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ auth_wrapper_kc_secret_file }}"
+    - "{{ auth_wrapper_session_secret_file }}"
+  register: secret_files
+
+- name: "Auth Wrapper | Show secret file status"
+  ansible.builtin.debug:
+    var: secret_files.results | map(attribute='stat') | list

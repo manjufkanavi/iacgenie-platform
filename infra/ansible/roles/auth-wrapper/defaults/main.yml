@@ -1,5 +1,6 @@
 ---
 # Auth Wrapper role defaults
+# Hardened per Antares security audit (2026-08-17)
 
 # Base docker directory
 docker_compose_dir: /home/mkanavi/docker/iacgenie
@@ -8,6 +9,37 @@ docker_compose_dir: /home/mkanavi/docker/iacgenie
 shared_auth_wrapper_path: /home/mkanavi/docker/iacgenie/shared-auth-wrapper
 
 # Auth wrapper configuration
-auth_wrapper_auth_url: "http://keycloak:8080"
+auth_wrapper_auth_url: "https://auth.iacgenie.com"
 auth_wrapper_realm: "iacgenie"
 auth_wrapper_client_id: "auth-wrapper"
+auth_wrapper_port: 9096
+auth_wrapper_image: "iacgenie/auth-wrapper:v1.4.2"
+
+# TLS verification (antires: missing explicit TLS config)
+auth_wrapper_insecure_skip_verify: false
+
+# Backend allowlist (antires: SSRF risk)
+auth_wrapper_backends:
+  - name: clamav
+    host: 127.0.0.1
+    port: 9092
+  - name: pagegen
+    host: 127.0.0.1
+    port: 3032
+  - name: crowdsec
+    host: 127.0.0.1
+    port: 3033
+  - name: searxng
+    host: 127.0.0.1
+    port: 8084
+  - name: default
+    host: 127.0.0.1
+    port: 9090
+
+# Secret file paths
+auth_wrapper_kc_secret_file: /run/secrets/auth_wrapper_kc_secret
+auth_wrapper_session_secret_file: /run/secrets/auth_wrapper_session_secret
+
+# Backup configuration
+auth_wrapper_backup_dir: /home/mkanavi/backups/auth-wrapper
+auth_wrapper_backup_retention_days: 30
