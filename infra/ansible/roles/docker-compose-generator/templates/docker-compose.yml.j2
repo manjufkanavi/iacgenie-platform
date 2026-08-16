@@ -8,7 +8,6 @@ services:
   # =====================
   postgres:
     image: postgres:15-alpine
-    user: "1000:1000"
     container_name: iacgenie_postgres
     restart: unless-stopped
     environment:
@@ -19,8 +18,8 @@ services:
       - /home/mkanavi/docker/iacgenie/data/postgres:/var/lib/postgresql/data
       - ./templates/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
       - ./templates/postgresql.conf:/etc/postgresql/postgresql.conf:ro
-      - ./templates/server.crt:/var/lib/postgresql/data/server.crt:ro
-      - ./templates/server.key:/var/lib/postgresql/data/server.key:ro
+      - ./templates/server.crt:/etc/postgresql/server.crt:ro
+      - ./templates/server.key:/etc/postgresql/server.key:ro
       - ./templates/create_databases.sh:/docker-entrypoint-initdb.d/01-create-databases.sh:ro
     ports:
       - "127.0.0.1:5432:5432"
@@ -177,7 +176,8 @@ services:
       - no-new-privileges:true
     read_only: true
     tmpfs:
-      - /data
+      - /tmp
+      - /var/run
     deploy:
       resources:
         limits:
@@ -330,18 +330,17 @@ services:
     container_name: iacgenie_openbao
     restart: always
     network_mode: host
-    user: "1000:1000"
     command: bao server -config=/openbao/storage/openbao-prod.hcl
     environment:
-      OPENBAO_ADDR: https://127.0.0.1:8200
-      OPENBAO_CLUSTER_ADDR: https://127.0.0.1:8201
+      OPENBAO_ADDR: http://127.0.0.1:8200
+      OPENBAO_CLUSTER_ADDR: http://127.0.0.1:8201
       OPENBAO_UI: "true"
       OPENBAO_LOG_LEVEL: info
     volumes:
       - /home/mkanavi/docker/iacgenie/openbao_raft:/openbao/raft
       - /home/mkanavi/docker/iacgenie/data/openbao:/openbao/storage
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null https://127.0.0.1:8200/v1/sys/health --no-check-certificate 2>&1"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8200/v1/sys/health 2>&1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -379,10 +378,12 @@ services:
     command:
       - start
       - --http-enabled=true
-      - --http-port=9003
+      - --http-port=8080
       - --db=postgres
+      - --import-realm
       - --hostname={{ keycloak_hostname | default('https://auth.iacgenie.com') }}
       - --hostname-admin={{ keycloak_hostname | default('https://auth.iacgenie.com') }}
+      - --hostname-strict=false
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: "${KEYCLOAK_ADMIN_USER}"
       KC_BOOTSTRAP_ADMIN_PASSWORD: "${KEYCLOAK_ADMIN_PASSWORD}"
@@ -397,20 +398,25 @@ services:
       - ./keycloak.conf:/opt/keycloak/conf/keycloak.conf:ro
     ports:
       - "127.0.0.1:8083:8080"
-      - "127.0.0.1:9003:9003"
     networks:
       - iacgenie-backend
     depends_on:
       - postgres
     healthcheck:
-      test: ["CMD-SHELL", "exec 6<>/dev/tcp/127.0.0.1/9003 && exec 6>&-"]
+      test: ["CMD-SHELL", "exec 6<>/dev/tcp/127.0.0.1/8080 && exec 6>&-"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 120s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     deploy:
       resources:
         limits:
           memory: "{{ service_memory_defaults.keycloak }}"
+          cpus: "1.0"
     logging:
       driver: json-file
       options:

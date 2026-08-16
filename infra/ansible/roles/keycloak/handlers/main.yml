@@ -1,4 +1,6 @@
 ---
-- name: "No-op: restart keycloak (use docker-compose-generator reload instead)"
-  ansible.builtin.debug:
-    msg: "Container restart handled by docker-compose-generator. No separate restart needed."
+- name: Reload docker compose
+  ansible.builtin.command: docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.yml up -d keycloak
+  args:
+    chdir: /home/mkanavi/docker/iacgenie
+  changed_when: true

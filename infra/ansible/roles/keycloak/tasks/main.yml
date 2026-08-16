@@ -2,6 +2,15 @@
 # Keycloak role - Main entry point
 # Note: Container deployment is handled by docker-compose-generator role
 
+- name: "Keycloak | Read admin password from .env"
+  ansible.builtin.shell: grep KEYCLOAK_ADMIN_PASSWORD /home/mkanavi/docker/iacgenie/.env | head -1 | cut -d= -f2
+  register: _kc_admin_pass_raw
+  changed_when: false
+
+- name: "Keycloak | Set admin password"
+  ansible.builtin.set_fact:
+    keycloak_admin_password: "{{ _kc_admin_pass_raw.stdout | trim }}"
+
 - name: "Keycloak | Create data directory"
   ansible.builtin.file:
     path: "{{ keycloak_data_dir | default('/home/mkanavi/docker/iacgenie/keycloak_data') }}"

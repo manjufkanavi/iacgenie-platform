@@ -1,0 +1,7 @@
+---
+# Minimal playbook to deploy just the Keycloak role (password fix + config)
+- hosts: iacgenie-server
+  become: true
+  roles:
+    - role: keycloak
+    - role: keycloak_realm

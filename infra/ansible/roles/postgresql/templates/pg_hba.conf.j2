@@ -11,6 +11,6 @@ host    all             all             127.0.0.1/32            scram-sha-256
 # IPv6 local connections — require scram-sha-256 password auth
 host    all             all             ::1/128                 scram-sha-256
 
-# SSL required for Docker network connections
-hostssl all             all             0.0.0.0/0               scram-sha-256
-hostssl all             all             ::/0                    scram-sha-256
+# Docker network connections — require scram-sha-256 password auth
+host    all             all             0.0.0.0/0               scram-sha-256
+host    all             all             ::/0                    scram-sha-256

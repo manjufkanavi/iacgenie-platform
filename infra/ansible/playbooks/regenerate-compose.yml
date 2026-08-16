@@ -1,0 +1,7 @@
+---
+# Regenerate docker-compose.yml only
+- hosts: iacgenie-server
+  become: true
+  roles:
+    - role: deploy-env
+    - role: docker-compose-generator

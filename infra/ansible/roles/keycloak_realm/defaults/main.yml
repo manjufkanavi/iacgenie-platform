@@ -13,11 +13,47 @@ keycloak_realms:
   - name: iacgenie
     displayName: "IacGenie Platform"
     enabled: true
+    registrationAllowed: false
     registrationEmailAsUsername: false
     rememberMe: true
+    verifyEmail: false
     loginWithEmailAllowed: true
     duplicateEmailsAllowed: false
+    resetPasswordAllowed: true
+    editUsernameAllowed: false
     sslRequired: "external"
+    # ── Brute-force protection ──
+    bruteForceProtected: true
+    permanentLockout: false
+    failureFactor: 10
+    maxTemporaryLockouts: 0
+    maxFailureWaitSeconds: 900
+    minimumQuickLoginWaitSeconds: 900
+    waitIncrementMinutes: 60
+    quickLoginCheckMilliSeconds: 30000
+    # ── Session settings ──
+    ssoSessionIdleTimeout: 1800
+    ssoSessionMaxLifespan: 36000
+    offlineSessionIdleTimeout: 2592000
+    clientSessionIdleTimeout: 1800
+    clientSessionMaxLifespan: 36000
+    accessTokenLifespan: 300
+    accessTokenLifespanForImplicitFlow: 900
+    refreshTokenMaxReuse: 0
+    maxSessions: -1
+    # ── Event logging ──
+    eventsEnabled: true
+    eventsExpiration: 0
+    eventsListeners:
+      - jboss-logging
+    adminEventsEnabled: true
+    adminEventsDetailsEnabled: true
+    # ── OTP / MFA ──
+    otpPolicyPeriod: 30
+    otpPolicyDigits: 6
+    otpPolicyType: "totp"
+    otpPolicyAlgorithm: "HmacSHA1"
+    otpPolicyTemporary: false
     roles:
       realm:
         - name: platform-admin
@@ -46,11 +82,47 @@ lightserp_realms:
   - name: lightserp
     displayName: "LightSerp Platform"
     enabled: true
+    registrationAllowed: false
     registrationEmailAsUsername: false
     rememberMe: true
+    verifyEmail: false
     loginWithEmailAllowed: true
     duplicateEmailsAllowed: false
+    resetPasswordAllowed: true
+    editUsernameAllowed: false
     sslRequired: "external"
+    # ── Brute-force protection ──
+    bruteForceProtected: true
+    permanentLockout: false
+    failureFactor: 10
+    maxTemporaryLockouts: 0
+    maxFailureWaitSeconds: 900
+    minimumQuickLoginWaitSeconds: 900
+    waitIncrementMinutes: 60
+    quickLoginCheckMilliSeconds: 30000
+    # ── Session settings ──
+    ssoSessionIdleTimeout: 1800
+    ssoSessionMaxLifespan: 36000
+    offlineSessionIdleTimeout: 2592000
+    clientSessionIdleTimeout: 1800
+    clientSessionMaxLifespan: 36000
+    accessTokenLifespan: 300
+    accessTokenLifespanForImplicitFlow: 900
+    refreshTokenMaxReuse: 0
+    maxSessions: -1
+    # ── Event logging ──
+    eventsEnabled: true
+    eventsExpiration: 0
+    eventsListeners:
+      - jboss-logging
+    adminEventsEnabled: true
+    adminEventsDetailsEnabled: true
+    # ── OTP / MFA ──
+    otpPolicyPeriod: 30
+    otpPolicyDigits: 6
+    otpPolicyType: "totp"
+    otpPolicyAlgorithm: "HmacSHA1"
+    otpPolicyTemporary: false
     roles:
       realm:
         - name: platform-admin
@@ -112,7 +184,7 @@ lightserp_clients:
       - "https://api.iacgenie.com"
       - "+"
     standardFlowEnabled: true
-    directAccessGrantsEnabled: true
+    directAccessGrantsEnabled: false
     serviceAccountsEnabled: true
     consentRequired: false
     protocol: openid-connect
@@ -170,7 +242,7 @@ keycloak_clients:
       - "https://lightserp.iacgenie.com"
       - "+"
     standardFlowEnabled: true
-    directAccessGrantsEnabled: true
+    directAccessGrantsEnabled: false
     serviceAccountsEnabled: false
     consentRequired: false
     protocol: openid-connect

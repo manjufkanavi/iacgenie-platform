@@ -1,6 +1,6 @@
 # PostgreSQL 15 configuration
 # Managed by Ansible
-listen_addresses = '127.0.0.1'
+listen_addresses = '*'
 port = 5432
 max_connections = 100
 
@@ -12,11 +12,7 @@ maintenance_work_mem = 128MB
 huge_pages = try
 
 # ─── SSL/TLS ───
-ssl = on
-ssl_cert_file = 'server.crt'
-ssl_key_file = 'server.key'
-ssl_min_protocol_version = 'TLSv1.2'
-ssl_prefer_server_ciphers = on
+ssl = off
 
 # ─── WAL settings ───
 wal_level = replica
@@ -46,5 +42,5 @@ autovacuum_analyze_threshold = 50
 
 # ─── Data directory ───
 data_directory = '/var/lib/postgresql/data'
-hba_file = '/var/lib/postgresql/data/pg_hba.conf'
+hba_file = '/etc/postgresql/pg_hba.conf'
 ident_file = '/var/lib/postgresql/data/pg_ident.conf'
