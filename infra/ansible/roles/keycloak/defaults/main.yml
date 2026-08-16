@@ -2,11 +2,16 @@ keycloak_version: "26.0"
 keycloak_port: 8083
 keycloak_admin_user: admin
 keycloak_admin_password: "{{ keycloak_pass | default('CHANGE_ME_IN_VAULT') }}"
+keycloak_db_password: "{{ keycloak_pass | default('CHANGE_ME_IN_VAULT') }}"
 keycloak_realm: iacgenie
 keycloak_db_host: postgres
 keycloak_db_port: 5432
 keycloak_db_name: keycloak
 keycloak_admin_url: "http://127.0.0.1:{{ keycloak_port }}"
+
+# Backup configuration (antires: no backup strategy)
+keycloak_backup_dir: "/home/mkanavi/backups/keycloak"
+keycloak_backup_retention_days: 30
 
 # LightSerp realm clients (Keycloak admin API on port 9003)
 lightserp_realm_enabled: true

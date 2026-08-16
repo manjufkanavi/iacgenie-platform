@@ -171,7 +171,7 @@ services:
           cpus: '0.5'
           memory: 1g
   keycloak:
-    image: quay.io/keycloak/keycloak:26.0
+    image: quay.io/keycloak/keycloak:26.0-pg
     container_name: iacgenie_keycloak
     restart: unless-stopped
     command:
@@ -184,42 +184,57 @@ services:
     - --hostname-admin=https://auth.iacgenie.com
     - --hostname-strict=false
     environment:
-      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
-      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER}
-      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
-      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN_USER}
-      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
-      KC_DB_PASSWORD: ${KC_DB_PASSWORD}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME}
+      KC_BOOTSTRAP_ADMIN_PASSWORD_FILE: /run/secrets/keycloak_admin_password
+      KC_DB_PASSWORD_FILE: /run/secrets/keycloak_db_password
+      KC_DB_HOST: ${KC_DB_HOST}
+      KC_DB_PORT: ${KC_DB_PORT}
+      KC_DB_NAME: ${KC_DB_NAME}
     volumes:
     - /home/mkanavi/docker/iacgenie/data/keycloak:/opt/keycloak/data
     - ./keycloak.conf:/opt/keycloak/conf/keycloak.conf:ro
+    - /run/secrets/keycloak_admin_password
+    - /run/secrets/keycloak_db_password
     ports:
     - 127.0.0.1:8083:8080
     networks:
     - iacgenie-backend
     depends_on:
     - postgres
+    read_only: true
+    tmpfs:
+    - /tmp:noexec,nosuid,size=100m
+    - /opt/keycloak/bin:noexec,nosuid
+    pids_limit: 1024
+    shm_size: 256m
     healthcheck:
       test:
-      - CMD
-      - wget
-      - --spider
-      - -q
-      - -T
-      - '2'
-      - http://127.0.0.1:8080/
+      - CMD-SHELL
+      - wget --spider -q -T 2 http://127.0.0.1:8080/health/live || exit 1
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 120s
     security_opt:
     - no-new-privileges:true
     cap_drop:
     - ALL
+    cap_add:
+    - CHOWN
+    - DAC_OVERRIDE
+    - FOWNER
+    - SETUID
+    - SETGID
     deploy:
       resources:
         limits:
           cpus: '1.0'
           memory: 2g
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "3"
   gitea:
     image: gitea/gitea:1.23.4-rootless
     container_name: iacgenie_gitea

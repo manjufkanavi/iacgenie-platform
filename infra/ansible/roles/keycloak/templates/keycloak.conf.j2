@@ -1,22 +1,54 @@
 # Keycloak Configuration for iacgenie platform
 # Managed by Ansible - do not edit manually
 # Read-only mount at /opt/keycloak/conf/keycloak.conf in container
+# Hardened per Antares security audit (2026-08-17)
 
-# Database (PostgreSQL driver baked into image via 'kc.sh build --db postgres')
+# =====================
+# Database (PostgreSQL)
+# =====================
 db=postgres
 db-url-host={{ keycloak_db_host | default('postgres') }}
 db-url-port=5432
 db-url-database=keycloak
 
-# HTTP
+# JDBC connection pool tuning (antires: JDBC leak warning)
+db-pool-initial-size=10
+db-pool-max-size=50
+db-validation-query=SELECT 1
+
+# =====================
+# HTTP / Proxy
+# =====================
 http-enabled=true
 http-port=8080
 
-# Hostname (external access)
+# Reverse proxy configuration (antires: KC_PROXY for Cloudflare/Nginx)
+# Enables correct parsing of X-Forwarded-For, X-Forwarded-Proto, Host headers
+proxy=edge
+proxy-headers=xforwarded
+
+# Hostname (external access via Cloudflare Tunnel)
 hostname={{ keycloak_hostname | default('https://auth.iacgenie.com') }}
 hostname-admin={{ keycloak_hostname | default('https://auth.iacgenie.com') }}
 hostname-admin-sts={{ keycloak_hostname | default('https://auth.iacgenie.com') }}
+hostname-strict=false
 
-# Admin Bootstrap (for first-boot admin user creation)
+# =====================
+# Admin Bootstrap
+# =====================
+# NOTE: Password is managed via KC_BOOTSTRAP_ADMIN_PASSWORD_FILE (file-based secret)
+# NOT via plaintext in this config (antires: plaintext credential exposure)
 bootstrap-admin-username={{ keycloak_admin_user | default('admin') }}
-bootstrap-admin-password={{ keycloak_admin_password | default('CHANGE_ME_IN_VAULT') }}
+
+# =====================
+# Health Check
+# =====================
+# Enable Keycloak built-in health endpoint for better healthchecks (antires: TCP-only healthcheck)
+health-enabled=true
+
+# =====================
+# JVM / Performance
+# =====================
+# GC tuning for production workloads
+java-opt=-XX:+UseG1GC
+java-opt=-XX:MaxGCPauseMillis=200

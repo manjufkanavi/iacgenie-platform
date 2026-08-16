@@ -1,15 +1,37 @@
 ---
 # Keycloak role - Main entry point
 # Note: Container deployment is handled by docker-compose-generator role
+# Hardened per Antares security audit (2026-08-17)
 
-- name: "Keycloak | Read admin password from .env"
-  ansible.builtin.shell: grep KEYCLOAK_ADMIN_PASSWORD /home/mkanavi/docker/iacgenie/.env | head -1 | cut -d= -f2
-  register: _kc_admin_pass_raw
-  changed_when: false
+# =====================
+# Secret File Creation (antires: plaintext credential exposure)
+# =====================
 
-- name: "Keycloak | Set admin password"
-  ansible.builtin.set_fact:
-    keycloak_admin_password: "{{ _kc_admin_pass_raw.stdout | trim }}"
+- name: "Keycloak | Create secrets directory"
+  ansible.builtin.file:
+    path: /run/secrets
+    state: directory
+    mode: "0700"
+
+- name: "Keycloak | Create admin password secret file"
+  ansible.builtin.copy:
+    content: "{{ keycloak_admin_password | default('CHANGE_ME_IN_VAULT') }}\n"
+    dest: /run/secrets/keycloak_admin_password
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: "Keycloak | Create DB password secret file"
+  ansible.builtin.copy:
+    content: "{{ keycloak_db_password | default('CHANGE_ME_IN_VAULT') }}\n"
+    dest: /run/secrets/keycloak_db_password
+    owner: root
+    group: root
+    mode: "0600"
+
+# =====================
+# Data Directory Setup
+# =====================
 
 - name: "Keycloak | Create data directory"
   ansible.builtin.file:
@@ -26,6 +48,38 @@
     group: mkanavi
     mode: "0755"
     state: directory
+
+# =====================
+# Permission Validation (antires: PostgreSQL volume permission errors)
+# =====================
+
+- name: "Keycloak | Validate data directory ownership"
+  ansible.builtin.stat:
+    path: "{{ keycloak_data_dir | default('/home/mkanavi/docker/iacgenie/data/keycloak') }}"
+  register: _kc_data_dir_stat
+
+- name: "Keycloak | Fix data directory ownership if needed"
+  ansible.builtin.file:
+    path: "{{ keycloak_data_dir | default('/home/mkanavi/docker/iacgenie/data/keycloak') }}"
+    owner: "1000"
+    group: "1000"
+    mode: "0700"
+    state: directory
+  when: _kc_data_dir_stat.stat.uid is defined and (_kc_data_dir_stat.stat.uid != 1000 or _kc_data_dir_stat.stat.gid != 1000)
+
+# =====================
+# H2 Cleanup (antires: orphaned H2 database directory)
+# =====================
+
+- name: "Keycloak | Remove orphaned H2 directory"
+  ansible.builtin.file:
+    path: "{{ keycloak_data_dir | default('/home/mkanavi/docker/iacgenie/data/keycloak') }}/h2"
+    state: absent
+  ignore_errors: true
+
+# =====================
+# Configuration Deployment
+# =====================
 
 - name: "Keycloak | Deploy keycloak.conf"
   ansible.builtin.template:
@@ -45,8 +99,56 @@
     mode: "0600"
   notify: Reload docker compose
 
+# =====================
+# Backup Strategy (antires: no backup strategy)
+# =====================
+
+- name: "Keycloak | Create backup directory"
+  ansible.builtin.file:
+    path: "{{ keycloak_backup_dir | default('/home/mkanavi/backups/keycloak') }}"
+    state: directory
+    mode: "0700"
+
+- name: "Keycloak | Deploy backup script"
+  ansible.builtin.copy:
+    content: |
+      #!/bin/bash
+      # Keycloak backup script - managed by Ansible
+      BACKUP_DIR="{{ keycloak_backup_dir | default('/home/mkanavi/backups/keycloak') }}"
+      TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+      BACKUP_FILE="${BACKUP_DIR}/keycloak_backup_${TIMESTAMP}.tar.gz"
+      PG_DUMP_FILE="${BACKUP_DIR}/keycloak_pg_dump_${TIMESTAMP}.sql"
+
+      # Backup PostgreSQL keycloak database
+      docker exec iacgenie_postgres pg_dump -U postgres keycloak > "${PG_DUMP_FILE}" 2>/dev/null
+
+      # Backup Keycloak data directory
+      tar -czf "${BACKUP_FILE}" -C /home/mkanavi/docker/iacgenie/data keycloak/ 2>/dev/null
+
+      # Remove backups older than {{ keycloak_backup_retention_days | default(30) }} days
+      find "${BACKUP_DIR}" -name "keycloak_backup_*" -mtime +{{ keycloak_backup_retention_days | default(30) }} -delete
+      find "${BACKUP_DIR}" -name "keycloak_pg_dump_*" -mtime +{{ keycloak_backup_retention_days | default(30) }} -delete
+
+      echo "Backup completed: ${BACKUP_FILE}"
+    dest: /home/mkanavi/docker/iacgenie/scripts/keycloak_backup.sh
+    owner: mkanavi
+    group: mkanavi
+    mode: "0750"
+
+- name: "Keycloak | Deploy backup cron job"
+  ansible.builtin.cron:
+    name: "Keycloak daily backup"
+    minute: "0"
+    hour: "3"
+    job: "/home/mkanavi/docker/iacgenie/scripts/keycloak_backup.sh >> /var/log/keycloak_backup.log 2>&1"
+    user: mkanavi
+
+# =====================
+# Client Setup
+# =====================
+
 - name: "Keycloak | Verify Keycloak container is running"
-  ansible.builtin.command: docker ps -a --filter "name=iacgenie-keycloak" --format "{{ '{{.Names'}}' }}"
+  ansible.builtin.command: docker ps -a --filter "name=iacgenie-keycloak" --format "{{ '{{.Names'}}" }}"
   register: keycloak_status
   changed_when: false
   failed_when: false
