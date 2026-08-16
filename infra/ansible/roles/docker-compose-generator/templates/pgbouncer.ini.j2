@@ -1,0 +1,24 @@
+# PgBouncer configuration
+# Managed by Ansible
+
+[databases]
+lightsrp = host=postgres port=5432 dbname=lightsrp
+
+; Global settings
+[pgbouncer]
+listen_addr = *
+listen_port = 6432
+auth_type = scram-sha-256
+auth_file = /etc/pgbouncer/userlist.txt
+pool_mode = transaction
+max_client_conn = 400
+default_pool_size = 50
+min_pool_size = 10
+reserve_pool_size = 5
+reserve_pool_timeout = 3
+max_connections_per_host = 100
+idle_transaction_timeout = 600
+log_connections = 1
+log_disconnections = 1
+log_pooler_errors = 1
+stats_period = 60

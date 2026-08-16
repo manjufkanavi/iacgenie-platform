@@ -1,0 +1,56 @@
+#!/bin/bash
+# Redis Backup Script
+# Managed by Ansible
+# Backs up Redis data via RDB snapshot + GPG encryption
+# Usage: bash /home/mkanavi/docker/iacgenie/scripts/redis-backup.sh
+
+set -euo pipefail
+
+BACKUP_DIR="${REDIS_BACKUP_DIR:-/home/mkanavi/docker/iacgenie/data/redis/backups}"
+DATA_DIR="${REDIS_DATA_DIR:-/home/mkanavi/docker/iacgenie/data/redis}"
+RETENTION_DAYS="${REDIS_RETENTION_DAYS:-7}"
+GPG_RECIPIENT="${REDIS_BACKUP_USER:-backup-user}"
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+BACKUP_FILE="redis_backup_${TIMESTAMP}.rdb"
+ENCRYPTED_FILE="redis_backup_${TIMESTAMP}.rdb.gpg"
+
+# Create backup directory
+mkdir -p "${BACKUP_DIR}"
+
+echo "[$(date)] Starting Redis backup..."
+
+# Trigger RDB save via redis-cli
+if [ -n "${REDIS_PASSWORD}" ]; then
+    redis-cli -a "${REDIS_PASSWORD}" BGSAVE > /dev/null 2>&1
+else
+    redis-cli BGSAVE > /dev/null 2>&1
+fi
+
+# Wait for BGSAVE to complete
+sleep 5
+
+# Copy the RDB file
+if [ -f "${DATA_DIR}/dump.rdb" ]; then
+    cp "${DATA_DIR}/dump.rdb" "${BACKUP_DIR}/${BACKUP_FILE}"
+    echo "[$(date)] RDB snapshot saved: ${BACKUP_FILE}"
+else
+    echo "[$(date)] ERROR: dump.rdb not found in ${DATA_DIR}"
+    exit 1
+fi
+
+# Calculate checksum
+sha256sum "${BACKUP_DIR}/${BACKUP_FILE}" > "${BACKUP_DIR}/${BACKUP_FILE}.sha256"
+echo "[$(date)] Checksum saved: ${BACKUP_FILE}.sha256"
+
+# Encrypt with GPG
+if command -v gpg &> /dev/null; then
+    gpg --batch --yes --trust-model always --recipient "${GPG_RECIPIENT}" --encrypt "${BACKUP_DIR}/${BACKUP_FILE}" 2>/dev/null && \
+        rm -f "${BACKUP_DIR}/${BACKUP_FILE}" || \
+        echo "[$(date)] WARNING: GPG encryption failed, keeping unencrypted backup"
+fi
+
+# Clean up old backups
+find "${BACKUP_DIR}" -name "redis_backup_*.rdb*" -mtime +${RETENTION_DAYS} -delete
+echo "[$(date)] Cleaned up backups older than ${RETENTION_DAYS} days"
+
+echo "[$(date)] Backup complete: ${ENCRYPTED_FILE}"

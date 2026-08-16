@@ -25,6 +25,28 @@ service_memory_defaults:
   pagegen: "512m"
   searxng: "512m"
 
+# Phase 10.22: CPU limits — Service CPU quotas
+service_cpu_defaults:
+  postgres: "1.0"
+  redis: "0.5"
+  minio: "2.0"
+  openbao: "1.0"
+  keycloak: "1.0"
+  gitea: "0.5"
+  nginx: "0.25"
+  cloudflared: "0.25"
+  lightserp: "0.5"
+  pagezen: "0.5"
+  loki: "0.5"
+  promtail: "0.1"
+  prometheus: "1.0"
+  grafana: "0.5"
+  auth_wrapper: "0.25"
+  clamav: "0.5"
+  crowdsec: "0.5"
+  pagegen: "0.5"
+  searxng: "0.5"
+
 # Phase 10.7: Service network assignments
 service_networks:
   postgres:

@@ -38,7 +38,7 @@
     recurse: true
     owner: mkanavi
     group: mkanavi
-    mode: "0755"
+    mode: "0700"
   loop:
     - /home/mkanavi/docker/iacgenie/data/postgres
     - /home/mkanavi/docker/iacgenie/data/redis
@@ -89,3 +89,37 @@
     group: "977"
     mode: "0755"
     recurse: true
+
+- name: "Compose Gen | Create PgBouncer config directory"
+  ansible.builtin.file:
+    path: /home/mkanavi/docker/iacgenie/pgbouncer
+    state: directory
+    owner: mkanavi
+    group: mkanavi
+    mode: "0755"
+
+- name: "Compose Gen | Deploy PgBouncer config"
+  ansible.builtin.template:
+    src: pgbouncer.ini.j2
+    dest: /home/mkanavi/docker/iacgenie/pgbouncer/pgbouncer.ini
+    owner: mkanavi
+    group: mkanavi
+    mode: "0644"
+  notify: Reload docker compose
+
+- name: "Compose Gen | Create postgres_exporter config directory"
+  ansible.builtin.file:
+    path: /home/mkanavi/docker/iacgenie/postgres_exporter
+    state: directory
+    owner: mkanavi
+    group: mkanavi
+    mode: "0755"
+
+- name: "Compose Gen | Deploy postgres_exporter metrics config"
+  ansible.builtin.template:
+    src: postgres_exporter.yml.j2
+    dest: /home/mkanavi/docker/iacgenie/postgres_exporter/metrics.yml
+    owner: mkanavi
+    group: mkanavi
+    mode: "0644"
+  notify: Reload docker compose

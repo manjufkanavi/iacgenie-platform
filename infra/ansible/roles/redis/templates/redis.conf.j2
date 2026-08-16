@@ -1,18 +1,63 @@
 # Redis 7 configuration
-# Managed by Ansible
+# Managed by Ansible — hardened for production
+#
+# Network
+bind {{ redis_bind | default('127.0.0.1') }}
 port {{ redis_port | default(6379) }}
-bind 127.0.0.1
-maxmemory {{ redis_maxmemory | default('2gb') }}
+tcp-backlog {{ redis_tcp_backlog | default(511) }}
+timeout {{ redis_timeout | default(300) }}
+tcp-keepalive {{ redis_tcp_keepalive | default(300) }}
+protected-mode {{ redis_protected_mode | default('yes') }}
+databases {{ redis_databases | default(16) }}
+
+# TLS/SSL
+tls-port {{ redis_tls_port | default(6380) }}
+tls-cert-file {{ redis_tls_cert_file | default('/etc/redis/tls/server.crt') }}
+tls-key-file {{ redis_tls_key_file | default('/etc/redis/tls/server.key') }}
+tls-ca-cert-file {{ redis_tls_ca_cert_file | default('/etc/redis/tls/ca.crt') }}
+tls-auth-clients {{ redis_tls_auth_clients | default('no') }}
+tls-protocols "{{ redis_tls_protocols | default('TLSv1.2 TLSv1.3') }}"
+tls-ciphers {{ redis_tls_ciphers | default('HIGH:!aNULL:!MD5:!3DES') }}
+tls-ciphersuites {{ redis_tls_ciphersuites | default('TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256') }}
+tls-prefer-server-ciphers {{ redis_tls_prefer_server_ciphers | default('yes') }}
+
+# Memory
+maxmemory {{ redis_maxmemory | default('512mb') }}
 maxmemory-policy {{ redis_maxmemory_policy | default('allkeys-lru') }}
-appendonly {{ redis_aof_enabled | default('yes') }}
-appendfilename "appendonly.aof"
-dir {{ redis_data_dir | default('/var/lib/redis') }}
-save 900 1
-save 300 10
-save 60 10000
-protected-mode yes
-tcp-backlog 511
-timeout 0
-tcp-keepalive 300
-loglevel notice
-databases 16
+maxmemory-samples {{ redis_maxmemory_samples | default(5) }}
+
+# Persistence — AOF + RDB
+appendonly {{ redis_appendonly | default('yes') }}
+appendfilename "{{ redis_appendfilename | default('appendonly.aof') }}"
+appendfsync {{ redis_appendfsync | default('everysec') }}
+auto-aof-rewrite-percentage {{ redis_auto_aof_rewrite_percentage | default(100) }}
+auto-aof-rewrite-min-size {{ redis_auto_aof_rewrite_min_size | default('64mb') }}
+save {{ redis_save_1 | default('900') }} {{ redis_save_2 | default('1') }}
+save {{ redis_save_3 | default('300') }} {{ redis_save_4 | default('10') }}
+save {{ redis_save_5 | default('60') }} {{ redis_save_6 | default('10000') }}
+rdbcompression {{ redis_rdb_compression | default('yes') }}
+rdbchecksum {{ redis_rdb_checksum | default('yes') }}
+dbfilename {{ redis_dbfilename | default('dump.rdb') }}
+dir {{ redis_data_dir | default('/data') }}
+
+# ACL — Separate users per service
+user default on >{{ redis_password | default('CHANGE_ME_IN_VAULT') }} ~* &* +@all
+user iacgenie-app on >{{ redis_iacgenie_password | default('CHANGE_ME_IN_VAULT') }} ~iacgenie:* &* +@read +@write +@connection +@admin
+user lightserp-app on >{{ redis_lightserp_password | default('CHANGE_ME_IN_VAULT') }} ~lightserp:* &* +@read +@write +@connection +@admin
+user backup-user on >{{ redis_backup_password | default('CHANGE_ME_IN_VAULT') }} ~* &* +@read +@write
+
+# Slow log
+slowlog-log-slower-than {{ redis_slowlog_slower_than | default(10000) }}
+slowlog-max-len {{ redis_slowlog_max_len | default(128) }}
+
+# Logging
+loglevel {{ redis_loglevel | default('notice') }}
+logfile {{ redis_logfile | default('') }}
+
+# Connection limits
+maxclients {{ redis_maxclients | default(10000) }}
+
+# Security — disable dangerous commands
+rename-command FLUSHDB ""
+rename-command FLUSHALL ""
+rename-command DEBUG ""

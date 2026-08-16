@@ -4,31 +4,52 @@
 ---
 services:
   # =====================
-  # PostgreSQL 15
+  # PostgreSQL 15 (hardened)
   # =====================
   postgres:
     image: postgres:15-alpine
+    user: "1000:1000"
     container_name: iacgenie_postgres
-    restart: always
+    restart: unless-stopped
     environment:
       POSTGRES_USER: lightsrp
       POSTGRES_PASSWORD: "${PG_ROOT_PASSWORD}"
       POSTGRES_DB: lightsrp
     volumes:
       - /home/mkanavi/docker/iacgenie/data/postgres:/var/lib/postgresql/data
+      - ./templates/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+      - ./templates/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      - ./templates/server.crt:/var/lib/postgresql/data/server.crt:ro
+      - ./templates/server.key:/var/lib/postgresql/data/server.key:ro
+      - ./templates/create_databases.sh:/docker-entrypoint-initdb.d/01-create-databases.sh:ro
     ports:
       - "127.0.0.1:5432:5432"
     networks:
       - iacgenie-backend
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+      - /run/postgresql
+    command: >
+      postgres
+      -c config_file=/etc/postgresql/postgresql.conf
+      -c hba_file=/etc/postgresql/pg_hba.conf
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U lightsrp -d lightsrp"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 30s
     deploy:
       resources:
         limits:
           memory: "{{ service_memory_defaults.postgres }}"
+          cpus: "2.0"
+        reservations:
+          memory: "1g"
     logging:
       driver: json-file
       options:
@@ -36,32 +57,178 @@ services:
         max-file: "3"
 
   # =====================
-  # Redis 7
+  # PgBouncer (Connection Pooler)
   # =====================
-  redis:
-    image: redis:7-alpine
-    container_name: iacgenie_redis
-    restart: always
-    command: redis-server --appendonly yes --maxmemory {{ service_memory_defaults.redis | default('512m') }} --maxmemory-policy allkeys-lru
-    volumes:
-      - /home/mkanavi/docker/iacgenie/data/redis:/data
+  pgbouncer:
+    image: docker-pgbouncer/pgbouncer:latest
+    container_name: iacgenie_pgbouncer
+    restart: unless-stopped
+    environment:
+      DATABASE: lightsrp
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USER: lightsrp
+      DATABASE_PASSWORD: "${PG_ROOT_PASSWORD}"
+      PORT: 6432
+      LISTEN_ADDR: "0.0.0.0"
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 400
+      DEFAULT_POOL_SIZE: 50
+      MIN_POOL_SIZE: 10
+      AUTH_TYPE: md5
     ports:
-      - "127.0.0.1:6379:6379"
+      - "127.0.0.1:6432:6432"
     networks:
       - iacgenie-backend
+    depends_on:
+      - postgres
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 6432 -U lightsrp"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 15s
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    deploy:
+      resources:
+        limits:
+          memory: "256m"
+          cpus: "0.5"
+        reservations:
+          memory: "128m"
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # =====================
+  # postgres_exporter (Prometheus Metrics)
+  # =====================
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: iacgenie_postgres_exporter
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: "postgres://lightsrp:${PG_ROOT_PASSWORD}@postgres:5432/lightsrp?sslmode=require"
+    ports:
+      - "127.0.0.1:9187:9187"
+    networks:
+      - iacgenie-backend
+    depends_on:
+      - postgres
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9187/metrics || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: "128m"
+          cpus: "0.25"
+        reservations:
+          memory: "64m"
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # =====================
+  # Redis 7 (hardened)
+  # =====================
+  redis:
+    image: redis:7.2.4-alpine
+    container_name: iacgenie_redis
+    restart: unless-stopped
+    command: redis-server /etc/redis/redis.conf
+    volumes:
+      - /home/mkanavi/docker/iacgenie/data/redis:/data
+      - ./templates/redis.conf:/etc/redis/redis.conf:ro
+      - ./templates/server.crt:/etc/redis/tls/server.crt:ro
+      - ./templates/server.key:/etc/redis/tls/server.key:ro
+      - ./templates/ca.crt:/etc/redis/tls/ca.crt:ro
+    ports:
+      - "127.0.0.1:6379:6379"
+      - "127.0.0.1:6380:6380"
+    networks:
+      - iacgenie-backend
+    depends_on:
+      - postgres
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /data
     deploy:
       resources:
         limits:
           memory: "{{ service_memory_defaults.redis }}"
+          cpus: "0.5"
+        reservations:
+          memory: "256m"
     logging:
       driver: json-file
       options:
         max-size: "100m"
+        max-file: "3"
+
+  # =====================
+  # redis_exporter (Prometheus Metrics)
+  # =====================
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.53.0-alpine
+    container_name: iacgenie_redis_exporter
+    restart: unless-stopped
+    environment:
+      REDIS_ADDR: "redis://:${REDIS_PASSWORD}@redis:6379"
+      REDIS_PASSWORD: "${REDIS_PASSWORD}"
+      REDIS_ALIAS: "iacgenie-redis"
+    ports:
+      - "127.0.0.1:9188:9121"
+    networks:
+      - iacgenie-backend
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9121/metrics || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: "64m"
+          cpus: "0.1"
+        reservations:
+          memory: "32m"
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
         max-file: "3"
 
   # =====================
@@ -75,6 +242,7 @@ services:
     environment:
       MINIO_ROOT_USER: "{{ minio_root_user | default('iacgenie') }}"
       MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD}"
+      MINIO_PROMETHEUS_AUTH_TYPE: "public"
     volumes:
       - /home/mkanavi/docker/iacgenie/data/minio:/data
     ports:
@@ -83,7 +251,7 @@ services:
     networks:
       - iacgenie-backend
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD-SHELL", "mc ready local && curl -f http://127.0.0.1:9000/minio/health/live || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -91,6 +259,21 @@ services:
       resources:
         limits:
           memory: "{{ service_memory_defaults.minio }}"
+          cpus: "{{ service_cpu_defaults.minio | default('2.0') }}"
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
     logging:
       driver: json-file
       options:

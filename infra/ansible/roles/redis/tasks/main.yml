@@ -1,7 +1,6 @@
 ---
 # Redis role - Main entry point
-# Note: Redis runs in Docker, so host-side tasks only deploy env files.
-# Docker handles data directory, user management, and internal config.
+# Note: Redis runs in Docker, so host-side tasks only deploy env files and configs.
 
 - name: "Redis | Deploy environment file"
   ansible.builtin.template:
@@ -11,6 +10,32 @@
     group: mkanavi
     mode: "0600"
   notify: Reload docker compose
+
+- name: "Redis | Deploy redis.conf"
+  ansible.builtin.template:
+    src: redis.conf.j2
+    dest: /home/mkanavi/docker/iacgenie/templates/redis.conf
+    owner: mkanavi
+    group: mkanavi
+    mode: "0600"
+  notify: Reload docker compose
+
+- name: "Redis | Deploy backup script"
+  ansible.builtin.template:
+    src: backup.sh.j2
+    dest: /opt/redis/backup.sh
+    owner: mkanavi
+    group: mkanavi
+    mode: "0750"
+  notify: Reload docker compose
+
+- name: "Redis | Create backup directory"
+  ansible.builtin.file:
+    path: /opt/redis/backups
+    state: directory
+    owner: mkanavi
+    group: mkanavi
+    mode: "0750"
 
 - name: "Redis | Verify Redis container is running"
   ansible.builtin.command: docker ps -a --filter "name=iacgenie-redis" --format "{{ '{{.Names}}' }}"

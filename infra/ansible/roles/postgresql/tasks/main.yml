@@ -12,6 +12,9 @@
     mode: "0600"
   notify: Reload docker compose
 
+- name: "PostgreSQL | Deploy SSL certificates and configs"
+  ansible.builtin.import_tasks: ssl.yml
+
 - name: "PostgreSQL | Verify PostgreSQL container is running"
   ansible.builtin.command: docker ps -a --filter "name=iacgenie-postgres" --format "{{ '{{.Names}}' }}"
   register: pg_status

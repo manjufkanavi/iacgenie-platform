@@ -332,6 +332,20 @@ server {
     }
 }
 
+# MinIO API — HTTP redirect
+server {
+    listen 80;
+    server_name minio.iacgenie.com;
+    return 301 https://$host$request_uri;
+}
+
+# MinIO Console — HTTP redirect
+server {
+    listen 80;
+    server_name console.minio.iacgenie.com;
+    return 301 https://$host$request_uri;
+}
+
 # Auth-Wrapper Dashboard — authentication gateway
 server {
     listen 80;
@@ -892,6 +906,83 @@ server {
     }
 }
 
+# MinIO API — HTTPS with TLS termination
+server {
+    listen 443 ssl http2;
+    server_name minio.iacgenie.com;
+
+    ssl_certificate /etc/letsencrypt/live/iacgenie.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/iacgenie.com/privkey.pem;
+
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache   shared:SSL:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Content-Security-Policy "default-src 'none';" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+    add_header X-Permitted-Cross-Domain-Policies "none" always;
+
+    limit_req zone=api burst=20 nodelay;
+
+    location / {
+        proxy_pass http://127.0.0.1:9000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 300;
+        proxy_redirect off;
+        proxy_hide_header X-Powered-By;
+    }
+}
+
+# MinIO Console — HTTPS with TLS termination
+server {
+    listen 443 ssl http2;
+    server_name console.minio.iacgenie.com;
+
+    ssl_certificate /etc/letsencrypt/live/iacgenie.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/iacgenie.com/privkey.pem;
+
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache   shared:SSL:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Content-Security-Policy "default-src 'none';" always;
+
+    # Basic auth for console admin access
+    auth_basic "MinIO Console Admin";
+    auth_basic_user_file /etc/nginx/.htpasswd_minio;
+
+    location / {
+        proxy_pass http://127.0.0.1:9001;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 300;
+        proxy_redirect off;
+        proxy_hide_header X-Powered-By;
+    }
+}
+
+# Vault — HTTPS with TLS termination
 server {
     listen 443 ssl http2;
     server_name vault.iacgenie.com;

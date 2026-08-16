@@ -2,9 +2,9 @@
 # MinIO role - Main entry point
 - name: "MinIO | Create data directory"
   ansible.builtin.file:
-    path: "{{ minio_data_dir | default('/var/lib/minio') }}"
-    owner: root
-    group: root
+    path: "/home/mkanavi/docker/iacgenie/data/minio"
+    owner: mkanavi
+    group: mkanavi
     mode: "0700"
     state: directory
 
@@ -18,7 +18,7 @@
   notify: Reload docker compose
 
 - name: "MinIO | Verify MinIO container is running"
-  ansible.builtin.command: docker ps -a --filter "name=iacgenie-minio" --format "{{ '{{.Names}}' }}"
+  ansible.builtin.command: docker ps -a --filter "name=iacgenie_minio" --format "{{ '{{.Names}}' }}"
   register: minio_status
   changed_when: false
   failed_when: false

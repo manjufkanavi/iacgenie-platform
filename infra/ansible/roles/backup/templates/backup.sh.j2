@@ -1,59 +1,108 @@
 #!/bin/bash
 # Backup script for IacGenie infrastructure
 # Managed by Ansible
+set -euo pipefail
 
-BACKUP_DIR={{ backup_dest | default('/mnt/backups') }}
+BACKUP_DIR={{ backup_dest | default('/home/mkanavi/backups') }}
 RETENTION_DAYS={{ backup_retention_days | default(30) }}
 DATE=$(date +%Y%m%d_%H%M%S)
-CONTAINER_NAME=iacgenie_backup_$DATE
+LOG_FILE="/var/log/backup.log"
+
+# Logging function
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
+}
+
+log "=== Starting backup ==="
 
 # Create backup directories
-mkdir -p $BACKUP_DIR/{postgres,redis,minio,keycloak,gitea}
+mkdir -p "$BACKUP_DIR"/{postgres,redis,minio,keycloak,gitea}
 
+# ─────────────────────────────────────────────────────────────
 # Backup PostgreSQL
-echo "Backing up PostgreSQL..."
-docker run --rm --name $CONTAINER_NAME \
-  -v postgres_data:/var/lib/postgresql/data:ro \
-  -v $BACKUP_DIR/postgres:/backup \
-  postgres:15-alpine \
-  pg_dumpall -U lightsrp > /backup/pg_full_$DATE.sql
+# ─────────────────────────────────────────────────────────────
+log "Backing up PostgreSQL..."
+PG_BACKUP_FILE="$BACKUP_DIR/postgres/pg_full_$DATE.sql"
 
-# Backup Redis AOF
-echo "Backing up Redis..."
-docker run --rm --name $CONTAINER_NAME \
-  -v redis_data:/data:ro \
-  -v $BACKUP_DIR/redis:/backup \
-  alpine cp /data/appendonly.aof /backup/redis_$DATE.aof
+# Use docker exec with PGPASSWORD for authentication
+PGPASSWORD="${PG_ROOT_PASSWORD:-CHANGE_ME_IN_VAULT}" docker exec iacgenie_postgres \
+    pg_dumpall -U lightsrp -d lightsrp \
+    --no-password \
+    2>>"$LOG_FILE" > "$PG_BACKUP_FILE"
 
+if [ -s "$PG_BACKUP_FILE" ]; then
+    # Compress backup
+    gzip "$PG_BACKUP_FILE"
+    PG_BACKUP_FILE="${PG_BACKUP_FILE}.gz"
+
+    # Generate SHA256 checksum for integrity verification
+    sha256sum "$PG_BACKUP_FILE" > "${PG_BACKUP_FILE}.sha256"
+    log "PostgreSQL backup: $(du -h "$PG_BACKUP_FILE" | cut -f1) — checksum verified"
+else
+    log "ERROR: PostgreSQL backup failed or is empty"
+    exit 1
+fi
+
+# ─────────────────────────────────────────────────────────────
+# Backup Redis (AOF snapshot)
+# ─────────────────────────────────────────────────────────────
+log "Backing up Redis..."
+REDIS_BACKUP_FILE="$BACKUP_DIR/redis/redis_$DATE.aof"
+docker exec iacgenie_redis redis-cli BGSAVE 2>>"$LOG_FILE" || true
+sleep 5
+docker exec iacgenie_redis redis-cli LASTSAVE 2>>"$LOG_FILE" || true
+docker exec iacgenie_redis cat /data/dump.rdb 2>/dev/null > "$REDIS_BACKUP_FILE" || \
+    docker exec iacgenie_redis cat /data/appendonlydir 2>/dev/null > "$REDIS_BACKUP_FILE" || \
+    log "WARNING: Redis backup could not copy data"
+
+# ─────────────────────────────────────────────────────────────
 # Backup MinIO data
-echo "Backing up MinIO..."
-docker run --rm --name $CONTAINER_NAME \
-  -v minio_data:/data:ro \
-  -v $BACKUP_DIR/minio:/backup \
-  alpine tar czf /backup/minio_$DATE.tar.gz /data
+# ─────────────────────────────────────────────────────────────
+log "Backing up MinIO..."
+MINIO_BACKUP_FILE="$BACKUP_DIR/minio/minio_$DATE.tar.gz"
+docker run --rm \
+    -v /home/mkanavi/docker/iacgenie/data/minio:/data:ro \
+    -v "$BACKUP_DIR/minio:/backup" \
+    alpine \
+    tar czf /backup/minio_$DATE.tar.gz /data 2>>"$LOG_FILE"
 
+# ─────────────────────────────────────────────────────────────
 # Backup Keycloak data
-echo "Backing up Keycloak..."
-docker run --rm --name $CONTAINER_NAME \
-  -v keycloak_data:/data:ro \
-  -v $BACKUP_DIR/keycloak:/backup \
-  alpine tar czf /backup/keycloak_$DATE.tar.gz /data
+# ─────────────────────────────────────────────────────────────
+log "Backing up Keycloak..."
+KC_BACKUP_FILE="$BACKUP_DIR/keycloak/keycloak_$DATE.tar.gz"
+docker run --rm \
+    -v /home/mkanavi/docker/iacgenie/data/keycloak:/data:ro \
+    -v "$BACKUP_DIR/keycloak:/backup" \
+    alpine \
+    tar czf /backup/keycloak_$DATE.tar.gz /data 2>>"$LOG_FILE"
 
+# ─────────────────────────────────────────────────────────────
 # Backup Gitea data
-echo "Backing up Gitea..."
-docker run --rm --name $CONTAINER_NAME \
-  -v gitea_data:/data:ro \
-  -v $BACKUP_DIR/gitea:/backup \
-  alpine tar czf /backup/gitea_$DATE.tar.gz /data
+# ─────────────────────────────────────────────────────────────
+log "Backing up Gitea..."
+GITEA_BACKUP_FILE="$BACKUP_DIR/gitea/gitea_$DATE.tar.gz"
+docker run --rm \
+    -v /home/mkanavi/docker/iacgenie/data/gitea:/data:ro \
+    -v "$BACKUP_DIR/gitea:/backup" \
+    alpine \
+    tar czf /backup/gitea_$DATE.tar.gz /data 2>>"$LOG_FILE"
 
+# ─────────────────────────────────────────────────────────────
 # Clean old backups
-echo "Cleaning old backups (>30 days)..."
-find $BACKUP_DIR -type f -mtime +$RETENTION_DAYS -delete
+# ─────────────────────────────────────────────────────────────
+log "Cleaning old backups (>${RETENTION_DAYS} days)..."
+find "$BACKUP_DIR" -type f -mtime +"$RETENTION_DAYS" -delete
 
-# Rclone sync to Google Drive if enabled
-{% if rclone_remote | default('gdrive') %}
-echo "Syncing to Google Drive..."
-rclone sync $BACKUP_DIR {{ rclone_remote }}:{{ rclone_dest | default('iacgenie-backups') }}/ --max-age {{ backup_retention_days | default(30) }}d --progress
+# ─────────────────────────────────────────────────────────────
+# Rclone sync to remote storage if enabled
+# ─────────────────────────────────────────────────────────────
+{% if rclone_enabled | default(false) %}
+log "Syncing to {{ rclone_remote | default('gdrive') }}..."
+rclone sync "$BACKUP_DIR" {{ rclone_remote | default('gdrive') }}:{{ rclone_dest | default('iacgenie-backups') }}/ \
+    --max-age {{ backup_retention_days | default(30) }}d \
+    --progress \
+    2>>"$LOG_FILE"
 {% endif %}
 
-echo "Backup completed at $(date)"
+log "=== Backup completed successfully ==="

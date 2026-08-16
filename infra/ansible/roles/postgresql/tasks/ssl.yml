@@ -1,0 +1,48 @@
+---
+# PostgreSQL role - SSL Certificate Generation
+
+- name: "PostgreSQL | Ensure templates directory exists"
+  ansible.builtin.file:
+    path: /home/mkanavi/docker/iacgenie/templates
+    state: directory
+    owner: mkanavi
+    group: mkanavi
+    mode: "0755"
+
+- name: "PostgreSQL | Generate self-signed SSL certificate"
+  ansible.builtin.command: >
+    openssl req -new -newkey rsa:2048 -days 365 -nodes -x509
+    -subj "/C=IN/ST=Karnataka/L=Bangalore/O=IacGenie/CN=postgres"
+    -keyout /home/mkanavi/docker/iacgenie/templates/server.key
+    -out /home/mkanavi/docker/iacgenie/templates/server.crt
+  args:
+    creates: /home/mkanavi/docker/iacgenie/templates/server.crt
+  notify: Reload docker compose
+
+- name: "PostgreSQL | Set SSL certificate permissions"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    owner: mkanavi
+    group: mkanavi
+    mode: "0600"
+  loop:
+    - /home/mkanavi/docker/iacgenie/templates/server.key
+    - /home/mkanavi/docker/iacgenie/templates/server.crt
+
+- name: "PostgreSQL | Copy pg_hba.conf template"
+  ansible.builtin.template:
+    src: pg_hba.conf.j2
+    dest: /home/mkanavi/docker/iacgenie/templates/pg_hba.conf
+    owner: mkanavi
+    group: mkanavi
+    mode: "0644"
+  notify: Reload docker compose
+
+- name: "PostgreSQL | Copy postgresql.conf template"
+  ansible.builtin.template:
+    src: postgresql.conf.j2
+    dest: /home/mkanavi/docker/iacgenie/templates/postgresql.conf
+    owner: mkanavi
+    group: mkanavi
+    mode: "0644"
+  notify: Reload docker compose

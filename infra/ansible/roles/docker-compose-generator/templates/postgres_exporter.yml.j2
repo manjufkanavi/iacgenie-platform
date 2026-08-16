@@ -1,0 +1,119 @@
+# PostgreSQL exporter configuration
+# Managed by Ansible
+---
+metrics:
+  - postgres_dbstats:
+      query: "SELECT datname, xact_commit, xact_rollback, blks_read, blks_hit, tup_returned, tup_fetched, insertions, updates, deletions, conflicts, temp_files, temp_bytes, deadlocks FROM pg_stat_database WHERE datname NOT LIKE 'template%'"
+      metrics:
+        - datname:
+            usage: "LABEL"
+            description: "Name of the database"
+        - xact_commit:
+            usage: "COUNTER"
+            description: "Number of transactions committed"
+        - xact_rollback:
+            usage: "COUNTER"
+            description: "Number of transactions rolled back"
+        - blks_read:
+            usage: "COUNTER"
+            description: "Number of disk blocks read"
+        - blks_hit:
+            usage: "COUNTER"
+            description: "Number of buffer hits"
+        - tup_returned:
+            usage: "COUNTER"
+            description: "Number of rows returned"
+        - tup_fetched:
+            usage: "COUNTER"
+            description: "Number of rows fetched"
+        - insertions:
+            usage: "COUNTER"
+            description: "Number of rows inserted"
+        - updates:
+            usage: "COUNTER"
+            description: "Number of rows updated"
+        - deletions:
+            usage: "COUNTER"
+            description: "Number of rows deleted"
+        - conflicts:
+            usage: "COUNTER"
+            description: "Number of conflicts"
+        - temp_files:
+            usage: "COUNTER"
+            description: "Number of temp files created"
+        - temp_bytes:
+            usage: "COUNTER"
+            description: "Temp bytes written"
+        - deadlocks:
+            usage: "COUNTER"
+            description: "Number of deadlocks detected"
+
+  - postgres_statio_tables:
+      query: "SELECT schemaname, relname, heap_blks_read, heap_blks_hit, tup_inserted, tup_updated, tup_deleted FROM pg_stat_user_tables"
+      metrics:
+        - schemaname:
+            usage: "LABEL"
+            description: "Schema name"
+        - relname:
+            usage: "LABEL"
+            description: "Table name"
+        - heap_blks_read:
+            usage: "COUNTER"
+            description: "Disk blocks read"
+        - heap_blks_hit:
+            usage: "COUNTER"
+            description: "Buffer hits"
+        - tup_inserted:
+            usage: "COUNTER"
+            description: "Rows inserted"
+        - tup_updated:
+            usage: "COUNTER"
+            description: "Rows updated"
+        - tup_deleted:
+            usage: "COUNTER"
+            description: "Rows deleted"
+
+  - postgres_statio_indexes:
+      query: "SELECT schemaname, relname, indexrelname, idx_scan, idx_tup_read, idx_tup_fetch FROM pg_stat_user_indexes"
+      metrics:
+        - schemaname:
+            usage: "LABEL"
+            description: "Schema name"
+        - relname:
+            usage: "LABEL"
+            description: "Table name"
+        - indexrelname:
+            usage: "LABEL"
+            description: "Index name"
+        - idx_scan:
+            usage: "COUNTER"
+            description: "Index scans"
+        - idx_tup_read:
+            usage: "COUNTER"
+            description: "Index tuples read"
+        - idx_tup_fetch:
+            usage: "COUNTER"
+            description: "Index tuples fetched"
+
+  - postgres_statio_sequences:
+      query: "SELECT schemaname, relname, last_value, is_called FROM pg_sequences WHERE schemaname NOT IN ('pg_catalog', 'information_schema')"
+      metrics:
+        - schemaname:
+            usage: "LABEL"
+            description: "Schema name"
+        - relname:
+            usage: "LABEL"
+            description: "Sequence name"
+        - last_value:
+            usage: "GAUGE"
+            description: "Last sequence value"
+        - is_called:
+            usage: "GAUGE"
+            description: "Whether sequence has been called"
+
+  - postgres_wal:
+      query: "SELECT COALESCE(SUM(wal_bytes), 0) as wal_bytes FROM pg_stat_wal"
+      metrics:
+        - wal_bytes:
+            usage: "COUNTER"
+            description: "WAL bytes generated"

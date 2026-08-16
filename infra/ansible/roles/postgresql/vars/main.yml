@@ -1,19 +1,20 @@
 ---
-# PostgreSQL Role Vars
-# Phase 10.11: Keycloak DB credentials
+# ── PostgreSQL Configuration ────────────────────────────────────────────────
+# Memory settings
+pg_shared_buffers: "256MB"
+pg_effective_cache_size: "1GB"
+pg_work_mem: "4MB"
+pg_maintenance_work_mem: "128MB"
+pg_max_connections: 100
+pg_data_dir: "/home/mkanavi/docker/iacgenie/data/postgres"
+pg_port: 5432
 
-postgres_version: "15"
-postgres_port: 5432
-postgres_data_dir: "/home/mkanavi/docker/iacgenie/data/postgres"
-postgres_conf_file: "/home/mkanavi/docker/iacgenie/data/postgres/postgresql.conf"
-postgres_hba_file: "/home/mkanavi/docker/iacgenie/data/postgres/pg_hba.conf"
+# ── Database Users ───────────────────────────────────────────────────────────
+# Application user (lightsrp) — used by default in docker-compose
+# Additional users for multi-tenant support
 
-# Phase 10.11: Keycloak DB
-keycloak_db_user: keycloak
-keycloak_db_name: keycloak
-keycloak_db_password: CHANGE_ME_IN_VAULT
-
-# Multi-tenant databases (Phase 10.3)
+# ── Multi-tenant databases (Phase 10.3) ─────────────────────────────────────
+# Note: Databases are created via init scripts in docker-compose entrypoint
 postgres_databases:
   - name: iacgenie
     owner: iacgenie
@@ -24,14 +25,12 @@ postgres_databases:
   - name: lightsrp
     owner: lightsrp
 
+# ── Database Users ───────────────────────────────────────────────────────────
 postgres_users:
-  - name: postgres
-    password: CHANGE_ME_IN_VAULT
-    superuser: true
   - name: iacgenie
     password: CHANGE_ME_IN_VAULT
   - name: keycloak
-    password: "{{ keycloak_db_password }}"
+    password: CHANGE_ME_IN_VAULT
   - name: gitea
     password: CHANGE_ME_IN_VAULT
   - name: lightsrp

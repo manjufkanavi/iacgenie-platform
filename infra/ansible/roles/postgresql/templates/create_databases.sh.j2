@@ -1,0 +1,12 @@
+#!/bin/bash
+# Create additional databases on first startup
+# This script runs in /docker-entrypoint-initdb.d/ when PostgreSQL initializes
+set -e
+
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<-EOSQL
+    CREATE DATABASE iacgenie OWNER iacgenie;
+    CREATE DATABASE keycloak OWNER keycloak;
+    CREATE DATABASE gitea OWNER gitea;
+EOSQL
+
+echo "Additional databases created successfully"
