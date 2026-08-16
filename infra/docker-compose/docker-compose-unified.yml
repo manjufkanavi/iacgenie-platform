@@ -134,7 +134,7 @@ services:
     container_name: iacgenie_openbao
     restart: unless-stopped
     command: bao server -config=/openbao/raft/openbao-prod.hcl
-    user: "100:1000"
+    user: 100:1000
     environment:
       OPENBAO_ADDR: http://127.0.0.1:8200
       OPENBAO_CLUSTER_ADDR: http://127.0.0.1:8201
@@ -233,8 +233,8 @@ services:
     logging:
       driver: json-file
       options:
-        max-size: "100m"
-        max-file: "3"
+        max-size: 100m
+        max-file: '3'
   gitea:
     image: gitea/gitea:1.23.4-rootless
     container_name: iacgenie_gitea
@@ -294,47 +294,31 @@ services:
     image: lightserp-lightserp-api:latest
     container_name: iacgenie_lightserp_api
     restart: unless-stopped
-    # Hardened per Antares security audit (2026-08-17)
-    ports:
-    - 127.0.0.1:8000:3000
     environment:
       LOGTIDE_URL: http://localhost:4318/v1/traces
       MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
-      MINIO_SECRET_KEY_FILE: /run/secrets/lightserp_minio_secret_key
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
       NSQD_ADDR: nsqd:4150
       LIGHTSERP_PAGEZEN_API: http://pagezen:8082
       SEARXNG_URL: http://searxng:8080
       LIGHTSERP_S3_BASE: iacgenie-lightserp
-      LIGHTSERP_ALLOW_INSECURE: "false"
-      REDIS_PASSWORD_FILE: /run/secrets/lightserp_redis_password
-      LIGHTSERP_API_SECRET_FILE: /run/secrets/lightserp_api_secret
-      LIGHTSERP_DATABASE_URL_FILE: /run/secrets/lightserp_database_url
-      LIGHTSERP_KEYCLOAK_CLIENT_SECRET_FILE: /run/secrets/lightserp_keycloak_client_secret
-    secrets:
-    - lightserp_api_secret
-    - lightserp_database_url
-    - lightserp_keycloak_client_secret
-    - lightserp_minio_secret_key
-    - lightserp_redis_password
-    volumes:
-    - ../ansible/roles/openbao/files/inject-secrets.sh:/usr/local/bin/inject-secrets.sh:ro
-    - ../ansible/roles/openbao/files/openbao_injector.py:/usr/local/bin/openbao_injector.py:ro
-    - ../ansible/roles/openbao/files/configs:/etc/openbao-config:ro
-    - openbao-approle:/var/run/approle
-    # Read-only filesystem (antires: writable root)
-    read_only: true
-    tmpfs:
-    - /tmp:noexec,nosuid,size=100m
-    # Healthcheck (antires: no health monitoring)
-    healthcheck:
-      test:
-      - CMD-SHELL
-      - curl -f http://127.0.0.1:3000/health || exit 1
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 15s
+      LIGHTSERP_ALLOW_INSECURE: 'false'
+      MINIO_SECRET_KEY_FILE: ${MINIO_ROOT_PASSWORD}
+      REDIS_PASSWORD_FILE: /run/secrets/lightserp_redis_password${REDIS_PASSWORD}
+      LIGHTSERP_API_SECRET_FILE: LIGHTSERP_API_SECRET_FILE
+      LIGHTSERP_DATABASE_URL_FILE: LIGHTSERP_DATABASE_URL_FILE
+      LIGHTSERP_KEYCLOAK_CLIENT_SECRET_FILE: LIGHTSERP_KEYCLOAK_CLIENT_SECRET_FILE
+    ports:
+    - 127.0.0.1:8000:3000
+    networks:
+    - iacgenie-frontend
+    - iacgenie-backend
+    - iacgenie-messaging
+    depends_on:
+    - minio
+    - nsqd
+    - searxng
+    - openbao
     deploy:
       resources:
         limits:
@@ -345,10 +329,543 @@ services:
     - no-new-privileges:true
     cap_drop:
     - ALL
-    cap_add: []
+    volumes:
+    - ../ansible/roles/openbao/files/inject-secrets.sh:/usr/local/bin/inject-secrets.sh:ro
+    - ../ansible/roles/openbao/files/openbao_injector.py:/usr/local/bin/openbao_injector.py:ro
+    - ../ansible/roles/openbao/files/configs:/etc/openbao-config:ro
+    - openbao-approle:/var/run/approle
+    entrypoint:
+    - /usr/local/bin/inject-secrets.sh
+    - lightserp-api
+    - --
+    read_only: true
+    tmpfs:
+    - /tmp:noexec,nosuid,size=100m
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -f http://127.0.0.1:3000/health || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    secrets:
+    - lightserp_api_secret
+    - lightserp_database_url
+    - lightserp_keycloak_client_secret
+    - lightserp_minio_secret_key
+    - lightserp_redis_password
+  lightserp-webui:
+    image: lightserp-lightserp-webui:latest
+    container_name: iacgenie_lightserp_webui
+    restart: unless-stopped
+    ports:
+    - 127.0.0.1:3001:3070
     networks:
     - iacgenie-frontend
-
+    depends_on:
+    - lightserp-api
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 512m
+          pids: 100
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    read_only: true
+    tmpfs:
+    - /tmp:noexec,nosuid,size=50m
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -f http://127.0.0.1:3070/health || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    cap_add: []
+  searxng:
+    image: searxng/searxng:latest
+    container_name: iacgenie_searxng
+    restart: unless-stopped
+    environment:
+      SEARXNG_SECRET: ${SEARXNG_SECRET_KEY}
+      SEARXNG_BASE_URL: http://search.iacgenie.com
+    ports:
+    - 127.0.0.1:8082:8080
+    networks:
+    - iacgenie-frontend
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -f http://127.0.0.1:8080/health || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 512m
+          pids: 100
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    cap_add: []
+    volumes:
+    - /home/mkanavi/docker/iacgenie/data/searxng:/etc/searxng
+    read_only: true
+    tmpfs:
+    - /tmp:noexec,nosuid,size=50m
+  nsqd:
+    image: nsqio/nsq:latest
+    container_name: iacgenie_nsqd
+    restart: unless-stopped
+    command: nsqd --data-path=/nsq/data
+    volumes:
+    - /home/mkanavi/docker/iacgenie/data/nsqd:/nsq/data
+    ports:
+    - 127.0.0.1:4150:4150
+    - 127.0.0.1:4151:4151
+    networks:
+    - iacgenie-messaging
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -f http://127.0.0.1:4151/health || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256m
+          pids: 100
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    read_only: true
+    tmpfs:
+    - /tmp:noexec,nosuid,size=50m
+    cap_add: []
+  pagezen:
+    image: lightserp-pagezen:latest
+    container_name: iacgenie_pagezen
+    restart: unless-stopped
+    environment:
+      LIGHTSERP_API_URL: http://lightserp-api:8000
+      LIGHTSERP_API_SECRET: ${LIGHTSERP_API_SECRET}
+    ports:
+    - 127.0.0.1:8081:8082
+    networks:
+    - iacgenie-frontend
+    depends_on:
+    - lightserp-api
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256m
+          pids: 100
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    read_only: true
+    tmpfs:
+    - /tmp:noexec,nosuid,size=50m
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -f http://127.0.0.1:8082/health || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    cap_add: []
+  iacgenie-backend:
+    image: iacgenie-backend:latest
+    container_name: iacgenie_backend
+    restart: unless-stopped
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      NSQD_ADDR: nsqd:4150
+      OPENBAO_ADDR: http://openbao:8200
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: iacgenie
+      KEYCLOAK_CLIENT_ID: iacgenie-platform
+      JWT_SECRET: ${IACGENIE_JWT_SECRET}
+      APP_ENV: production
+    ports:
+    - 127.0.0.1:3003:8000
+    networks:
+    - iacgenie-backend
+    depends_on:
+    - postgres
+    - minio
+    - redis
+    - nsqd
+    - keycloak
+    - openbao
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512m
+          pids: 100
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    volumes:
+    - ../ansible/roles/openbao/files/inject-secrets.sh:/usr/local/bin/inject-secrets.sh:ro
+    - ../ansible/roles/openbao/files/openbao_injector.py:/usr/local/bin/openbao_injector.py:ro
+    - ../ansible/roles/openbao/files/configs:/etc/openbao-config:ro
+    - openbao-approle:/var/run/approle
+    entrypoint:
+    - /usr/local/bin/inject-secrets.sh
+    - iacgenie-backend
+    - --
+    read_only: true
+    tmpfs:
+    - /tmp:noexec,nosuid,size=50m
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -f http://127.0.0.1:8000/health || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    cap_add: []
+  iacgenie-frontend:
+    image: iacgenie-frontend:latest
+    container_name: iacgenie_frontend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:3003
+      NEXT_PUBLIC_PLATFORM_URL: https://platform.iacgenie.com
+    ports:
+    - 127.0.0.1:3002:80
+    networks:
+    - iacgenie-frontend
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 512m
+          pids: 100
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    cap_add: []
+    read_only: true
+    tmpfs:
+    - /tmp:noexec,nosuid,size=50m
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -f http://127.0.0.1:3002/health || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+  grafana:
+    image: grafana/grafana:latest
+    container_name: iacgenie_grafana
+    restart: unless-stopped
+    environment:
+      GF_SERVER_ROOT_URL: http://localhost:3004
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+    ports:
+    - 127.0.0.1:3004:3000
+    volumes:
+    - /home/mkanavi/docker/iacgenie/data/grafana:/var/lib/grafana
+    networks:
+    - iacgenie-frontend
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 512m
+          pids: 100
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    cap_add: []
+    read_only: true
+    tmpfs:
+    - /tmp:noexec,nosuid,size=50m
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -f http://127.0.0.1:3000/health || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: iacgenie_prometheus
+    restart: unless-stopped
+    volumes:
+    - /home/mkanavi/docker/iacgenie/data/prometheus:/prometheus
+    ports:
+    - 127.0.0.1:9090:9090
+    networks:
+    - iacgenie-frontend
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1g
+          pids: 100
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    read_only: true
+    tmpfs:
+    - /tmp:noexec,nosuid,size=50m
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -f http://127.0.0.1:9090/-/healthy || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    cap_add: []
+  cloudflared:
+    image: cloudflare/cloudflared:2024.12.0
+    container_name: iacgenie_cloudflared
+    restart: unless-stopped
+    command:
+    - tunnel
+    - --config
+    - /etc/cloudflared/config.yml
+    - run
+    volumes:
+    - ./cloudflared/auth.json:/etc/cloudflared/cert.json:ro
+    - ./cloudflared/config.yml:/etc/cloudflared/config.yml:ro
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - wget --spider -q http://127.0.0.1:4000/ready || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    cap_add:
+    - NET_BIND_SERVICE
+    read_only: true
+    tmpfs:
+    - /tmp:noexec,nosuid,size=50m
+    - /etc/cloudflared:noexec,nosuid
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256m
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: 50m
+        max-file: '3'
+  clamav-backend:
+    image: rguziy/clamav-web-client:latest
+    container_name: iacgenie_clamav
+    restart: unless-stopped
+    ports:
+    - 127.0.0.1:9092:80
+    networks:
+    - iacgenie-frontend
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 512m
+          pids: 100
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    read_only: true
+    tmpfs:
+    - /tmp:noexec,nosuid,size=50m
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -f http://127.0.0.1:9092/health || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    cap_add: []
+  crowdsec-backend:
+    image: crowdsecurity/crowdsec:latest
+    container_name: iacgenie_crowdsec
+    restart: unless-stopped
+    ports:
+    - 127.0.0.1:3033:8080
+    volumes:
+    - /var/log/nginx:/var/log/nginx:ro
+    - /home/mkanavi/docker/iacgenie/data/crowdsec-db:/var/lib/crowdsec/data
+    - /home/mkanavi/docker/iacgenie/data/crowdsec-config:/etc/crowdsec
+    networks:
+    - iacgenie-frontend
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 512m
+          pids: 100
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    cap_add: []
+    read_only: true
+    tmpfs:
+    - /tmp:noexec,nosuid,size=50m
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -f http://127.0.0.1:3033/health || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+  pagegen:
+    image: lightserp-pagegen:latest
+    container_name: iacgenie_pagegen
+    restart: unless-stopped
+    environment:
+      LIGHTSERP_API_URL: http://lightserp-api:8000
+      LIGHTSERP_API_SECRET: ${LIGHTSERP_API_SECRET}
+    ports:
+    - 127.0.0.1:3032:3031
+    networks:
+    - iacgenie-frontend
+    depends_on:
+    - lightserp-api
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 512m
+          pids: 100
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    read_only: true
+    tmpfs:
+    - /tmp:noexec,nosuid,size=50m
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -f http://127.0.0.1:3031/health || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    cap_add: []
+  searxng-backend:
+    image: searxng/searxng:latest
+    container_name: iacgenie_searxng_backend
+    restart: unless-stopped
+    ports:
+    - 127.0.0.1:8084:8080
+    networks:
+    - iacgenie-frontend
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 512m
+          pids: 100
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    cap_add: []
+    volumes:
+    - /home/mkanavi/docker/iacgenie/data/searxng:/etc/searxng
+    read_only: true
+    tmpfs:
+    - /tmp:noexec,nosuid,size=50m
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -f http://127.0.0.1:8080/health || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+  auth-wrapper:
+    image: iacgenie/auth-wrapper:v1.4.2
+    container_name: iacgenie_auth_wrapper
+    restart: unless-stopped
+    ports:
+    - 127.0.0.1:9091:9096
+    environment:
+      PORT: 9096
+      KEYCLOAK_URL: https://auth.iacgenie.com
+      KEYCLOAK_REALM: iacgenie
+      KEYCLOAK_CLIENT_ID: auth-wrapper
+      KEYCLOAK_CLIENT_SECRET_FILE: /run/secrets/auth_wrapper_kc_secret
+      SESSION_SECRET_FILE: /run/secrets/auth_wrapper_session_secret
+      SERVICE_NAME: Auth-Wrapper
+      SERVICE_TITLE: IaCGenie Services
+      SERVICE_BACKENDS: clamav:9092,pagegen:3032,crowdsec:3033,searxng:8084,default:9090
+      INSECURE_SKIP_VERIFY: 'false'
+    secrets:
+    - auth_wrapper_kc_secret
+    - auth_wrapper_session_secret
+    read_only: true
+    tmpfs:
+    - /tmp:noexec,nosuid,size=50m
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -f http://127.0.0.1:9096/health || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256m
+          pids: 500
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    cap_add: []
 networks:
   iacgenie-frontend:
     driver: bridge
