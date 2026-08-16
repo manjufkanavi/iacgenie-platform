@@ -566,24 +566,47 @@ services:
     cap_drop:
     - ALL
   cloudflared:
-    image: cloudflare/cloudflared:latest
+    image: cloudflare/cloudflared:2024.12.0
     container_name: iacgenie_cloudflared
     restart: unless-stopped
-    command: tunnel --no-autoupdate --credentials-file /etc/cloudflared/cert.json run iacgenie-pi
-    environment: {}
-    networks:
-    - iacgenie-frontend
+    # Hardened per Antares security audit (2026-08-17)
+    command:
+    - tunnel
+    - --config
+    - /etc/cloudflared/config.yml
+    - run
+    volumes:
+    - ./cloudflared/auth.json:/etc/cloudflared/cert.json:ro
+    - ./cloudflared/config.yml:/etc/cloudflared/config.yml:ro
+    # Health monitoring (antires: no health monitoring)
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - wget --spider -q http://127.0.0.1:4000/ready || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    cap_add:
+    - NET_BIND_SERVICE
+    read_only: true
+    tmpfs:
+    - /tmp:noexec,nosuid,size=50m
+    - /etc/cloudflared:noexec,nosuid
     deploy:
       resources:
         limits:
           cpus: '0.25'
           memory: 256m
-    security_opt:
-    - no-new-privileges:true
-    cap_drop:
-    - ALL
-    volumes:
-    - /home/mkanavi/docker/iacgenie/docker/cloudflared/auth.json:/etc/cloudflared/cert.json:ro
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
   clamav-backend:
     image: rguziy/clamav-web-client:latest
     container_name: iacgenie_clamav

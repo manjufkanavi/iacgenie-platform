@@ -1,0 +1,38 @@
+# Cloudflare Tunnel Configuration
+# Managed by Ansible - do not edit manually
+# Hardened per Antares security audit (2026-08-17)
+
+tunnel: {{ cloudflared_tunnel_name | default('iacgenie-pi') }}
+credentials-file: {{ cloudflared_credentials_file | default('/home/mkanavi/docker/iacgenie/docker/cloudflared/auth.json') }}
+
+ingress:
+  # Explicit subdomain rules (antires: wildcard ingress bypass)
+  - hostname: "auth.iacgenie.com"
+    service: http://127.0.0.1:80
+
+  - hostname: "platform.iacgenie.com"
+    service: http://127.0.0.1:80
+
+  - hostname: "iacgenie.com"
+    service: http://127.0.0.1:80
+
+  - hostname: "www.iacgenie.com"
+    service: http://127.0.0.1:80
+
+  - hostname: "clamav.iacgenie.com"
+    service: http://127.0.0.1:80
+
+  - hostname: "crowdsec.iacgenie.com"
+    service: http://127.0.0.1:80
+
+  - hostname: "pagegen.iacgenie.com"
+    service: http://127.0.0.1:80
+
+  - hostname: "search.iacgenie.com"
+    service: http://127.0.0.1:80
+
+  - hostname: "vault.iacgenie.com"
+    service: http://127.0.0.1:80
+
+  # Default deny (antires: unauthorized subdomain access)
+  - service: http_status:404

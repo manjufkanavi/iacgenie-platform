@@ -1,0 +1,29 @@
+---
+# Cloudflare Tunnel role — Defaults
+# Hardened per Antares security audit (2026-08-17)
+
+cloudflared_version: "2024.12.0"
+cloudflared_tunnel_name: "iacgenie-pi"
+cloudflared_tunnel_id: "1291108a-4e8d-4439-9fa6-316be7da5f97"
+cloudflared_credentials_file: "/home/mkanavi/docker/iacgenie/docker/cloudflared/auth.json"
+cloudflared_config_dir: "/home/mkanavi/docker/iacgenie/docker/cloudflared"
+
+# Cloudflare Access settings (antires: sensitive services exposed without auth)
+cloudflared_access_enabled: true
+cloudflared_access_policies:
+  - name: "vault-access"
+    subdomain: "vault"
+    domain: "iacgenie.com"
+    require:
+      - email:
+          - "@iacgenie.com"
+  - name: "auth-access"
+    subdomain: "auth"
+    domain: "iacgenie.com"
+    require:
+      - email:
+          - "@iacgenie.com"
+
+# Backup configuration
+cloudflared_backup_dir: /home/mkanavi/backups/cloudflared
+cloudflared_backup_retention_days: 30
