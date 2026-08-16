@@ -9,9 +9,7 @@
 - hosts: iacgenie-server
   become: true
   vars:
-    # TLS: OpenBao now uses HTTPS directly
-    openbao_addr: "https://127.0.0.1:8200"
-    openbao_skip_tls_verify: true
+    openbao_addr: "http://127.0.0.1:8200"
     openbao_raft_dir: /home/mkanavi/docker/iacgenie/openbao_raft
     openbao_docker_compose: /home/mkanavi/docker/iacgenie
     openbao_hcl_dest: /home/mkanavi/docker/iacgenie/data/openbao/openbao-prod.hcl
@@ -37,25 +35,11 @@
         group: mkanavi
         mode: "0644"
 
-    - name: "Phase 1 | Ensure TLS certs exist"
-      ansible.builtin.stat:
-        path: "{{ item }}"
-      loop:
-        - "{{ openbao_tls_cert }}"
-        - "{{ openbao_tls_key }}"
-      register: tls_cert_status
-
-    - name: "Phase 1 | Show TLS cert status"
-      ansible.builtin.debug:
-        msg: "TLS cert at {{ item.item }}: {{ item.stat.exists | default(false) }}"
-      loop: "{{ tls_cert_status.results }}"
-
     - name: "Phase 1 | Restart OpenBao container"
       ansible.builtin.command:
         cmd: docker compose up -d openbao
       args:
         chdir: "{{ openbao_docker_compose }}"
-      when: tls_cert_status.results[0].stat.exists | default(false)
 
     # ── Phase 2: Wait for OpenBao to be ready ────────────────────────────
     - name: "Phase 2 | Wait for OpenBao container to be running"
@@ -71,7 +55,6 @@
       ansible.builtin.command: >
         docker exec iacgenie_openbao bao status
         --address={{ openbao_addr }}
-        -tls-skip-verify
       register: bao_health
       retries: 20
       delay: 5
@@ -83,7 +66,6 @@
       ansible.builtin.command: >
         docker exec iacgenie_openbao bao status
         --address={{ openbao_addr }}
-        -tls-skip-verify
       register: bao_init_check
       changed_when: false
       ignore_errors: true

@@ -348,7 +348,21 @@ services:
     deploy:
       resources:
         limits:
-          memory: "{{ service_memory_defaults.openbao }}"
+          memory: "1g"
+          cpus: "1.0"
+        reservations:
+          memory: "512m"
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - SETUID
+      - SETGID
+    security_opt:
+      - no-new-privileges:true
+    stop_signal: SIGTERM
+    stop_grace_period: 30s
     logging:
       driver: json-file
       options:

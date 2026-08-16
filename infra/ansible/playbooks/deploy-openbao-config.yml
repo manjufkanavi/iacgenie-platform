@@ -1,0 +1,6 @@
+---
+# Deploy OpenBao config files only (hardening fixes)
+- hosts: iacgenie-server
+  become: true
+  roles:
+    - role: openbao

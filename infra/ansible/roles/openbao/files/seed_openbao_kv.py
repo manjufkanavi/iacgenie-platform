@@ -12,7 +12,6 @@ Usage: python3 seed_openbao_kv.py
 import json
 import os
 import sys
-import ssl
 import urllib.request
 import urllib.error
 
@@ -20,7 +19,7 @@ import urllib.error
 # =====================
 # Configuration
 # =====================
-OPENBAO_ADDR = os.getenv("OPENBAO_ADDR", "https://127.0.0.1:8200")
+OPENBAO_ADDR = os.getenv("OPENBAO_ADDR", "http://127.0.0.1:8200")
 ENV_PATH = os.getenv("ENV_PATH", "/home/mkanavi/docker/iacgenie/.env")
 TOKEN_PATH = os.getenv("TOKEN_PATH", "/home/mkanavi/docker/iacgenie/openbao_raft/init_keys.json")
 
@@ -56,7 +55,7 @@ def parse_env(path):
 
 def kv_put(engine, path, data, token):
     """Write KV v2 secret via REST API."""
-    url = f"{OPENBAO_ADDR}/v1/{engine}/data/{path}"
+    url = f"{OPENBAO_ADDR}/v1/{engine}/{path}"
     payload = json.dumps({"data": data}).encode()
     req = urllib.request.Request(
         url,
@@ -68,7 +67,7 @@ def kv_put(engine, path, data, token):
         method="POST"
     )
     try:
-        resp = urllib.request.urlopen(req, context=ssl.create_default_context(), timeout=10)
+        resp = urllib.request.urlopen(req, timeout=10)
         return True, resp.status
     except urllib.error.HTTPError as e:
         body = e.read().decode()
@@ -182,28 +181,28 @@ def main():
 
     # iacgenie backend
     for key, path in [
-        ("DATABASE_URL", "config/platform/database_url"),
-        ("REDIS_URL", "config/platform/redis_url"),
-        ("JWT_SECRET", "config/platform/jwt_secret"),
-        ("OPENBAO_ADDR", "config/platform/openbao_addr"),
+        ("DATABASE_URL", "data/config/platform/database_url"),
+        ("REDIS_URL", "data/config/platform/redis_url"),
+        ("JWT_SECRET", "data/config/platform/jwt_secret"),
+        ("OPENBAO_ADDR", "data/config/platform/openbao_addr"),
     ]:
-        ok, info = kv_put("iacgenie", path, {"value": env.get(key, "")}, token)
+        ok, info = kv_put("iacgenie/kv", path, {"value": env.get(key, "")}, token)
         results.append((f"iacgenie/data/{path}", ok, info))
 
     # iacgenie Keycloak
     for key, path in [
-        ("KEYCLOAK_ADMIN_USER", "config/keycloak/kc_admin_user"),
-        ("KEYCLOAK_ADMIN_PASSWORD", "config/keycloak/kc_admin_password"),
+        ("KEYCLOAK_ADMIN_USER", "data/config/keycloak/kc_admin_user"),
+        ("KEYCLOAK_ADMIN_PASSWORD", "data/config/keycloak/kc_admin_password"),
     ]:
-        ok, info = kv_put("iacgenie", path, {"value": env.get(key, "")}, token)
+        ok, info = kv_put("iacgenie/kv", path, {"value": env.get(key, "")}, token)
         results.append((f"iacgenie/data/{path}", ok, info))
 
     # iacgenie MinIO
     for key, path in [
-        ("MINIO_ROOT_USER", "config/minio/minio_root_user"),
-        ("MINIO_ROOT_PASSWORD", "config/minio/minio_root_password"),
+        ("MINIO_ROOT_USER", "data/config/minio/minio_root_user"),
+        ("MINIO_ROOT_PASSWORD", "data/config/minio/minio_root_password"),
     ]:
-        ok, info = kv_put("iacgenie", path, {"value": env.get(key, "")}, token)
+        ok, info = kv_put("iacgenie/kv", path, {"value": env.get(key, "")}, token)
         results.append((f"iacgenie/data/{path}", ok, info))
 
     # ============ LIGHTSERP ============
@@ -217,7 +216,7 @@ def main():
         ("MINIO_ROOT_USER", "data/config/minio_access_key"),
         ("MINIO_ROOT_PASSWORD", "data/config/minio_secret_key"),
     ]:
-        ok, info = kv_put("lightserp", path, {"value": env.get(key, "")}, token)
+        ok, info = kv_put("lightserp/kv", path, {"value": env.get(key, "")}, token)
         results.append((f"lightserp/{path}", ok, info))
 
     # KV-gen path

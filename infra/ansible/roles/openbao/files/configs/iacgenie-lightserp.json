@@ -9,6 +9,6 @@
     "KC_BOOTSTRAP_ADMIN_USERNAME": "iacgenie/data/config/keycloak/kc_admin_user",
     "KC_BOOTSTRAP_ADMIN_PASSWORD": "iacgenie/data/config/keycloak/kc_admin_password"
   },
-  "openbao_addr": "https://127.0.0.1:8200",
+  "openbao_addr": "http://127.0.0.1:8200",
   "approle_cred_file": "/var/run/approle/iacgenie-backend-svc-creds.txt"
 }

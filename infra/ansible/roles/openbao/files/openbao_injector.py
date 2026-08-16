@@ -15,7 +15,7 @@ Config file format:
         "secret_paths": {
             "env_var_name": "vault_path/to/secret"
         },
-        "openbao_addr": "http://openbao:8200",
+        "openbao_addr": "http://127.0.0.1:8200",
         "approle_role_id_path": "/var/run/approle/role_id",
         "approle_secret_id_path": "/var/run/approle/secret_id",
         "timeout": 30
@@ -27,7 +27,7 @@ Environment variables can override OpenBao settings:
     OPENBAO_SECRET_ID - AppRole secret ID
 """
 
-import json, os, sys, subprocess, ssl, urllib.request, urllib.error, time, signal
+import json, os, sys, subprocess, urllib.request, urllib.error, time
 
 def log(msg):
     print(f"[openbao-injector] {msg}", flush=True)
@@ -43,7 +43,7 @@ def load_config(service_name):
         config = json.load(f)
 
     # Defaults
-    config.setdefault("openbao_addr", "https://127.0.0.1:8200")
+    config.setdefault("openbao_addr", "http://127.0.0.1:8200")
     config.setdefault("approle_role_id_path", "/var/run/approle/role_id")
     config.setdefault("approle_secret_id_path", "/var/run/approle/secret_id")
     config.setdefault("timeout", 30)
@@ -85,14 +85,14 @@ def get_role_id_and_secret_id(config):
         log("ERROR: AppRole role_id or secret_id not available")
         log(f"  role_id_path: {config['approle_role_id_path']} (exists: {os.path.exists(config['approle_role_id_path'])})")
         log(f"  secret_id_path: {config['approle_secret_id_path']} (exists: {os.path.exists(config['approle_secret_id_path'])})")
-        cred_file = f"/var/run/approle/{service_name}-creds.txt"
+        cred_file = f"/var/run/approle/{config.get('_service_name', 'unknown')}-creds.txt"
         log(f"  shared creds: {cred_file} (exists: {os.path.exists(cred_file)})")
         sys.exit(1)
 
     return role_id, secret_id
 
-def api_request(base_url, path, data=None, token=None, ssl_ctx=None):
-    """Make an API request to OpenBao."""
+def api_request(base_url, path, data=None, token=None):
+    """Make an API request to OpenBao (HTTP only)."""
     url = f"{base_url}{path}"
     headers = {"Content-Type": "application/json"}
     if token:
@@ -101,35 +101,33 @@ def api_request(base_url, path, data=None, token=None, ssl_ctx=None):
     body = json.dumps(data).encode() if data else None
     req = urllib.request.Request(url, data=body, headers=headers, method="POST" if data else "GET")
 
-    # Use default SSL context (validates against system CA bundle)
-    ctx = ssl_ctx if ssl_ctx else ssl.create_default_context()
-    resp = urllib.request.urlopen(req, timeout=config["timeout"], context=ctx)
+    resp = urllib.request.urlopen(req, timeout=config["timeout"])
     raw = resp.read()
     if raw:
         return json.loads(raw)
     return {"success": True}
 
-def auth_approle(role_id, secret_id, addr, ssl_ctx=None):
+def auth_approle(role_id, secret_id, addr):
     """Authenticate using AppRole, return client token."""
     result = api_request(addr, "/v1/auth/approle/login", {
         "role_id": role_id,
         "secret_id": secret_id
-    }, ssl_ctx=ssl_ctx)
+    })
     token = result.get("auth", {}).get("client_token")
     if not token:
         log(f"ERROR: Failed to get token from AppRole login: {json.dumps(result)[:200]}")
         sys.exit(1)
     return token
 
-def fetch_secret(addr, token, path, ssl_ctx=None):
+def fetch_secret(addr, token, path):
     """Fetch a secret from KV v2."""
-    result = api_request(addr, f"/v1/{path}", token=token, ssl_ctx=ssl_ctx)
+    result = api_request(addr, f"/v1/{path}", token=token)
     if not isinstance(result, dict):
         raise ValueError(f"Unexpected response type: {type(result)}")
     data = result.get("data", {}).get("data", {})
     return data
 
-def inject_secrets(token, secret_paths, addr, ssl_ctx=None):
+def inject_secrets(token, secret_paths, addr):
     """Fetch and inject secrets as environment variables."""
     for env_var, vault_path in secret_paths.items():
         if env_var in os.environ:
@@ -137,7 +135,7 @@ def inject_secrets(token, secret_paths, addr, ssl_ctx=None):
             pass
 
         try:
-            secrets = fetch_secret(addr, token, vault_path, ssl_ctx)
+            secrets = fetch_secret(addr, token, vault_path)
             if env_var in secrets:
                 os.environ[env_var] = secrets[env_var]
                 log(f"  ✓ {env_var} injected from {vault_path}")
@@ -176,14 +174,10 @@ def main():
 
     # Load config
     config = load_config(service_name)
-    # Use default SSL context (validates against system CA bundle)
-    ssl_ctx = ssl.create_default_context()
+    config["_service_name"] = service_name
 
-    # Force HTTPS for all connections (OpenBao runs with TLS)
+    # Use HTTP (OpenBao listens on HTTP — TLS terminated at Nginx)
     addr = config["openbao_addr"]
-    if addr.startswith("http://"):
-        addr = addr.replace("http://", "https://", 1)
-        log(f"Upgraded to HTTPS: {addr}")
     log(f"Service: {service_name}")
     log(f"OpenBao: {addr}")
     log(f"Secrets to inject: {len(config['secret_paths'])}")
@@ -193,7 +187,7 @@ def main():
     for attempt in range(config["retry_attempts"]):
         try:
             role_id, secret_id = get_role_id_and_secret_id(config)
-            token = auth_approle(role_id, secret_id, addr, ssl_ctx)
+            token = auth_approle(role_id, secret_id, addr)
             log("AppRole authentication: SUCCESS")
             break
         except urllib.error.HTTPError as e:
@@ -212,7 +206,7 @@ def main():
 
     # Inject secrets
     if token:
-        inject_secrets(token, config["secret_paths"], addr, ssl_ctx)
+        inject_secrets(token, config["secret_paths"], addr)
     else:
         log("Skipping secret injection (no token available, using existing env vars)")
 

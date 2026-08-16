@@ -1,5 +1,12 @@
+# =============================================================================
 # OpenBao Production Configuration
-# Managed by Ansible — do not edit manually
+# Managed by Ansible — DO NOT EDIT MANUALLY
+# =============================================================================
+# OpenBao {{ openbao_version | default('2.6.0') }} production config
+# - TLS terminated at Cloudflare edge / Nginx reverse proxy
+# - Raft storage with integrated snapshot
+# - Prometheus telemetry
+# =============================================================================
 
 # === UI ===
 ui = true
@@ -10,18 +17,15 @@ telemetry {
   disable_hostname          = true
 }
 
-# === Listener (TLS — mutual auth for internal services) ===
+# === Listener (HTTP — TLS terminated at Nginx) ===
+# OpenBao listens on 127.0.0.1 only. Nginx handles external TLS termination.
 listener "tcp" {
-  address     = "127.0.0.1:{{ openbao_port }}"
-  tls_disable = 0
-
-  tls_cert_file   = "/openbao/raft/server.crt"
-  tls_key_file    = "/openbao/raft/server.key"
-  tls_client_ca_file = "/openbao/raft/ca.crt"
+  address     = "127.0.0.1:{{ openbao_port | default(8200) }}"
+  tls_disable = 1
 }
 
-# === Cluster address (HTTPS for single-node) ===
-cluster_addr = "https://127.0.0.1:{{ openbao_port | int + 1 }}"
+# === Cluster address (HTTP for single-node) ===
+cluster_addr = "http://127.0.0.1:{{ openbao_port | default(8200) | int + 1 }}"
 
 # === Storage (Raft) ===
 storage "raft" {
@@ -33,8 +37,8 @@ storage "raft" {
 default_lease_ttl = "768h"
 max_lease_ttl     = "768h"
 
-# === API Addr (for cluster discovery — HTTPS) ===
-api_addr = "https://127.0.0.1:{{ openbao_port }}"
+# === API Addr (for cluster discovery — HTTP) ===
+api_addr = "http://127.0.0.1:{{ openbao_port | default(8200) }}"
 
 # === Log level ===
 log_level = "{{ openbao_log_level | default('info') }}"

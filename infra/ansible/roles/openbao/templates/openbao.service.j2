@@ -8,32 +8,31 @@ Type=notify
 User=mkanavi
 Group=mkanavi
 WorkingDirectory=/home/mkanavi/docker/iacgenie
-ExecStartPre=/usr/bin/docker rm -f openbao
+ExecStartPre=/usr/bin/docker rm -f iacgenie_openbao
 ExecStart=/usr/bin/docker run \
-    --name openbao \
+    --name iacgenie_openbao \
     --restart unless-stopped \
-    --user 100:100 \
+    --user 100:1000 \
     --memory 1g \
     --cpus 0.5 \
     --publish 127.0.0.1:8200:8200 \
     --publish 127.0.0.1:8201:8201 \
     --volume /home/mkanavi/docker/iacgenie/data/openbao:/openbao/storage \
-    --volume /home/mkanavi/docker/iacgenie/data/openbao_raft:/openbao/raft \
+    --volume /home/mkanavi/docker/iacgenie/openbao_raft:/openbao/raft \
     --env OPENBAO_ADDR=http://127.0.0.1:8200 \
     --env OPENBAO_CLUSTER_ADDR=http://127.0.0.1:8201 \
     --env OPENBAO_UI=true \
-    --env OPENBAO_STORAGE_TYPE=raft \
-    --env OPENBAO_STORAGE_PATH=/openbao/storage \
     --env OPENBAO_LOG_LEVEL=info \
     --cap-drop ALL \
     --cap-add SETGID \
     --cap-add SETUID \
     --cap-add DAC_OVERRIDE \
+    --cap-add IPC_LOCK \
     --security-opt no-new-privileges \
     openbao/openbao:2.6.0 \
     bao server -config=/openbao/storage/openbao-prod.hcl
-ExecStop=/usr/bin/docker stop -t 30 openbao
-ExecStopPost=/usr/bin/docker rm -f openbao
+ExecStop=/usr/bin/docker stop -t 30 iacgenie_openbao
+ExecStopPost=/usr/bin/docker rm -f iacgenie_openbao
 TimeoutStartSec=infinity
 TimeoutStopSec=30
 

@@ -133,22 +133,17 @@ services:
     image: openbao/openbao:2.6.0
     container_name: iacgenie_openbao
     restart: unless-stopped
-    command: bao server -config=/openbao/storage/openbao-prod.hcl
-    user: 0:0
+    command: bao server -config=/openbao/raft/openbao-prod.hcl
+    user: "100:1000"
     environment:
-      OPENBAO_ADDR: https://127.0.0.1:8200
-      OPENBAO_CLUSTER_ADDR: https://127.0.0.1:8201
+      OPENBAO_ADDR: http://127.0.0.1:8200
+      OPENBAO_CLUSTER_ADDR: http://127.0.0.1:8201
       OPENBAO_UI: 'true'
       OPENBAO_LOG_LEVEL: info
       BAO_SKIP_DROP_ROOT: 'true'
     volumes:
     - /home/mkanavi/docker/iacgenie/data/openbao:/openbao/storage
     - /home/mkanavi/docker/iacgenie/openbao_raft:/openbao/raft
-    - /etc/letsencrypt:/etc/letsencrypt
-    - openbao-appprope:/var/run/approle
-    ports:
-    - 127.0.0.1:8200:8200
-    - 127.0.0.1:8201:8201
     networks:
     - iacgenie-backend
     healthcheck:
@@ -157,8 +152,7 @@ services:
       - /usr/bin/bao
       - status
       - --address
-      - https://127.0.0.1:8200
-      - -tls-skip-verify
+      - http://127.0.0.1:8200
       interval: 30s
       timeout: 10s
       retries: 3
@@ -170,6 +164,7 @@ services:
     - SETGID
     - SETUID
     - DAC_OVERRIDE
+    - IPC_LOCK
     deploy:
       resources:
         limits:
@@ -691,6 +686,7 @@ services:
     - no-new-privileges:true
     cap_drop:
     - ALL
+  loki:
     image: grafana/loki:2.9.0
     container_name: iacgenie_loki
     restart: unless-stopped

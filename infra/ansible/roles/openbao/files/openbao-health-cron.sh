@@ -5,5 +5,5 @@
 STATUS=$(docker inspect --format="{{ .State.Status }}" iacgenie_openbao 2>/dev/null || echo "stopped")
 if [ "$STATUS" != "running" ]; then
   echo "$(date) OpenBao is $STATUS, restarting..." >> /var/log/openbao-health.log
-  docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.yml restart openbao
+  docker compose -f /home/mkanavi/docker/iacgenie/docker-compose-unified.yml restart iacgenie_openbao
 fi

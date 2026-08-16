@@ -32,7 +32,7 @@ BACKUP_DIR = os.getenv("OPENBAO_BACKUP_DIR", os.path.join(RAFT_DIR, "backups"))
 VAULT_DB = os.path.join(RAFT_DIR, "vault.db")
 CONFIG_FILE = os.path.join(RAFT_DIR, "openbao-prod.hcl")
 CONFIG_ALT = os.path.join(COMPOSE_DIR, "openbao_data", "openbao-prod.hcl")
-BAO_ADDR = "https://127.0.0.1:8200"
+BAO_ADDR = "http://127.0.0.1:8200"
 KEEP_DAYS = 30
 
 # Email configuration
@@ -41,7 +41,6 @@ EMAIL_FROM = os.getenv("BACKUP_EMAIL_FROM", "openbao-backup@iacgenie.com")
 EMAIL_SMTP = os.getenv("BACKUP_EMAIL_SMTP", "smtp.gmail.com:587")
 
 # SSL context: use default context (validates against system CA bundle)
-_ssl_ctx = ssl.create_default_context()
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -110,7 +109,7 @@ def bao_request(path, method="GET", data=None):
     if data:
         req.data = json.dumps(data).encode()
     try:
-        resp = urllib.request.urlopen(req, timeout=30, context=_ssl_ctx)
+        resp = urllib.request.urlopen(req, timeout=30)
         content = resp.read()
         if not content:
             return {}
@@ -162,7 +161,7 @@ def api_snapshot():
 
     try:
         with open(snap_path, "wb") as f:
-            with urllib.request.urlopen(req, timeout=120, context=_ssl_ctx) as resp:
+            with urllib.request.urlopen(req, timeout=120) as resp:
                 while True:
                     chunk = resp.read(65536)
                     if not chunk:
@@ -275,7 +274,7 @@ def restore_snapshot(snapshot_path):
     req = urllib.request.Request(url, headers=headers, data=data, method="PUT")
 
     log("  Uploading snapshot to OpenBao...")
-    resp = urllib.request.urlopen(req, timeout=300, context=_ssl_ctx)
+    resp = urllib.request.urlopen(req, timeout=300)
     log(f"  OK Restore complete. Response: {resp.status}")
     log("  NOTE: OpenBao may need to be restarted to apply the restored state.")
 

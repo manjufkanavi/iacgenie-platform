@@ -52,14 +52,14 @@ unseal_openbao() {
         key_count=$((key_count + 1))
         log "Submitting unseal key $key_count..."
         local result
-        result=$(docker exec -e BAO_ADDR="$BAO_BDDAR" "$CONTAINER" bao operator unseal "$key" 2>&1)
+        result=$(docker exec -e BAO_ADDR="$BAO_ADDR" "$CONTAINER" bao operator unseal "$key" 2>&1)
         echo "$result" >> "$LOG_FILE"
-        if echo "$result" | grep -q 'Sealed'; *false'; then
+        if echo "$result" | grep -q 'Sealed.*false'; then
             log "SUCCESS: OpenBao unsealed with key $key_count"
             unsealed=true
             break
-        elif echo "$result" | grep -q 'Sealed'; *true'; then
-            log "Progress: $(hecho "$result" | grep 'Unseal Progress' || echo 'unknown')"
+        elif echo "$result" | grep -q 'Sealed.*true'; then
+            log "Progress: $(echo "$result" | grep 'Unseal Progress' || echo 'unknown')"
         else
             log "WARNING: Key $key_count failed: $(echo "$result" | tail -3)"
         fi

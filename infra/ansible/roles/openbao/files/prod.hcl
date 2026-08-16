@@ -17,18 +17,15 @@ telemetry {
   disable_hostname          = true
 }
 
-# === Listener (TLS — mutual auth for internal services) ===
+# === Listener (HTTP — TLS terminated at Nginx) ===
+# OpenBao listens on 127.0.0.1 only. Nginx handles external TLS termination.
 listener "tcp" {
   address     = "127.0.0.1:8200"
-  tls_disable = 0
-
-  tls_cert_file   = "/openbao/raft/server.crt"
-  tls_key_file    = "/openbao/raft/server.key"
-  tls_client_ca_file = "/openbao/raft/ca.crt"
+  tls_disable = 1
 }
 
-# === Cluster address (HTTPS for single-node) ===
-cluster_addr = "https://127.0.0.1:8201"
+# === Cluster address (HTTP for single-node) ===
+cluster_addr = "http://127.0.0.1:8201"
 
 # === Storage (Raft) ===
 storage "raft" {
