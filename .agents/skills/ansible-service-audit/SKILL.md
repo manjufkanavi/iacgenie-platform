@@ -29,8 +29,9 @@ genuine issues, redeploy, and commits.
 - **VM:** `mkanavi@192.168.0.118`
 - **Docker path:** `/home/mkanavi/docker/iacgenie`
 - **Roles:** `infra/ansible/roles/<service>/`
-- **Models:** Antares (`Qwen3.6-35B-A3B-UD-MLX-8bit`) on `127.0.0.1:1234`,
-  VibeThinker (`VibeThinker-3B-OptiQ-4bit`) on `127.0.0.1:1234`
+- **Models:** Antares (`antares-1b-mlx-8bit`) on `127.0.0.1:1234`,
+  VibeThinker (`VibeThinker-3B-OptiQ-4bit`) on `127.0.0.1:1234`,
+  Self (`Qwen3.6-35B-A3B-UD-MLX-8bit`) — this agent
 - **Role SOULs:** `.agent/devops-engineer/SOUL.md`, `.agent/secops-engineer/SOUL.md`
 
 ## Phase 1: Gather Service Context
