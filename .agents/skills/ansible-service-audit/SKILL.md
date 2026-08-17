@@ -2,18 +2,18 @@
 name: ansible-service-audit
 description: >
   Full automated service audit: reads all Ansible files for a service,
-  launches 4 parallel subagent audits (DevOps+Antares, DevOps+VibeThinker,
-  SecOps+Antares, SecOps+VibeThinker), consolidates findings, fixes genuine
-  issues, redeploy, verify, and commit.
-version: 1.0.0
+  launches 6 parallel audits (Self+DevOps, Self+SecOps, Antares+DevOps,
+  Antares+SecOps, VibeThinker+DevOps, VibeThinker+SecOps), consolidates
+  findings, fixes genuine issues, redeploy, verify, and commit.
+version: 2.0.0
 tags: [ansible, audit, service, devops, secops, multi-agent, redeploy]
 ---
 
 # Ansible Service Audit
 
 Automated, multi-agent audit of any deployed service from the iacgenie-platform
-Ansible roles. Produces 4 independent audit reports, consolidates them, fixes
-genuine issues, redeploy, and commits.
+Ansible roles. Produces 6 independent audit reports from 3 models × 2 roles,
+consolidates them, fixes genuine issues, redeploy, and commits.
 
 ## When to Use
 
@@ -23,16 +23,46 @@ genuine issues, redeploy, and commits.
 - Pre-deployment hardening checks
 - When the user says "audit <service>" or "fix <service>"
 
+## Architecture
+
+```
+                    ┌─────────────────────────────────┐
+                    │       ansible-service-audit      │
+                    │         (this agent)             │
+                    │   Qwen3.6-35B-A3B-UD-MLX-4bit  │
+                    └──────────┬──────────────────────┘
+                               │
+              ┌────────────────┼────────────────┐
+              │                │                │
+    ┌─────────▼──────┐ ┌──────▼───────┐ ┌──────▼───────┐
+    │ delegate_task   │ │ curl (Antares)│ │ curl (Vibe)  │
+    │ Self+DevOps     │ │ Self+DevOps  │ │ Self+DevOps  │
+    └─────────┬───────┘ └──────┬───────┘ └──────┬───────┘
+              │                │                │
+    ┌─────────▼──────┐ ┌──────▼───────┐ ┌──────▼───────┐
+    │ delegate_task   │ │ curl (Antares)│ │ curl (Vibe)  │
+    │ Self+SecOps     │ │ Self+SecOps  │ │ Self+SecOps  │
+    └─────────────────┘ └──────────────┘ └──────────────┘
+```
+
+**Key insight:** Antares and VibeThinker do NOT support tool/function calling.
+They are pure text-in/text-out models via OpenAI-compatible API at
+`127.0.0.1:1234`. All context (file contents, prompts) must be passed as text
+in a single curl request. Self (this agent) uses `delegate_task` with full tool
+access.
+
 ## Prerequisites
 
 - **Repo:** `/Users/manjunathkanavi/iacgenie-platform` (already pulled)
 - **VM:** `mkanavi@192.168.0.118`
 - **Docker path:** `/home/mkanavi/docker/iacgenie`
 - **Roles:** `infra/ansible/roles/<service>/`
-- **Models:** Antares (`antares-1b-mlx-8bit`) on `127.0.0.1:1234`,
-  VibeThinker (`VibeThinker-3B-OptiQ-4bit`) on `127.0.0.1:1234`,
-  Self (`Qwen3.6-35B-A3B-UD-MLX-8bit`) — this agent
+- **Remote models:** Antares (`antares-1b-mlx-8bit`) and
+  VibeThinker (`VibeThinker-3B-OptiQ-4bit`) on `127.0.0.1:1234`
+  (no tool calling, text-only)
+- **Self model:** Whatever this agent runs on (no hardcoded model names)
 - **Role SOULs:** `.agent/devops-engineer/SOUL.md`, `.agent/secops-engineer/SOUL.md`
+- **Remote model wrapper:** `~/.hermes/skills/ansible-service-audit/scripts/remote_model_caller.py`
 
 ## Phase 1: Gather Service Context
 
@@ -69,9 +99,9 @@ Write a JSON context file at `/tmp/<service>_audit_context.json`:
 
 ```json
 {
-  "service": "lightserp-api",
-  "container_name": "iacgenie_lightserp_api",
-  "ansible_files": ["infra/ansible/roles/lightserp-api/tasks/main.yml", ...],
+  "service": "openbao",
+  "container_name": "iacgenie_openbao",
+  "ansible_files": ["infra/ansible/roles/openbao/tasks/main.yml", ...],
   "compose_entry": "...",
   "nginx_vhost": "...",
   "cloudflare_rule": "...",
@@ -83,118 +113,134 @@ Write a JSON context file at `/tmp/<service>_audit_context.json`:
 }
 ```
 
-## Phase 2: Launch 4 Parallel Audits
+## Phase 2: Launch 6 Parallel Audits
 
-Use `delegate_task` to spawn 4 subagents in parallel. Each receives:
-- The service context (from Phase 1)
-- The role SOUL (devops-engineer or secops-engineer)
-- The model to use (antares or vibethinker)
-- Instruction to produce a JSON audit report
+### 2.1 Self Audits (delegate_task — full tool access)
 
-### 2.1 Build Role Prompt
+Launch 2 subagents using `delegate_task`. These run with full tool access
+(file, terminal, search) and can read files and SSH to VM.
 
-Load the appropriate SOUL file and prepend the service context:
+```python
+# Self + DevOps — uses delegate_task (full tools)
+delegate_task(
+    goal="Audit service <SERVICE> from a DevOps perspective",
+    context=f"You are a DevOps Engineer following this SOUL:\n{read('.agent/devops-engineer/SOUL.md')}\n\nAUDIT TARGET: {SERVICE}\n\nCONTEXT:\n{read('/tmp/{SERVICE}_audit_context.json')}\n\nTASK: Perform a thorough DevOps audit. Read all Ansible role files. Identify ALL problems.\n\nOUTPUT — return ONLY valid JSON:\n{{\"service\": \"{SERVICE}\", \"role\": \"devops-engineer\", \"model\": \"self\", \"findings\": [...], \"summary\": \"...\", \"priority_order\": [...]}}",
+    toolsets=["file", "terminal", "search"]
+)
 
+# Self + SecOps — uses delegate_task (full tools)
+delegate_task(
+    goal="Audit service <SERVICE> from a SecOps perspective",
+    context=f"You are a SecOps Engineer following this SOUL:\n{read('.agent/secops-engineer/SOUL.md')}\n\nAUDIT TARGET: {SERVICE}\n\nCONTEXT:\n{read('/tmp/{SERVICE}_audit_context.json')}\n\nTASK: Perform a thorough security audit. Read all Ansible role files. Identify ALL security problems.\n\nOUTPUT — return ONLY valid JSON:\n{{\"service\": \"{SERVICE}\", \"role\": \"secops-engineer\", \"model\": \"self\", \"findings\": [...], \"summary\": \"...\", \"priority_order\": [...]}}",
+    toolsets=["file", "terminal", "search"]
+)
 ```
-You are a <role> following this SOUL:
-<contents of .agent/<role>/SOUL.md>
 
-AUDIT TARGET: <service-name>
+### 2.2 Remote Model Audits (curl — text only, no tool calling)
+
+Antares and VibeThinker do NOT support tool calling. Use the wrapper script
+to send all context as text in a single curl request.
+
+```bash
+WRAPPER=~/.hermes/skills/ansible-service-audit/scripts/remote_model_caller.py
+
+# Antares + DevOps — text-in/text-out via curl
+SERVICE="openbao"
+SYSTEM_PROMPT="You are a senior DevOps Engineer auditing infrastructure. Read the context below and identify ALL configuration, resource, health, backup, automation, and operational issues."
+USER_PROMPT=$(cat <<PROMPT
+AUDIT TARGET: ${SERVICE}
 
 CONTEXT:
-<contents of /tmp/<service>_audit_context.json>
+$(cat /tmp/${SERVICE}_audit_context.json)
 
-TASK: Perform a thorough audit of this service. Identify ALL problems:
-- Configuration issues
-- Security vulnerabilities
-- Resource misconfigurations
-- Missing best practices
-- Health check problems
-- Network exposure issues
-- Secret management problems
-- Docker security issues
+ANSIBLE FILES:
+$(for f in $(cat /tmp/${SERVICE}_audit_context.json | python3 -c "import sys,json; [print(open(f).read()[:500]) for f in json.load(sys.stdin)['ansible_files'][:10]]" 2>/dev/null); do echo "--- $f ---"; cat $f 2>/dev/null | head -100; echo; done)
 
-OUTPUT FORMAT — return ONLY valid JSON:
+TASK: Perform a thorough DevOps audit of ${SERVICE}. Identify ALL problems.
+
+OUTPUT — return ONLY valid JSON:
 {
-  "service": "<service-name>",
-  "role": "<devops-engineer|secops-engineer>",
-  "model": "<antares|vibethinker>",
+  "service": "${SERVICE}",
+  "role": "devops-engineer",
+  "model": "antares",
   "findings": [
     {
       "severity": "CRITICAL|HIGH|MEDIUM|LOW|INFO",
-      "category": "security|configuration|resource|network|healthcheck|secrets|best-practice",
+      "category": "configuration|resource|healthcheck|backup|automation|best-practice",
       "title": "Brief title",
-      "description": "Detailed description of the issue",
+      "description": "Detailed description",
       "files_affected": ["path/to/file"],
       "current_value": "...",
       "recommended_value": "...",
-      "fix_command": "ansible fix command or manual fix",
-      "ansible_files_to_modify": ["infra/ansible/roles/<service>/..."],
-      "docker_compose_to_modify": true|false,
-      "risk_if_unfixed": "What happens if this is not fixed"
+      "fix_command": "fix command",
+      "risk_if_unfixed": "..."
     }
   ],
   "summary": "Overall assessment",
-  "priority_order": ["fix 1", "fix 2", ...]
+  "priority_order": ["fix 1", "fix 2"]
 }
+PROMPT
+)
+
+python3 "$WRAPPER" antares-1b-mlx-8bit "$SYSTEM_PROMPT" "$USER_PROMPT" > /tmp/${SERVICE}_devops_antares_audit.json
+
+# Repeat for: antares+secops, vibethinker+devops, vibethinker+secops
 ```
 
-### 2.2 Launch 4 Delegations
+**Simpler approach** — use the wrapper with a JSON prompt file:
 
-```python
-# The 4 audit tasks — launch all 4 in parallel
-audit_tasks = [
-    {
-        "goal": "Audit service <SERVICE> from a DevOps perspective",
-        "context": "<role_prompt_devops_antares>",
-        "toolsets": ["terminal", "file", "web"],
-        "acp_command": "copilot"  # Use Antares model via delegation config
-    },
-    {
-        "goal": "Audit service <SERVICE> from a DevOps perspective using VibeThinker reasoning",
-        "context": "<role_prompt_devops_vibethinker>",
-        "toolsets": ["terminal", "file", "web"],
-    },
-    {
-        "goal": "Audit service <SERVICE> from a SecOps perspective",
-        "context": "<role_prompt_secops_antares>",
-        "toolsets": ["terminal", "file", "web"],
-    },
-    {
-        "goal": "Audit service <SERVICE> from a SecOps perspective using VibeThinker reasoning",
-        "context": "<role_prompt_secops_vibethinker>",
-        "toolsets": ["terminal", "file", "web"],
-    },
-]
+```bash
+# Step 1: Build prompt file with all context embedded
+cat > /tmp/${SERVICE}_devops_antares_prompt.json <<EOF
+{
+  "service": "${SERVICE}",
+  "role": "devops-engineer",
+  "model": "antares",
+  "context": $(cat /tmp/${SERVICE}_audit_context.json),
+  "files": {
+    $(for f in $(cat /tmp/${SERVICE}_audit_context.json | python3 -c "import sys,json; print(','.join(json.load(sys.stdin)['ansible_files'][:15]))" 2>/dev/null); do echo "    \"$f\": $(cat \"$f\" 2>/dev/null | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')",; done)
+  }
+}
+EOF
+
+# Step 2: Call the model
+python3 "$WRAPPER" antares-1b-mlx-8bit \
+  "You are a senior DevOps Engineer. Audit the service below." \
+  "$(cat /tmp/${SERVICE}_devops_antares_prompt.json)" \
+  > /tmp/${SERVICE}_devops_antares_audit.json
 ```
-
-**Note:** The model selection for each subagent is controlled by the
-`delegation.model` config in `config.yaml`. Override per-task if needed.
 
 ### 2.3 Save Audit Results
 
-Each subagent writes its JSON report to:
-- `/tmp/<service>_devops_antares_audit.json`
-- `/tmp/<service>_devops_vibethinker_audit.json`
-- `/tmp/<service>_secops_antares_audit.json`
-- `/tmp/<service>_secops_vibethinker_audit.json`
+Each audit writes its JSON report to:
 
-Wait for all 4 to complete before proceeding.
+| Audit | Output File |
+|-------|-------------|
+| Self + DevOps | `/tmp/<service>_devops_self_audit.json` |
+| Self + SecOps | `/tmp/<service>_secops_self_audit.json` |
+| Antares + DevOps | `/tmp/<service>_devops_antares_audit.json` |
+| Antares + SecOps | `/tmp/<service>_secops_antares_audit.json` |
+| VibeThinker + DevOps | `/tmp/<service>_devops_vibethinker_audit.json` |
+| VibeThinker + SecOps | `/tmp/<service>_secops_vibethinker_audit.json` |
+
+Wait for all 6 to complete before proceeding.
 
 ## Phase 3: Consolidate Audit Findings
 
 ### 3.1 Merge All Findings
 
-Read all 4 JSON files and merge:
+Read all 6 JSON files and merge:
 
 ```python
 import json
 from collections import defaultdict
 
 audit_files = [
+    f"/tmp/{SERVICE}_devops_self_audit.json",
+    f"/tmp/{SERVICE}_secops_self_audit.json",
     f"/tmp/{SERVICE}_devops_antares_audit.json",
-    f"/tmp/{SERVICE}_devops_vibethinker_audit.json",
     f"/tmp/{SERVICE}_secops_antares_audit.json",
+    f"/tmp/{SERVICE}_devops_vibethinker_audit.json",
     f"/tmp/{SERVICE}_secops_vibethinker_audit.json",
 ]
 
@@ -288,7 +334,6 @@ Save to `/tmp/<service>_fix_plan.json`:
 For each fix, use the `patch` tool to modify the Ansible role files:
 
 ```bash
-# Example: Fix a docker-compose template issue
 patch(path="infra/ansible/roles/<service>/templates/docker-compose.service.yml.j2",
       old_string="old config line",
       new_string="new config line")
@@ -325,7 +370,6 @@ ansible-playbook -i inventory/hosts.yml site.yml --check -l <service> --tags val
 ### 6.1 Clean Up Existing Service
 
 ```bash
-# SSH to VM and stop/remove the service container
 ssh mkanavi@192.168.0.118 "docker stop iacgenie_<service> && docker rm iacgenie_<service>"
 ssh mkanavi@192.168.0.118 "docker rmi -f <image>"  # if needed
 ```
@@ -342,9 +386,8 @@ ansible-playbook -i inventory/hosts.yml playbooks/services.yml -l <service> --ta
 If changes are only in docker-compose:
 
 ```bash
-# Sync compose file to VM
 scp infra/docker-compose/docker-compose-unified.yml mkanavi@192.168.0.118:/tmp/
-ssh mkanavi@192.168.0.118 "cp /tmp/docker-compose-unified.yml /home/mkanavi/docker/iacgenie/docker-compose-unified.yml && cd /home/mkanavi/docker/iacgenie && docker compose up -d <service> --force-recreate"
+ssh mkanavi@127.0.0.1 "cp /tmp/docker-compose-unified.yml /home/mkanavi/docker/iacgenie/docker-compose-unified.yml && cd /home/mkanavi/docker/iacgenie && docker compose up -d <service> --force-recreate"
 ```
 
 ## Phase 7: Verify Service
@@ -359,17 +402,13 @@ ssh mkanavi@192.168.0.118 "docker logs iacgenie_<service> --tail 20"
 ### 7.2 Service Reachability
 
 ```bash
-# Internal check (from VM)
 ssh mkanavi@192.168.0.118 "curl -sf http://127.0.0.1:<PORT>/health || echo 'UNREACHABLE'"
-
-# External check (via Cloudflare)
 curl -sI "https://<domain>.iacgenie.com/health" | head -5
 ```
 
 ### 7.3 Health Check Endpoints
 
 ```bash
-# Check specific health endpoint
 ssh mkanavi@192.168.0.118 "docker exec iacgenie_<service> curl -sf http://127.0.0.1:<PORT>/health"
 ```
 
@@ -393,11 +432,11 @@ cd /Users/manjunathkanavi/iacgenie-platform
 git add -A
 
 # Commit with audit summary
-git commit -m "audit: <service> multi-agent audit fixes
+git commit -m "audit: <service> 6-agent multi-model audit fixes
 
-Automated audit with 4 parallel agents (DevOps+Antares, DevOps+VibeThinker,
-SecOps+Antares, SecOps+VibeThinker). Consolidated <N> findings, fixed <M>
-genuine issues.
+Automated audit with 6 parallel audits (Self+DevOps, Self+SecOps,
+Antares+DevOps, Antares+SecOps, VibeThinker+DevOps, VibeThinker+SecOps).
+Consolidated <N> findings, fixed <M> genuine issues.
 
 Findings: <N> total, <M> fixed, <K> skipped (false positive/info)
 Services redeployed: <service>
@@ -413,6 +452,25 @@ git push origin main
 
 ## Quick Reference
 
+### Model Architecture
+
+| Model | Access Type | Tool Calling | Use |
+|-------|-------------|--------------|-----|
+| Self (this agent) | `delegate_task` | ✅ Full tools | DevOps + SecOps audits |
+| Antares | `curl` (text-only) | ❌ No | DevOps + SecOps audits |
+| VibeThinker | `curl` (text-only) | ❌ No | DevOps + SecOps audits |
+
+### 6 Audit Matrix
+
+| # | Role | Model | Output File |
+|---|------|-------|-------------|
+| 1 | DevOps | Self | `_devops_self_audit.json` |
+| 2 | SecOps | Self | `_secops_self_audit.json` |
+| 3 | DevOps | Antares | `_devops_antares_audit.json` |
+| 4 | SecOps | Antares | `_secops_antares_audit.json` |
+| 5 | DevOps | VibeThinker | `_devops_vibethinker_audit.json` |
+| 6 | SecOps | VibeThinker | `_secops_vibethinker_audit.json` |
+
 ### Service Name Mapping
 
 | User Input | Service Name | Container | Ansible Role |
@@ -424,7 +482,7 @@ git push origin main
 | keycloak | keycloak | iacgenie_keycloak | `infra/ansible/roles/keycloak/` |
 | gitea | gitea | iacgenie_gitea | `infra/ansible/roles/gitea/` |
 | lightserp-api | lightserp-api | iacgenie_lightserp_api | `infra/ansible/roles/lightserp-api/` |
-| lightserp-webui | lightserp-webui | iacgenie_lightserp_webui | `infra/ansible/roles/lightserp/` |
+| lightserp-webui | lightserp-webui | iacgenie_lightserp_webui | `infra/ansible/roles/openbao/` |
 | searxng | searxng | iacgenie_searxng | `infra/ansible/roles/searxng/` |
 | pagezen | pagezen | iacgenie_pagezen | `infra/ansible/roles/pagezen/` |
 | nginx | nginx | (systemd) | `infra/ansible/roles/nginx/` |
@@ -435,10 +493,12 @@ git push origin main
 | File | Purpose |
 |------|---------|
 | `/tmp/<service>_audit_context.json` | Service context package |
-| `/tmp/<service>_devops_antares_audit.json` | DevOps + Antares audit |
-| `/tmp/<service>_devops_vibethinker_audit.json` | DevOps + VibeThinker audit |
-| `/tmp/<service>_secops_antares_audit.json` | SecOps + Antares audit |
-| `/tmp/<service>_secops_vibethinker_audit.json` | SecOps + VibeThinker audit |
+| `/tmp/<service>_devops_self_audit.json` | Self + DevOps audit |
+| `/tmp/<service>_secops_self_audit.json` | Self + SecOps audit |
+| `/tmp/<service>_devops_antares_audit.json` | Antares + DevOps audit |
+| `/tmp/<service>_secops_antares_audit.json` | Antares + SecOps audit |
+| `/tmp/<service>_devops_vibethinker_audit.json` | VibeThinker + DevOps audit |
+| `/tmp/<service>_secops_vibethinker_audit.json` | VibeThinker + SecOps audit |
 | `/tmp/<service>_consolidated_audit.json` | Merged/deduped findings |
 | `/tmp/<service>_fix_plan.json` | Approved fix list |
 | `infra/docs/<service>-audit-report.md` | Human-readable report |
@@ -453,11 +513,12 @@ git push origin main
 6. **Cloudflared needs restart, not reload** — it has no SIGHUP handler
 7. **SSH to VM for live verification** — templates may differ from deployed state
 8. **Remember to update both template AND live** — Ansible SOT pattern
+9. **Remote models don't support tool calling** — pass all context as text in curl
+10. **Self model is not hardcoded** — whatever this agent runs on is "self"
 
 ### Related Skills
 
-- `devops` — Infrastructure debugging, service teardown, deployment patterns
-- `antares-security-audit` — Direct Antares model security audit
+- `ansible-service-audit` — This skill (multi-agent audit with 6 reports)
 - `infra-drift-audit` — Ansible template vs live VM drift comparison
 - `docker-compose-drift-remediation` — Docker compose drift detection
 - `service-security-audit` — Service-level security audit workflow
