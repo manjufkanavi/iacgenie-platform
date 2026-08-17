@@ -27,6 +27,12 @@ services:
       - iacgenie-backend
     cap_drop:
       - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETUID
+      - SETGID
     security_opt:
       - no-new-privileges:true
     tmpfs:
@@ -92,6 +98,8 @@ services:
     security_opt:
       - no-new-privileges:true
     read_only: true
+    tmpfs:
+      - /etc/pgbouncer
     deploy:
       resources:
         limits:
@@ -172,6 +180,12 @@ services:
       start_period: 15s
     cap_drop:
       - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETUID
+      - SETGID
     security_opt:
       - no-new-privileges:true
     read_only: true
@@ -307,7 +321,10 @@ services:
     image: cloudflare/cloudflared:2025.6.0
     container_name: iacgenie_cloudflared
     restart: always
-    command: tunnel --no-autoupdate --credentials-file /etc/cloudflared/cert.json run {{ cloudflared_tunnel_name }}
+    command: tunnel --no-autoupdate --credentials-file /etc/cloudflared/{{ cloudflared_tunnel_name }}.json run {{ cloudflared_tunnel_name }}
+    volumes:
+      - /etc/cloudflared:/etc/cloudflared:ro
+      - /home/mkanavi/.cloudflared:/home/cloudflared/.cloudflared:ro
     networks:
       - iacgenie-frontend
     deploy:
@@ -330,6 +347,7 @@ services:
     container_name: iacgenie_openbao
     restart: always
     network_mode: host
+    user: "1000:1000"
     command: bao server -config=/openbao/storage/openbao-prod.hcl
     environment:
       OPENBAO_ADDR: http://127.0.0.1:8200
@@ -489,7 +507,7 @@ services:
   # =====================
   auth_wrapper:
     build:
-      context: ./shared-auth-wrapper/auth_wrapper
+      context: ./shared-auth-wrapper
       dockerfile: Dockerfile
     container_name: iacgenie_auth_wrapper
     restart: unless-stopped
@@ -538,10 +556,11 @@ services:
       LIGHTSERP_PAGEZEN_API: "http://pagezen:8082"
       SEARXNG_URL: "http://searxng:8080"
       LIGHTSERP_S3_BASE: "iacgenie-lightserp"
-      REDIS_URL: "redis://:${REDIS_PASSWORD}@redis:6379/0"
+      REDIS_URL: "${REDIS_URL}"
       LIGHTSERP_API_SECRET: "${LIGHTSERP_API_SECRET}"
       LIGHTSERP_DATABASE_URL: "${LIGHTSERP_DATABASE_URL}"
       LIGHTSERP_KEYCLOAK_CLIENT_SECRET: "${LIGHTSERP_KEYCLOAK_CLIENT_SECRET}"
+      DATABASE_URL: "${LIGHTSERP_DATABASE_URL}"
     ports:
       - "127.0.0.1:8000:3000"
     networks:
@@ -554,7 +573,7 @@ services:
       - nsqd
       - searxng
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8000/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:3000/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -797,7 +816,7 @@ services:
     networks:
       - iacgenie-backend
     healthcheck:
-      test: ["CMD-SHELL", "clamdscan --ping || exit 1"]
+      test: ["CMD-SHELL", "clamdscan --ping=1 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -827,7 +846,7 @@ services:
     depends_on:
       - clamav
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9092/ || exit 1"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/ || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -846,7 +865,7 @@ services:
   # CrowdSec (security)
   # =====================
   crowdsec-backend:
-    image: crowdsecurity/crowdsec:2.2.0
+    image: crowdsecurity/crowdsec:latest
     container_name: iacgenie_crowdsec
     restart: unless-stopped
     ports:
@@ -855,8 +874,9 @@ services:
       - iacgenie-frontend
     volumes:
       - ./data/crowdsec:/etc/crowdsec
+      - ./data/crowdsec-db:/var/lib/crowdsec/data
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3033/healthz || exit 1"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -888,7 +908,7 @@ services:
     depends_on:
       - lightserp-api
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3032/health || exit 1"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3031/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -918,7 +938,7 @@ services:
     networks:
       - iacgenie-frontend
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3002/ || exit 1"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:80/ || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -939,14 +959,14 @@ services:
     container_name: iacgenie_backend
     restart: unless-stopped
     environment:
-      DATABASE_URL: "${IACGENIE_DB_URL}"
-      JWT_SECRET: "${IACGENIE_JWT_SECRET}"
+      DATABASE_URL: "${DATABASE_URL}"
+      JWT_SECRET: "${JWT_SECRET}"
     ports:
       - "127.0.0.1:3003:8000"
     networks:
       - iacgenie-backend
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3003/docs || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:8000/docs || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

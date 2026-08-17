@@ -2,7 +2,6 @@
 """Fetch secrets from OpenBao KV v2 and generate a .env file."""
 import json
 import os
-import ssl
 import urllib.request
 import urllib.error
 from datetime import datetime, timezone
@@ -14,7 +13,6 @@ from datetime import datetime, timezone
 OPENBAO_ADDR = os.getenv("OPENBAO_ADDR", "http://127.0.0.1:8200")
 OUTPUT_PATH = "/home/mkanavi/docker/iacgenie/.env"
 TOKEN_PATH = "/home/mkanavi/docker/iacgenie/openbao_raft/init_keys.json"
-SSL_SKIP_VERIFY = True
 
 # All KV paths to fetch (matching openbao-secrets role)
 KV_PATHS = [
@@ -37,12 +35,9 @@ KV_PATHS = [
 
 def get_token():
     """Get OpenBao admin token from init_keys.json or env var."""
-    # Try environment variable first
     token = os.getenv("OPENBAO_ADMIN_TOKEN")
     if token:
         return token
-
-    # Try reading from init_keys.json
     try:
         with open(TOKEN_PATH, "r") as f:
             data = json.load(f)
@@ -52,19 +47,12 @@ def get_token():
         return None
 
 
-def build_ssl_context():
-    """Build SSL context using system CA bundle (proper verification)."""
-    return ssl.create_default_context()
-
-
 def read_kv(engine, path, token):
     """Read a secret from OpenBao KV v2."""
-    ctx = build_ssl_context()
-    # KV v2 requires: /v1/{engine}/data/{path}
     url = f"{OPENBAO_ADDR}/v1/{engine}/data/{path}"
     req = urllib.request.Request(url, headers={"X-Vault-Token": token})
     try:
-        with urllib.request.urlopen(req, context=ctx, timeout=10) as resp:
+        with urllib.request.urlopen(req, timeout=10) as resp:
             data = json.loads(resp.read().decode())
             return data.get("data", {}).get("data", {})
     except urllib.error.HTTPError as e:
@@ -79,7 +67,7 @@ def read_kv(engine, path, token):
 
 def build_database_url(pg):
     """Build DATABASE_URL from postgres KV data."""
-    return f"postgresql://{pg.get('POSTGRES_USER', 'iacgenie_pg')}:{pg.get('POSTGRES_PASSWORD', '')}@postgres:5432/{pg.get('POSTGRES_DB', 'iacgenie')}"
+    return f"postgresql://{pg.get('POSTGRES_USER', 'iacgenie_pg')}:***@postgres:5432/{pg.get('POSTGRES_DB', 'iacgenie')}"
 
 
 def generate_env(token):
@@ -125,22 +113,24 @@ def generate_env(token):
     ]:
         data = read_kv("lightserp", path, token)
         if data:
-            # Map to env var names
             env_vars[data.get("key", path).replace("data/config/", "").replace("_", "").upper()] = data.get("value", "")
             fetched_paths.append(path)
             print(f"[OK] lightserp/{path}")
         else:
             print(f"[SKIP] lightserp/{path} (not found or unreadable)")
 
-    # Build composite URLs
+    # Build composite URLs with proper URL encoding
     if "POSTGRES_USER" in env_vars:
+        import urllib.parse
         pg_data = env_vars
-        env_vars["DATABASE_URL"] = build_database_url(pg_data)
+        pg_pass = urllib.parse.quote(pg_data.get("POSTGRES_PASSWORD", ""), safe="")
+        env_vars["DATABASE_URL"] = f"postgresql://{pg_data.get('POSTGRES_USER', 'iacgenie_pg')}:{pg_pass}@postgres:5432/{pg_data.get('POSTGRES_DB', 'iacgenie')}"
 
     if "REDIS_PASSWORD" in env_vars:
-        env_vars["REDIS_URL"] = f"redis://:${env_vars['REDIS_PASSWORD']}@redis:6379/0"
+        import urllib.parse
+        redis_pass = urllib.parse.quote(env_vars["REDIS_PASSWORD"], safe="")
+        env_vars["REDIS_URL"] = f"redis://:{redis_pass}@redis:6379/0"
 
-    # Add OpenBao address
     env_vars["OPENBAO_ADDR"] = OPENBAO_ADDR
 
     print(f"\n[FETCHED] {len(fetched_paths)}/{len(KV_PATHS)} paths from OpenBao")
@@ -159,17 +149,15 @@ def write_env(env_vars):
         "",
     ]
 
-    # Sort keys for consistency
     for key in sorted(env_vars.keys()):
         value = env_vars[key]
-        if value:  # Skip empty values
+        if value:
             lines.append(f"{key}={value}")
         else:
             lines.append(f"{key}=")
 
     content = "\n".join(lines) + "\n"
 
-    # Write file with restricted permissions
     fd = os.open(OUTPUT_PATH, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     try:
         os.write(fd, content.encode())

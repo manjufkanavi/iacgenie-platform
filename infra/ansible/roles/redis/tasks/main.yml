@@ -20,6 +20,14 @@
     mode: "0600"
   notify: Reload docker compose
 
+- name: "Redis | Create backup directory"
+  ansible.builtin.file:
+    path: /opt/redis/backups
+    state: directory
+    owner: mkanavi
+    group: mkanavi
+    mode: "0750"
+
 - name: "Redis | Deploy backup script"
   ansible.builtin.template:
     src: backup.sh.j2
@@ -28,14 +36,6 @@
     group: mkanavi
     mode: "0750"
   notify: Reload docker compose
-
-- name: "Redis | Create backup directory"
-  ansible.builtin.file:
-    path: /opt/redis/backups
-    state: directory
-    owner: mkanavi
-    group: mkanavi
-    mode: "0750"
 
 - name: "Redis | Verify Redis container is running"
   ansible.builtin.command: docker ps -a --filter "name=iacgenie-redis" --format "{{ '{{.Names}}' }}"

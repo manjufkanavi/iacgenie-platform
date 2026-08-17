@@ -1,0 +1,299 @@
+{
+  "service": "openbao",
+  "role": "devops-engineer",
+  "model": "vibethinker",
+  "findings": [
+    {
+      "severity": "CRITICAL",
+      "category": "configuration",
+      "title": "Shamir unseal threshold mismatch between Ansible defaults and live state",
+      "description": "defaults/main.yml defines 3 unseal keys (3/3 Shamir) on lines 17-23, but the live state reports Shamir 2/3. This means the Ansible automation will attempt to unseal with 3 keys against a 2-key threshold, causing unseal failures. The openbao_unseal_key_1/2/3 variables are all defined but the live system only requires 2 of 3.",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/defaults/main.yml"
+      ],
+      "current_value": "openbao_unseal_key_1/2/3 defined (3/3 threshold); live state: 2/3 Shamir",
+      "recommended_value": "Align defaults/main.yml to match live state (2/3) or re-initialize OpenBao with 3/3 threshold",
+      "fix_command": "Edit defaults/main.yml: change openbao_unseal_key_3 to empty or remove it; update openbao_unseal_keys list to 2 items",
+      "risk_if_unfixed": "OpenBao unseal automation will fail or waste resources on the 3rd key; playbook idempotency is broken"
+    },
+    {
+      "severity": "CRITICAL",
+      "category": "automation",
+      "title": "Missing referenced files cause Ansible task failures",
+      "description": "tasks/main.yml references files that do not exist in the role: (1) inject-secrets.sh (line 92), (2) openbao-health-cron.sh (line 127), (3) files/configs/iacgenie-backend.json (line 106), (4) files/configs/lightserp-api.json (line 107). These tasks will fail or silently skip, leaving the system without health monitoring and service config files.",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/tasks/main.yml"
+      ],
+      "current_value": "Tasks reference inject-secrets.sh, openbao-health-cron.sh, and config JSON files that do not exist in files/ directory",
+      "recommended_value": "Create the missing files or remove the tasks that reference them",
+      "fix_command": "Create files/inject-secrets.sh, files/openbao-health-cron.sh, and files/configs/{iacgenie-backend.json,lightserp-api.json} or remove the failing tasks",
+      "risk_if_unfixed": "Ansible playbook fails on non-existent file references; no health check cron installed; service config files missing for injector"
+    },
+    {
+      "severity": "CRITICAL",
+      "category": "automation",
+      "title": "openbao_injector.py has NameError: config not in api_request scope",
+      "description": "In openbao_injector.py, the api_request() function at line 104 references config['timeout'] but 'config' is only declared as 'global config' inside main() at line 152. The api_request(), auth_approle(), and fetch_secret() functions cannot access the module-level 'config' variable because it is only assigned inside main() after the global declaration. This causes a NameError when the injector tries to authenticate to OpenBao.",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/files/openbao_injector.py"
+      ],
+      "current_value": "config is declared 'global' only in main(); api_request() accesses config['timeout'] which is undefined",
+      "recommended_value": "Pass config as a parameter to api_request() or declare config at module level with a default dict",
+      "fix_command": "Add 'config = {\"timeout\": 30, \"retry_attempts\": 3, \"retry_delay\": 2}' at module level, or pass config as argument to api_request(addr, path, data, token, config)",
+      "risk_if_unfixed": "Service secret injection via openbao_injector.py always fails with NameError; services cannot authenticate to OpenBao"
+    },
+    {
+      "severity": "HIGH",
+      "category": "healthcheck",
+      "title": "Health check does not validate OpenBao seal status",
+      "description": "The compose healthcheck uses 'wget -q -O /dev/null http://127.0.0.1:8200/v1/sys/health' which returns HTTP 200 even when OpenBao is sealed. A sealed OpenBao returns {\"sealed\":true} with status 200. The health check does not parse the response body to check the 'sealed' field, so the container reports 'healthy' while the service is actually sealed and unresponsive.",
+      "files_affected": [
+        "Compose configuration (docker-compose.yaml or equivalent)"
+      ],
+      "current_value": "Health check only validates HTTP 200 response code, ignores seal status in response body",
+      "recommended_value": "Health check should verify both HTTP 200 AND sealed=false: wget -q -O - http://127.0.0.1:8200/v1/sys/health | grep -q '\"sealed\":false'",
+      "fix_command": "Update healthcheck test to: wget -q -O - http://127.0.0.1:8200/v1/sys/health 2>&1 | grep -q '\"sealed\":false'",
+      "risk_if_unfixed": "Container reports healthy while OpenBao is sealed; all dependent services fail silently; no automatic recovery triggered"
+    },
+    {
+      "severity": "HIGH",
+      "category": "configuration",
+      "title": "TLS disabled on internal listener — secrets transmitted in plaintext",
+      "description": "openbao-prod.hcl.j2 (line 24) and files/prod.hcl (line 24) both set tls_disable = 1, meaning all OpenBao API traffic is plaintext HTTP. While TLS termination at Nginx/Cloudflare is intended, any bypass of Nginx (direct access to port 8200, Nginx failure, misconfiguration) exposes all secrets including root tokens, API keys, and database credentials in plaintext.",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/templates/openbao-prod.hcl.j2",
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/files/prod.hcl"
+      ],
+      "current_value": "tls_disable = 1; listener on 127.0.0.1:8200 without TLS",
+      "recommended_value": "Enable TLS on the listener with self-signed certs for local communication, or ensure strict network segmentation between Nginx and OpenBao",
+      "fix_command": "Add TLS cert/key paths in listener block: tls_cert_file = \"/etc/openbao/tls/cert.pem\", tls_key_file = \"/etc/openbao/tls/key.pem\"",
+      "risk_if_unfixed": "All secrets, tokens, and credentials transmitted in plaintext; vulnerable to network sniffing if Nginx is bypassed or compromised"
+    },
+    {
+      "severity": "HIGH",
+      "category": "configuration",
+      "title": "Static file deployed instead of parameterized Jinja template",
+      "description": "tasks/main.yml (lines 33-48) copies 'src: prod.hcl' from files/ directory — a static file with hardcoded values. The parameterized template 'templates/openbao-prod.hcl.j2' exists but is NEVER deployed. This means all Ansible variables (openbao_port, openbao_log_level, etc.) are ignored and the deployed config is always identical regardless of environment variables.",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/tasks/main.yml",
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/templates/openbao-prod.hcl.j2"
+      ],
+      "current_value": "copy task uses src: prod.hcl (static file in files/)",
+      "recommended_value": "Use template module with src: openbao-prod.hcl.j2 to apply variable substitutions",
+      "fix_command": "Replace copy tasks with template tasks: src: openbao-prod.hcl.j2, dest: {{ openbao_raft_data_dir }}/openbao-prod.hcl",
+      "risk_if_unfixed": "Environment-specific configurations (port, log level) are ignored; single configuration for all environments; template is dead code"
+    },
+    {
+      "severity": "HIGH",
+      "category": "backup",
+      "title": "Backup script references wrong database file for raft storage",
+      "description": "backup_openbao.py line 32 sets VAULT_DB to '{RAFT_DIR}/vault.db', but OpenBao with raft storage uses 'raft/raft.db' not 'vault.db'. The main.yml tasks even fix permissions on both 'vault.db' and 'raft/raft.db' (lines 69-70), confirming both may exist but vault.db is not the raft database. The backup script will silently skip the raw DB copy because vault.db does not exist in raft mode.",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/files/backup_openbao.py"
+      ],
+      "current_value": "VAULT_DB = os.path.join(RAFT_DIR, 'vault.db') — wrong for raft storage",
+      "recommended_value": "VAULT_DB = os.path.join(RAFT_DIR, 'raft/raft.db') for raft storage, or use both paths with fallback",
+      "fix_command": "Change line 32 to: VAULT_DB = os.path.join(RAFT_DIR, 'raft/raft.db')",
+      "risk_if_unfixed": "Raw raft DB backup silently skipped; backup relies only on API snapshot with no local DB copy fallback"
+    },
+    {
+      "severity": "HIGH",
+      "category": "automation",
+      "title": "Service tokens directory is empty — no tokens generated or persisted",
+      "description": "Live state confirms the service_tokens directory at /home/mkanavi/docker/iacgenie/openbao_raft/service_tokens/ is EMPTY. The service_tokens.yml task generates tokens but they may not have been created (playbook not run) or tokens were deleted. Without tokens, services cannot authenticate to OpenBao. The backup token is also missing, which the cron job likely depends on.",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/tasks/service_tokens.yml"
+      ],
+      "current_value": "service_tokens/ directory exists but is empty; no iacgenie_token.txt, lightserp_token.txt, terraform_token.txt, or backup_token.txt",
+      "recommended_value": "Run the service_tokens task to generate all tokens, or set up auto-token regeneration",
+      "fix_command": "Run: ansible-playbook ... -e openbao_bootstrap_tokens=true to regenerate all service tokens",
+      "risk_if_unfixed": "All services fail to authenticate to OpenBao; backup cron cannot operate; iacgenie, lightserp, and terraform all lose secret access"
+    },
+    {
+      "severity": "MEDIUM",
+      "category": "configuration",
+      "title": "No audit logging configured",
+      "description": "openbao-prod.hcl.j2 has zero audit stanza. Without audit logging, there is no record of API access, secret reads, token usage, or administrative actions. This is a critical gap for security compliance, incident investigation, and operational debugging.",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/templates/openbao-prod.hcl.j2"
+      ],
+      "current_value": "No audit backend configured",
+      "recommended_value": "Add file-based audit backend: audit 'file' { path = '/openbao/raft/audit.log' }",
+      "fix_command": "Add to openbao-prod.hcl.j2: audit \"file\" { path = \"/openbao/raft/audit.log\" file_mode = 0600 }",
+      "risk_if_unfixed": "No audit trail for security incidents; non-compliant with security best practices; cannot track who accessed what secrets"
+    },
+    {
+      "severity": "MEDIUM",
+      "category": "configuration",
+      "title": "Lease TTL set to 32 days (768h) — excessive for service tokens",
+      "description": "Both default_lease_ttl and max_lease_ttl are set to 768h (32 days). Service tokens with this TTL remain valid for over a month after creation. If a service token is compromised, the attacker has 32 days of access. For dynamic secrets (database credentials, etc.), this is far too long.",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/templates/openbao-prod.hcl.j2",
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/files/prod.hcl"
+      ],
+      "current_value": "default_lease_ttl = 768h, max_lease_ttl = 768h",
+      "recommended_value": "default_lease_ttl = 24h, max_lease_ttl = 168h (1 week) for production",
+      "fix_command": "Set default_lease_ttl = \"24h\" and max_lease_ttl = \"168h\" in openbao-prod.hcl.j2",
+      "risk_if_unfixed": "Compromised tokens remain valid for 32 days; excessive blast radius for credential leaks"
+    },
+    {
+      "severity": "MEDIUM",
+      "category": "automation",
+      "title": "Backup token uses wrong policy (iacgenie-service instead of openbao-backup)",
+      "description": "service_tokens.yml line 127 assigns the 'iacgenie-service' policy to the backup token, but a dedicated 'openbao-backup' policy exists in files/policies/openbao-backup.hcl with proper permissions for raft snapshot and restore operations. The iacgenie-service policy only grants read access to iacgenie/kv, not to sys/storage/raft/snapshot.",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/tasks/service_tokens.yml",
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/files/policies/openbao-backup.hcl"
+      ],
+      "current_value": "Backup token policy: iacgenie-service (KV read only)",
+      "recommended_value": "Backup token should use openbao-backup policy with raft snapshot/restore permissions",
+      "fix_command": "Change service_tokens.yml line 126: policies: ['openbao-backup'] and ensure openbao-backup policy is applied",
+      "risk_if_unfixed": "Backup cron cannot perform raft snapshots (no sys/storage/raft/snapshot permission); backups fail silently"
+    },
+    {
+      "severity": "MEDIUM",
+      "category": "automation",
+      "title": "Conflicting secret seeding between kv_bootstrap and openbao-secrets roles",
+      "description": "kv_bootstrap.yml seeds secrets from role defaults (openbao_ig_pg_password, etc.) while openbao-secrets/tasks/main.yml seeds the same secrets (postgres, redis, minio, etc.) using Ansible's 'lookup(password,...)' which generates random passwords each run. Running both roles will overwrite each other's values, causing inconsistency. The first role to run wins; the second overwrites with random values.",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/tasks/kv_bootstrap.yml",
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao-secrets/tasks/main.yml"
+      ],
+      "current_value": "Both roles seed identical secrets (postgres, redis, minio, keycloak, etc.)",
+      "recommended_value": "Use only one role for secret seeding; remove duplicate tasks from the other role",
+      "fix_command": "Remove openbao-secrets role or exclude its duplicate tasks; use kv_bootstrap.yml as the single source of truth",
+      "risk_if_unfixed": "Secrets overwritten on each playbook run; services may fail to connect with wrong credentials; non-deterministic behavior"
+    },
+    {
+      "severity": "MEDIUM",
+      "category": "configuration",
+      "title": "Corrupted raft data directory exists on disk",
+      "description": "Live state confirms a 'raft.bak.corrupted/' directory exists in the raft data directory. This indicates a previous backup or recovery operation failed, leaving corrupted data on disk. This could be a dangling reference from a failed snapshot or a partial restore attempt.",
+      "files_affected": [
+        "Live filesystem: /home/mkanavi/docker/iacgenie/openbao_raft/raft.bak.corrupted/"
+      ],
+      "current_value": "raft.bak.corrupted/ directory exists on disk",
+      "recommended_value": "Investigate and remove corrupted data; verify raft integrity with 'bao operator raft list-peers'",
+      "fix_command": "Run: bao operator raft list-peers && rm -rf /home/mkanavi/docker/iacgenie/openbao_raft/raft.bak.corrupted/",
+      "risk_if_unfixed": "Corrupted data may cause raft consensus issues; disk space wasted; potential confusion during disaster recovery"
+    },
+    {
+      "severity": "MEDIUM",
+      "category": "configuration",
+      "title": "systemd service template conflicts with docker-compose deployment",
+      "description": "templates/openbao.service.j2 defines a systemd service with 'docker run' flags (user 100:1000, --publish, --restart unless-stopped) that conflict with the docker-compose configuration (network_mode: host, restart: always, user defaults). Having both deployment methods defined creates confusion and potential deployment conflicts if one is activated.",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/templates/openbao.service.j2"
+      ],
+      "current_value": "systemd template uses 'docker run' with compose-style flags; compose uses 'network_mode: host'",
+      "recommended_value": "Use only one deployment method; remove the unused template or align both methods",
+      "fix_command": "Remove openbao.service.j2 if docker-compose is the primary deployment method, or document which method is authoritative",
+      "risk_if_unfixed": "Deployment confusion; potential port conflicts; service management inconsistencies"
+    },
+    {
+      "severity": "MEDIUM",
+      "category": "configuration",
+      "title": "Config file stored in Git but deployed as static copy — no version control on live config",
+      "description": "The HCL config is stored as 'files/prod.hcl' (static) and 'templates/openbao-prod.hcl.j2' (template) in Git, but the deployed config on the host may drift from the Git version since the Ansible role copies it rather than treating it as a managed template. Additionally, the backup script copies the live config to backup, but there's no mechanism to detect when the live config diverges from Git.",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/files/prod.hcl",
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/templates/openbao-prod.hcl.j2"
+      ],
+      "current_value": "Config is static file copied by Ansible; live config can drift from Git",
+      "recommended_value": "Use Ansible template module for all config deployment; add config validation in health checks",
+      "fix_command": "Replace copy tasks with template tasks; add config SHA256 check to health monitoring",
+      "risk_if_unfixed": "Configuration drift between Git and production; hard to detect unauthorized config changes"
+    },
+    {
+      "severity": "LOW",
+      "category": "best-practice",
+      "title": "Excessive use of failed_when: false masks task failures",
+      "description": "Multiple tasks across the role use 'failed_when: false' which silently suppresses errors. This includes policy application (policies.yml), KV bootstrap (kv_bootstrap.yml), unseal (unseal.yml), and service tokens (service_tokens.yml). While some are intentional (e.g., checking 409 'already exists'), many mask real failures.",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/tasks/policies.yml",
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/tasks/kv_bootstrap.yml",
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/tasks/service_tokens.yml",
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/tasks/unseal.yml"
+      ],
+      "current_value": "Multiple tasks use failed_when: false",
+      "recommended_value": "Use failed_when with specific conditions (e.g., status not in [200, 204, 409]) instead of blanket false",
+      "fix_command": "Replace 'failed_when: false' with 'failed_when: status not in [200, 204, 409]' for API tasks",
+      "risk_if_unfixed": "Policy application failures, KV seeding failures, and token creation failures are silently ignored; broken state goes undetected"
+    },
+    {
+      "severity": "LOW",
+      "category": "best-practice",
+      "title": "Hardcoded paths reduce role portability",
+      "description": "Multiple paths are hardcoded to /home/mkanavi/ throughout the role (tasks/main.yml, handlers, vars). This makes the role non-portable and tightly coupled to a specific user's filesystem layout.",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/tasks/main.yml",
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/vars/main.yml",
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao-secrets/defaults/main.yml"
+      ],
+      "current_value": "Paths hardcoded to /home/mkanavi/docker/iacgenie/...",
+      "recommended_value": "Use variables for all paths; accept path overrides via extra-vars or group_vars",
+      "fix_command": "Replace hardcoded paths with variables: openbao_base_dir: /home/mkanavi/docker/iacgenie",
+      "risk_if_unfixed": "Role cannot be reused for other environments or users without manual path editing"
+    },
+    {
+      "severity": "LOW",
+      "category": "best-practice",
+      "title": "No idempotency validation on policy application",
+      "description": "Policy application tasks only check for HTTP 200/204/409 status codes but do not validate that the policy content matches what is expected. If the template changes, the API call succeeds (409 = already exists) but the old policy content remains.",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/tasks/policies.yml"
+      ],
+      "current_value": "Policy application checks only HTTP status, not content diff",
+      "recommended_value": "Read current policy content and compare before applying; or always apply with idempotent PUT",
+      "fix_command": "Add a task to read existing policy and compare with template before applying",
+      "risk_if_unfixed": "Policy drift — template changes are not applied to running OpenBao; security policies may become outdated"
+    },
+    {
+      "severity": "INFO",
+      "category": "best-practice",
+      "title": "No auto-unseal configured — manual unseal required on restart",
+      "description": "openbao_auto_unseal is set to false in defaults/main.yml. OpenBao requires manual unseal key input after every restart. For production workloads, this creates a single point of failure — if the operator is unavailable during a crash, the service remains down.",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/defaults/main.yml"
+      ],
+      "current_value": "openbao_auto_unseal: false; manual Shamir unseal required",
+      "recommended_value": "Consider auto-unseal with AWS KMS, GCP KMS, Azure Key Vault, or HashiCorp Vault",
+      "fix_command": "Set openbao_auto_unseal: true and configure the appropriate auto-unseal backend",
+      "risk_if_unfixed": "Service downtime on restart until manual unseal is performed; operator dependency"
+    },
+    {
+      "severity": "INFO",
+      "category": "configuration",
+      "title": "init_keys.json contains root token in plaintext on disk",
+      "description": "The init_keys.json file at /home/mkanavi/docker/iacgenie/openbao_raft/init_keys.json contains the root token in plaintext. While file permissions are set to 0600, the token is readable by the mkanavi user and any process running as that user. The backup script also reads this file to authenticate.",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/tasks/main.yml"
+      ],
+      "current_value": "Root token stored in init_keys.json with 0600 permissions",
+      "recommended_value": "Store root token in a secrets manager or use auto-unseal to eliminate root token dependency",
+      "fix_command": "Restrict access further or move token to a dedicated secrets vault with rotation",
+      "risk_if_unfixed": "Root token accessible to mkanavi user and any process running as that user; backup script also has token access"
+    }
+  ],
+  "summary": "The openbao service has 18 findings across 6 categories. The most critical issues are: (1) Shamir threshold mismatch between Ansible defaults (3/3) and live state (2/3), which breaks unseal automation; (2) Missing referenced files (inject-secrets.sh, openbao-health-cron.sh, config JSONs) that cause task failures; (3) A NameError bug in openbao_injector.py preventing service secret injection; (4) Health check that reports 'healthy' even when OpenBao is sealed; (5) No audit logging configured for security compliance. The service has good backup procedures with API snapshots, checksums, and rotation, but the backup script has a wrong DB path reference. The overall operational readiness is moderate — the service runs and is unsealed, but automation is fragile with multiple silent failures masked by failed_when: false.",
+  "priority_order": [
+    "Fix Shamir threshold mismatch in defaults/main.yml to match live 2/3 state",
+    "Create missing files: inject-secrets.sh, openbao-health-cron.sh, files/configs/*.json",
+    "Fix openbao_injector.py NameError — pass config to api_request()",
+    "Update health check to validate sealed=false in response body",
+    "Fix backup_openbao.py VAULT_DB path for raft storage",
+    "Regenerate service tokens (service_tokens/ is empty)",
+    "Add audit logging to openbao-prod.hcl.j2",
+    "Use template module instead of copy for HCL config deployment",
+    "Fix backup token to use openbao-backup policy instead of iacgenie-service",
+    "Resolve conflicting secret seeding between kv_bootstrap and openbao-secrets roles",
+    "Investigate and clean up raft.bak.corrupted/ directory",
+    "Reduce lease TTLs from 768h to more reasonable values",
+    "Replace blanket failed_when: false with specific status code checks",
+    "Enable auto-unseal for production resilience",
+    "Align systemd template with docker-compose deployment method",
+    "Add idempotency validation for policy application",
+    "Parameterize hardcoded paths for portability",
+    "Evaluate root token storage security in init_keys.json"
+  ]
+}

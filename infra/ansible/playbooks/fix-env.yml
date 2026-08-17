@@ -1,0 +1,148 @@
+---
+# Fix .env file by generating it from OpenBao KV secrets
+- hosts: all
+  become: true
+  connection: local
+
+  tasks:
+    - name: Set OpenBao root token
+      ansible.builtin.set_fact:
+        openbao_root_token: "s.pRPpNddzoGQD9msKvqVftUdZ"
+
+    - name: Fetch PostgreSQL secrets from OpenBao
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/postgres"
+        headers:
+          X-Vault-Token: "{{ openbao_root_token }}"
+        validate_certs: no
+      register: postgres_secrets
+      changed_when: false
+
+    - name: Fetch Redis secrets from OpenBao
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/redis"
+        headers:
+          X-Vault-Token: "{{ openbao_root_token }}"
+        validate_certs: no
+      register: redis_secrets
+      changed_when: false
+
+    - name: Fetch MinIO secrets from OpenBao
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/minio"
+        headers:
+          X-Vault-Token: "{{ openbao_root_token }}"
+        validate_certs: no
+      register: minio_secrets
+      changed_when: false
+
+    - name: Fetch Keycloak admin secrets from OpenBao
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/keycloak_admin"
+        headers:
+          X-Vault-Token: "{{ openbao_root_token }}"
+        validate_certs: no
+      register: keycloak_admin_secrets
+      changed_when: false
+
+    - name: Fetch Keycloak DB secrets from OpenBao
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/keycloak_db"
+        headers:
+          X-Vault-Token: "{{ openbao_root_token }}"
+        validate_certs: no
+      register: keycloak_db_secrets
+      changed_when: false
+
+    - name: Fetch Gitea DB secrets from OpenBao
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/gitea_db"
+        headers:
+          X-Vault-Token: "{{ openbao_root_token }}"
+        validate_certs: no
+      register: gitea_db_secrets
+      changed_when: false
+
+    - name: Fetch Gitea admin secrets from OpenBao
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/gitea_admin"
+        headers:
+          X-Vault-Token: "{{ openbao_root_token }}"
+        validate_certs: no
+      register: gitea_admin_secrets
+      changed_when: false
+
+    - name: Fetch LightSerp secrets from OpenBao
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/lightserp"
+        headers:
+          X-Vault-Token: "{{ openbao_root_token }}"
+        validate_certs: no
+      register: lightserp_secrets
+      changed_when: false
+
+    - name: Fetch JWT secrets from OpenBao
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/jwt"
+        headers:
+          X-Vault-Token: "{{ openbao_root_token }}"
+        validate_certs: no
+      register: jwt_secrets
+      changed_when: false
+
+    - name: Fetch Cloudflare secrets from OpenBao
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/cloudflare"
+        headers:
+          X-Vault-Token: "{{ openbao_root_token }}"
+        validate_certs: no
+      register: cloudflare_secrets
+      changed_when: false
+
+    - name: Fetch Grafana secrets from OpenBao
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/grafana"
+        headers:
+          X-Vault-Token: "{{ openbao_root_token }}"
+        validate_certs: no
+      register: grafana_secrets
+      changed_when: false
+
+    - name: Fetch SearXNG secrets from OpenBao
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/searxng"
+        headers:
+          X-Vault-Token: "{{ openbao_root_token }}"
+        validate_certs: no
+      register: searxng_secrets
+      changed_when: false
+
+    - name: Fetch NSQD secrets from OpenBao
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/nsqd"
+        headers:
+          X-Vault-Token: "{{ openbao_root_token }}"
+        validate_certs: no
+      register: nsqd_secrets
+      changed_when: false
+
+    - name: Fetch SMTP secrets from OpenBao
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:8200/v1/iacgenie/kv/data/smtp"
+        headers:
+          X-Vault-Token: "{{ openbao_root_token }}"
+        validate_certs: no
+      register: smtp_secrets
+      changed_when: false
+
+    - name: Generate .env file from OpenBao secrets
+      ansible.builtin.copy:
+        content: |
+          # Unified environment - generated from OpenBao KV
+          # WARNING: This file is auto-generated. Do not edit manually.
+
+          OPENBAO_ADDR=http://127.0.0.1:8200
+          {{ postgres_secrets.json.data.data | default({}) | dict2items | map('regex_replace', '^(\w+)=', '') | join('\n') }}
+        dest: /home/mkanavi/docker/iacgenie/.env
+        mode: "0600"
+      when: postgres_secrets.json.data is defined

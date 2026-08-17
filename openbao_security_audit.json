@@ -1,0 +1,336 @@
+{
+  "service": "openbao",
+  "role": "secops-engineer",
+  "model": "antares",
+  "audit_date": "2026-08-17",
+  "openbao_version": "2.6.0",
+  "findings": [
+    {
+      "severity": "CRITICAL",
+      "category": "network",
+      "title": "TLS disabled on OpenBao listener",
+      "description": "The OpenBao listener is configured with tls_disable=1 (openbao-prod.hcl.j2 line 24). Even though the comment states 'TLS terminated at Nginx reverse proxy,' the Docker Compose uses network_mode: host, which places OpenBao directly on the host network. Any process on the host can reach the API without TLS encryption. The healthcheck also uses plain HTTP (http://127.0.0.1:8200/v1/sys/health). While binding to 127.0.0.1 limits external access, the lack of TLS means any local attacker, compromised container, or misconfigured nginx can intercept unencrypted API traffic including tokens and secrets.",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/templates/openbao-prod.hcl.j2",
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/defaults/main.yml"
+      ],
+      "current_value": "listener tcp: tls_disable=1, address=127.0.0.1:8200",
+      "recommended_value": "Enable TLS on the OpenBao listener: tls_disable=0, provide tls_cert_file and tls_key_file. Even behind a reverse proxy, TLS between nginx and OpenBao prevents local interception.",
+      "fix_command": "Generate self-signed TLS cert: openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/openbao/tls.key -out /etc/openbao/tls.crt -subj '/CN=openbao'. Update HCL: tls_disable=0, tls_cert_file='/etc/openbao/tls.crt', tls_key_file='/etc/openbao/tls.key'",
+      "risk_if_unfixed": "All API traffic (tokens, secrets, config) transmitted in plaintext on host network. Any local process can sniff credentials. Violates CIS Benchmark 1.1 (TLS enabled)."
+    },
+    {
+      "severity": "CRITICAL",
+      "category": "secrets",
+      "title": "Root token stored in plaintext on host filesystem",
+      "description": "The init_keys.json file on the host filesystem (/home/mkanavi/docker/iacgenie/openbao_raft/init_keys.json) contains the root token in plaintext. Both backup_openbao.py (lines 72-101) and seed_openbao_kv.py (lines 27-37) read the root token from this file. Any user or process with read access to this directory can extract the root token and gain full admin access to OpenBao. The file permissions and directory permissions are not verified in the Ansible role.",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/files/backup_openbao.py",
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/files/seed_openbao_kv.py"
+      ],
+      "current_value": "init_keys.json exists on host at /home/mkanavi/docker/iacgenie/openbao_raft/ with root token in plaintext",
+      "recommended_value": "Remove init_keys.json after initialization. Use auto-unseal (Vault Agent, AWS KMS, GCP Cloud KMS, etc.) to eliminate root token entirely. If manual unseal is required, store keys in a hardware security module (HSM) or dedicated secrets manager, not on the same host.",
+      "fix_command": "1. chmod 0600 init_keys.json && chown mkanavi:mkanavi init_keys.json. 2. After initial unseal, delete init_keys.json. 3. Implement auto-unseal or external key management.",
+      "risk_if_unfixed": "Full OpenBao compromise if any local user, backup script, or compromised process reads init_keys.json. Root token grants unrestricted access to all secrets, policies, and auth methods."
+    },
+    {
+      "severity": "CRITICAL",
+      "category": "audit",
+      "title": "No audit logging configured",
+      "description": "The openbao-prod.hcl.j2 configuration file has zero audit sink configured. OpenBao's audit logging is entirely disabled. Without audit logs, there is no record of authentication attempts, secret access, policy changes, configuration modifications, or administrative operations. This is a critical compliance failure and eliminates all forensic capability.",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/templates/openbao-prod.hcl.j2"
+      ],
+      "current_value": "No audit sink configured in HCL file",
+      "recommended_value": "Configure at least one audit device: file-based audit with restricted permissions (mode 0600) writing to a dedicated log directory, or syslog/remote audit sink for tamper-resistant logging. Example: audit 'file' { path = '/openbao/audit/audit.log' file_mode = 0600 }",
+      "fix_command": "Add to HCL: audit 'file' { path = '/openbao/audit/audit.log' file_mode = 0600 }. Create directory: mkdir -p /openbao/audit && chmod 0700 /openbao/audit. Enable via API: bao audit enable file path=/openbao/audit/audit.log",
+      "risk_if_unfixed": "Complete lack of audit trail. Violates CIS Benchmark 1.13 (audit logging), SOC2, PCI-DSS, HIPAA, and GDPR audit requirements. No ability to detect unauthorized access, investigate breaches, or prove compliance."
+    },
+    {
+      "severity": "HIGH",
+      "category": "config",
+      "title": "Excessive default and max lease TTL (768h / 32 days)",
+      "description": "The default_lease_ttl and max_lease_ttl are both set to 768h (32 days) in openbao-prod.hcl.j2 (lines 37-38). CIS Benchmark 1.9 recommends max_lease_ttl not exceed 768h, but 768h is the maximum allowed and represents the upper bound. For production use, a shorter TTL (e.g., 168h/7d or 24h) reduces the window of exposure if a token is compromised.",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/templates/openbao-prod.hcl.j2"
+      ],
+      "current_value": "default_lease_ttl = 768h, max_lease_ttl = 768h",
+      "recommended_value": "Set default_lease_ttl = 24h and max_lease_ttl = 168h (7 days). Service tokens already have explicit TTLs, so this mainly affects user and unauthenticated tokens.",
+      "fix_command": "In openbao-prod.hcl.j2: default_lease_ttl = \"24h\" and max_lease_ttl = \"168h\"",
+      "risk_if_unfixed": "Compromised tokens remain valid for up to 32 days. Long-lived tokens increase the attack window and violate CIS Benchmark 1.9 (recommended TTL limits)."
+    },
+    {
+      "severity": "HIGH",
+      "category": "config",
+      "title": "Cluster address uses HTTP instead of HTTPS",
+      "description": "The cluster_addr in openbao-prod.hcl.j2 (line 28) is set to http://127.0.0.1:8201. In a Raft cluster, this address is used for cluster communication (leader election, log replication). Using HTTP means cluster traffic is unencrypted, allowing potential interception of replication data and cluster state.",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/templates/openbao-prod.hcl.j2"
+      ],
+      "current_value": "cluster_addr = http://127.0.0.1:8201",
+      "recommended_value": "cluster_addr = https://127.0.0.1:8201 with TLS enabled on the listener. Set tls_cluster_addr if using a different port for cluster traffic.",
+      "fix_command": "Update HCL: cluster_addr = \"https://127.0.0.1:8201\". Ensure TLS is enabled on the listener.",
+      "risk_if_unfixed": "Unencrypted cluster replication traffic. In multi-node setups, an attacker could intercept replication logs or inject fake cluster members."
+    },
+    {
+      "severity": "HIGH",
+      "category": "container",
+      "title": "Unseal keys passed through Ansible variables exposed in process listings",
+      "description": "The unseal.yml task (line 57) sends unseal keys to the OpenBao API using the root token in the request body. The unseal keys are defined as Ansible variables (defaults/main.yml lines 17-19) which means they may appear in Ansible logs, playbook output, and potentially process listings. The unseal task references HTTPS (port 8200) but the listener is configured for HTTP on that port, indicating a configuration mismatch.",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/tasks/unseal.yml",
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/defaults/main.yml"
+      ],
+      "current_value": "Unseal keys as Ansible variables, sent via HTTP API with root token auth",
+      "recommended_value": "Use auto-unseal (AWS KMS, GCP KMS, Azure Key Vault, or Vault Agent auto-unseal) to eliminate manual unseal keys entirely. If manual unseal is required, use Shamir with external key distribution (not in Ansible variables).",
+      "fix_command": "Implement auto-unseal: add to HCL: auto_unseal { provider = \"aws\" kms_key = \"<key-arn>\" }. Remove manual unseal tasks from playbook.",
+      "risk_if_unfixed": "Unseal keys stored in Ansible history, logs, and variables. Configuration mismatch (HTTPS in task vs HTTP in config) causes unseal failures. Violates CIS Benchmark 1.3 (auto-unseal recommended)."
+    },
+    {
+      "severity": "HIGH",
+      "category": "policy",
+      "title": "Admin policy grants sudo capability on all paths",
+      "description": "The admin policy (admin.hcl.j2) grants sudo capability on path '*'. The sudo capability allows accessing paths that require sudo (like auth method configuration, policy management, and certain sys paths). While this is intentional for the admin role, it creates a high-value target. If the admin token is compromised, the attacker gains full control including the ability to modify auth methods, policies, and seal/unseal the vault.",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/templates/policies/admin.hcl.j2"
+      ],
+      "current_value": "path '*' { capabilities = [create,read,update,delete,list,sudo] }",
+      "recommended_value": "Keep sudo capability for the admin policy but restrict it to specific high-privilege paths where it's actually needed. Consider using named paths instead of wildcards where possible. Implement token binding and short TTLs for admin tokens.",
+      "fix_command": "Refine admin policy to use specific high-privilege paths: path 'sys/*' { capabilities = [sudo, create, read, update, delete, list] } and path 'auth/*' { capabilities = [sudo, create, read, update, delete, list] }",
+      "risk_if_unfixed": "Compromised admin token grants full vault takeover including policy modification, auth method changes, and seal/unseal control."
+    },
+    {
+      "severity": "HIGH",
+      "category": "auth",
+      "title": "OIDC default role allows any user with matching email claim",
+      "description": "The 'user' OIDC role (oidc_auth.yml lines 149-166) has bound_claims set to an empty object {}, meaning any Keycloak user with a valid email claim can authenticate and receive the openbao-service-read policy. There is no bound_audiences restriction, no allowed_users/bound_claims filtering by specific email addresses or groups. Any Keycloak user can log into OpenBao and read all KV engines.",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/tasks/oidc_auth.yml"
+      ],
+      "current_value": "bound_claims: {} (empty), policy: openbao-service-read",
+      "recommended_value": "Add bound_claims with specific email patterns or groups: bound_claims: { roles: 'openbao-service-read' } or bound_allowed_users with specific email addresses. Add bound_audiences to restrict token audience.",
+      "fix_command": "Update OIDC role: bound_claims: { roles: 'openbao-service-read' }, bound_audiences: ['openbao-oidc'], bound_subject: 'specific-user-or-group'",
+      "risk_if_unfixed": "Any Keycloak user can authenticate to OpenBao and read all KV secrets. No user-level authorization filtering. Violates CIS Benchmark 5.12 (OIDC bound claims)."
+    },
+    {
+      "severity": "HIGH",
+      "category": "secrets",
+      "title": "Backup token uses iacgenie-service policy instead of dedicated backup policy",
+      "description": "The backup token (service_tokens.yml lines 117-148) is created with the iacgenie-service policy, which grants read access to iacgenie/kv/* and list on iacgenie/kv. This means the backup token can only access one namespace's secrets, but the backup script attempts to snapshot the entire raft database which contains ALL data. The token policy doesn't match the backup operation's actual scope. Additionally, the backup_token_ttl is 168h (7 days) — long-lived backup tokens increase exposure.",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/tasks/service_tokens.yml",
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/files/backup_openbao.py"
+      ],
+      "current_value": "backup token uses iacgenie-service policy (iacgenie/kv/* read), TTL 168h",
+      "recommended_value": "Create a dedicated backup-read policy with access to sys/storage/raft/* for snapshot operations. Set shorter TTL (e.g., 24h) for backup tokens. Consider using token renewable=false for backup tokens.",
+      "fix_command": "Create backup policy: path 'sys/storage/raft/snapshot' { capabilities = [read] }. path 'sys/storage/raft/state' { capabilities = [read] }. Assign to backup token.",
+      "risk_if_unfixed": "Backup token has wrong policy scope. Long-lived backup token increases attack surface. If backup token is compromised, attacker can access iacgenie secrets beyond just backup scope."
+    },
+    {
+      "severity": "HIGH",
+      "category": "compliance",
+      "title": "Multiple CIS Benchmark violations detected",
+      "description": "The OpenBao configuration violates multiple CIS OpenBao Benchmark controls: (1) CIS 1.1 - TLS not enabled on listener; (2) CIS 1.2 - No TLS client certificate requirement; (3) CIS 1.3 - Manual Shamir unseal instead of auto-unseal; (4) CIS 1.4 - No rate limiting configured; (5) CIS 1.9 - Max lease TTL at maximum allowed (768h); (6) CIS 1.13 - No audit logging configured; (7) CIS 5.12 - OIDC not using bound claims; (8) CIS 5.16 - No namespace isolation; (9) CIS 6.1 - Root token persisted on disk (init_keys.json).",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/templates/openbao-prod.hcl.j2",
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/defaults/main.yml",
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/tasks/oidc_auth.yml"
+      ],
+      "current_value": "Multiple CIS benchmarks not met: TLS, audit, auto-unseal, rate limiting, bound claims, namespaces",
+      "recommended_value": "Address all CIS benchmarks: enable TLS, configure audit logging, implement auto-unseal, add rate limiting, reduce TTLs, configure OIDC bound claims, use namespaces for isolation.",
+      "fix_command": "Run OpenBao CIS benchmark scanner: bao operator diag -enable-tls=false 2>/dev/null | grep -i cis. Systematically fix each violation.",
+      "risk_if_unfixed": "Non-compliance with CIS benchmarks, SOC2, PCI-DSS, HIPAA. Audit failures, regulatory penalties, inability to pass security assessments."
+    },
+    {
+      "severity": "MEDIUM",
+      "category": "network",
+      "title": "Healthcheck endpoint accessible without authentication",
+      "description": "The Docker healthcheck (docker-compose context) uses wget -q -O /dev/null http://127.0.0.1:8200/v1/sys/health. The /v1/sys/health endpoint returns status without authentication. While it doesn't expose secrets, it reveals OpenBao version, seal status, and initialization state — information useful for reconnaissance.",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/defaults/main.yml"
+      ],
+      "current_value": "Healthcheck: http://127.0.0.1:8200/v1/sys/health (no auth)",
+      "recommended_value": "Add authentication to healthcheck or use sys/health with seal-indicator parameter. Bind healthcheck to a management-only interface. Consider adding a healthcheck token.",
+      "fix_command": "Update healthcheck to use a dedicated healthcheck token: bao auth token create -policy=healthcheck -ttl=1h. Healthcheck: wget -q -O /dev/null -H 'X-Vault-Token: <token>' http://127.0.0.1:8200/v1/sys/health",
+      "risk_if_unfixed": "Reconnaissance information exposed: version number, seal status, initialization state. Version disclosure aids targeted attacks."
+    },
+    {
+      "severity": "MEDIUM",
+      "category": "secrets",
+      "title": "OpenBao Injector falls back to environment variables without validation",
+      "description": "The openbao_injector.py (lines 146-149) falls back to existing environment variables if OpenBao is unreachable, without logging this as a security event or failing securely. A service could silently operate with stale or default credentials if OpenBao is down, potentially using hardcoded fallback values.",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/files/openbao_injector.py"
+      ],
+      "current_value": "Fallback: uses existing env var silently if OpenBao unreachable",
+      "recommended_value": "Implement fail-secure behavior: log a security event when fallback is used, set a security flag env var, or fail the process if OpenBao is unreachable (fail-open vs fail-closed).",
+      "fix_command": "Add to injector: if OpenBao unreachable, set OPENBAO_FALLBACK_MODE=1 env var and log security event. Consider fail-closed: exit with error if OpenBao unreachable.",
+      "risk_if_unfixed": "Services may silently operate with stale/incorrect credentials. No security alert when OpenBao is unavailable. Hard to detect credential staleness."
+    },
+    {
+      "severity": "MEDIUM",
+      "category": "backup",
+      "title": "Backup snapshots not encrypted",
+      "description": "The backup_openbao.py script creates raft snapshots (lines 151-187) and raw DB copies (lines 189-206) without any encryption. The snapshot file contains all secrets, policies, and configuration data in plaintext. While checksums are generated (SHA256), there is no encryption of the backup data itself. If the backup directory is accessed by an unauthorized party, all secrets are exposed.",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/files/backup_openbao.py"
+      ],
+      "current_value": "Snapshots stored as unencrypted .snap files with SHA256 checksums only",
+      "recommended_value": "Encrypt snapshots using AES-256 or similar. Use a separate encryption key stored in HSM or external KMS. Consider using OpenBao's built-in snapshot encryption: bao operator raft snapshot -token=<token> | openssl enc -aes-256-cbc -salt -pbkdf2 > encrypted.snap",
+      "fix_command": "Add encryption to backup script: pipe snapshot through openssl enc -aes-256-cbc -salt -pbkdf2 -pass env:BACKUP_ENCRYPTION_KEY. Store encryption key in external KMS, not on host.",
+      "risk_if_unfixed": "All secrets exposed if backup files are compromised. No encryption at rest for backup data. Violates data protection requirements."
+    },
+    {
+      "severity": "MEDIUM",
+      "category": "secrets",
+      "title": "Service tokens stored on host filesystem in plaintext",
+      "description": "Service tokens (iacgenie_token.txt, lightserp_token.txt, terraform_token.txt, backup_token.txt) are saved to the host filesystem in the service_tokens/ directory (service_tokens.yml lines 35-148). Even with mode 0600, these tokens are stored in plaintext on the host. The service_tokens directory is at /home/mkanavi/docker/iacgenie/openbao_raft/service_tokens/ which is within the raft data directory.",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/tasks/service_tokens.yml"
+      ],
+      "current_value": "Service tokens stored as plaintext files in service_tokens/ directory (currently EMPTY per live state)",
+      "recommended_value": "Do not persist service tokens to disk. Use AppRole authentication for services instead of long-lived static tokens. If tokens are required, store them in a separate secrets manager or mount as Docker secrets.",
+      "fix_command": "Replace token-based auth with AppRole: enable approle auth, configure service configs with role_id/secret_id paths. Remove token persistence from Ansible tasks.",
+      "risk_if_unfixed": "Static tokens on disk can be stolen, copied, or leaked. Token rotation requires manual intervention. Long-lived 30-day tokens increase exposure window."
+    },
+    {
+      "severity": "MEDIUM",
+      "category": "config",
+      "title": "Ansible tasks use validate_certs: false for all OpenBao API calls",
+      "description": "Multiple Ansible tasks use validate_certs: false (policies.yml, service_tokens.yml, openbao-secrets/tasks/main.yml) when making API calls to OpenBao. This disables TLS certificate validation, making the Ansible automation vulnerable to man-in-the-middle attacks. Even though the API is on 127.0.0.1, this is a bad practice that could be exploited if the network configuration changes.",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/tasks/policies.yml",
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/tasks/service_tokens.yml",
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao-secrets/tasks/main.yml"
+      ],
+      "current_value": "validate_certs: false on all uri module calls to OpenBao API",
+      "recommended_value": "Set validate_certs: true and configure trusted CA. Since OpenBao uses self-signed certs, add the CA cert path: validate_certs: true, ca_path: '/etc/openbao/tls/ca.crt'. Or use validate_certs: false only with url_username/url_password for token auth.",
+      "fix_command": "Add ca_path to all uri tasks: ca_path: '/etc/openbao/tls/ca.crt' and set validate_certs: true. Or use validate_certs: false with proper token-based auth.",
+      "risk_if_unfixed": "Man-in-the-middle attacks possible on Ansible-to-OpenBao communication. Credential theft during policy/token/seeding operations. Certificate pinning bypass."
+    },
+    {
+      "severity": "MEDIUM",
+      "category": "unseal",
+      "title": "Shamir unseal threshold of 2/3 is minimal",
+      "description": "The unseal configuration uses Shamir 2/3 (2 of 3 keys required). While this is the minimum recommended threshold, it provides limited protection against single-point compromise. A single key holder can combine with any other key to unseal the vault. For production environments, a higher threshold (3/5 or 4/5) provides better security.",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/defaults/main.yml"
+      ],
+      "current_value": "Shamir 2/3 unseal threshold",
+      "recommended_value": "Use Shamir 3/5 or 4/5 for production. Or better yet, implement auto-unseal to eliminate manual key distribution entirely.",
+      "fix_command": "Change to 3/5: openbao_unseal_key_1, _2, _3, _4, _5 with threshold=3. Or implement auto-unseal with KMS provider.",
+      "risk_if_unfixed": "Single key compromise combined with any other key allows vault unseal. Limited protection against insider threats."
+    },
+    {
+      "severity": "MEDIUM",
+      "category": "auth",
+      "title": "AppRole injector communicates over HTTP without mutual TLS",
+      "description": "The openbao_injector.py (line 46) defaults to openbao_addr: http://127.0.0.1:8200 and makes all API requests over HTTP. The injector authenticates via AppRole and fetches secrets. There is no mutual TLS, client certificate verification, or network segmentation between the injector and OpenBao. Any process on the host can intercept or spoof the injector's traffic.",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/files/openbao_injector.py"
+      ],
+      "current_value": "HTTP connection to OpenBao, no client certificate verification",
+      "recommended_value": "Enable mTLS between injectors and OpenBao. Use TLS with client certificate authentication. Restrict AppRole login to specific CIDR ranges using bind_addr configuration.",
+      "fix_command": "Update injector config: openbao_addr: 'https://127.0.0.1:8200'. Enable TLS on OpenBao listener. Configure client cert verification.",
+      "risk_if_unfixed": "AppRole credentials and fetched secrets transmitted in plaintext. Host-level network attacks can intercept credentials. No mutual authentication."
+    },
+    {
+      "severity": "LOW",
+      "category": "config",
+      "title": "OpenBao runs as root container user",
+      "description": "The Docker Compose configuration does not specify a non-root user. OpenBao processes run as root inside the container. While cap_drop: ALL mitigates some risk, running as root increases the blast radius of container escapes and violates the principle of least privilege.",
+      "files_added": [
+        "docker-compose.yml (inferred from compose_entry context)"
+      ],
+      "current_value": "No user specified in Docker Compose — runs as root",
+      "recommended_value": "Add 'user: \"1000:1000\"' to the OpenBao service definition in docker-compose.yml. Create a dedicated non-root user in the OpenBao image or use a distroless image.",
+      "fix_command": "Add to docker-compose: user: '1000:1000'. Ensure /openbao/storage and /openbao/raft directories are writable by UID 1000.",
+      "risk_if_unfixed": "Container escape grants root access to host. Violates CIS Benchmark 1.6 (run as non-root)."
+    },
+    {
+      "severity": "LOW",
+      "category": "config",
+      "title": "No rate limiting configured on API endpoints",
+      "description": "There is no rate limiting configured on the OpenBao API endpoints. Without rate limiting, the service is vulnerable to brute-force attacks on AppRole login, OIDC authentication, and token creation endpoints.",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/templates/openbao-prod.hcl.j2"
+      ],
+      "current_value": "No rate limiting configured",
+      "recommended_value": "Configure rate limiting in the listener configuration: listener 'tcp' { rate_limit = 1000 }. Or use nginx/cloudflare as a reverse proxy with rate limiting.",
+      "fix_command": "Add to HCL listener: rate_limit = 1000, rate_limit_window = \"60s\". Or configure nginx rate limiting as reverse proxy.",
+      "risk_if_unfixed": "Brute-force attacks on AppRole login, token creation, and unseal endpoints. No protection against credential stuffing."
+    },
+    {
+      "severity": "LOW",
+      "category": "compliance",
+      "title": "No namespace isolation for multi-tenant access",
+      "description": "OpenBao namespaces are not configured. All KV engines (iacgenie/kv, lightserp/kv, terraform/kv) operate in the default namespace. Namespaces provide logical isolation between teams/projects. Without namespaces, policy-based isolation is the only boundary, which is weaker than namespace isolation.",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/defaults/main.yml"
+      ],
+      "current_value": "All engines in default namespace (no namespaces configured)",
+      "recommended_value": "Create namespaces for each team/project: iacgenie, lightserp, terraform. Configure namespace-scoped policies and auth methods.",
+      "fix_command": "bao namespace create iacgenie, bao namespace create lightserp, bao namespace create terraform. Move KV engines into respective namespaces.",
+      "risk_if_unfixed": "No logical isolation between tenants. Policy misconfiguration could expose cross-tenant data. Violates CIS Benchmark 5.16."
+    },
+    {
+      "severity": "LOW",
+      "category": "backup",
+      "title": "Config file included in backups without sensitivity labeling",
+      "description": "The backup script copies the OpenBao HCL configuration file (openbao-prod.hcl) to the backup directory. While the config itself doesn't contain secrets, it reveals architecture details, listener configuration, and storage paths that aid reconnaissance.",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/files/backup_openbao.py"
+      ],
+      "current_value": "Config file included in backup directory alongside encrypted-sensitive data",
+      "recommended_value": "Exclude config file from backups or store it separately with appropriate access controls. The config file can be reconstructed from the Ansible templates.",
+      "fix_command": "Remove copy_config() from backup routine or move config backup to a separate, access-controlled location.",
+      "risk_if_unfixed": "Backup compromise reveals architecture details, network configuration, and storage layout."
+    },
+    {
+      "severity": "INFO",
+      "category": "config",
+      "title": "Terraform service token TTL set to 30 days",
+      "description": "The terraform service token has a TTL of 720h (30 days). For CI/CD tokens, a shorter TTL (e.g., 1h or per-run) is recommended. Long-lived tokens in CI/CD pipelines increase the attack surface if the CI/CD system is compromised.",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/defaults/main.yml"
+      ],
+      "current_value": "openbao_tf_token_ttl: 720h (30 days)",
+      "recommended_value": "Set terraform service token TTL to 1h or use short-lived tokens per Terraform run. Consider using Vault's CI/CD integration for dynamic credentials.",
+      "fix_command": "Change openbao_tf_token_ttl: '1h' in defaults/main.yml",
+      "risk_if_unfixed": "Long-lived CI/CD token increases exposure window if Terraform state or CI/CD system is compromised."
+    },
+    {
+      "severity": "INFO",
+      "category": "auth",
+      "title": "OIDC redirect URI includes HTTP endpoint",
+      "description": "The OIDC redirect URIs (defaults/main.yml line 41) include http://127.0.0.1:8200/oidc/callback in addition to the HTTPS endpoint. While the localhost endpoint is acceptable for development, having HTTP in the redirect URIs list could be exploited if an attacker can redirect the callback to the HTTP endpoint.",
+      "files_affected": [
+        "/Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/openbao/defaults/main.yml"
+      ],
+      "current_value": "redirect_uris: ['https://vault.iacgenie.com/oidc/callback', 'http://127.0.0.1:8200/oidc/callback']",
+      "recommended_value": "Remove HTTP redirect URI from production configuration. Keep only HTTPS endpoint. Use HTTP localhost only for development environments.",
+      "fix_command": "Remove 'http://127.0.0.1:8200/oidc/callback' from openbao_oidc_redirect_uris in production.",
+      "risk_if_unfixed": "HTTP callback URI could be exploited for OIDC authorization code interception in certain attack scenarios."
+    }
+  ],
+  "summary": "The OpenBao 2.6.0 deployment has significant security gaps that require immediate remediation. Three CRITICAL findings demand urgent attention: (1) TLS is disabled on the listener, exposing all API traffic in plaintext; (2) the root token is stored in plaintext on the host filesystem (init_keys.json), creating a single point of total compromise; and (3) no audit logging is configured, eliminating all forensic capability and violating compliance requirements. Four HIGH-severity issues include excessive lease TTLs, HTTP cluster address, overly permissive admin policy, and open OIDC authentication. The configuration also violates multiple CIS OpenBao Benchmark controls (TLS, audit, auto-unseal, rate limiting, namespaces, OIDC bound claims). MEDIUM issues center on unencrypted backups, plaintext service token storage, missing mTLS for injectors, and disabled certificate validation in Ansible. The overall security posture is WEAK — the service provides secret storage but lacks fundamental security controls that would protect those secrets from both external and insider threats. Prioritize enabling TLS, configuring audit logging, removing the root token from disk, and implementing auto-unseal.",
+  "priority_order": [
+    "Enable TLS on OpenBao listener (CRITICAL - network)",
+    "Remove root token from init_keys.json and implement auto-unseal (CRITICAL - secrets)",
+    "Configure audit logging with file or syslog sink (CRITICAL - audit)",
+    "Reduce default and max lease TTLs to 24h/168h (HIGH - config)",
+    "Change cluster_addr to HTTPS (HIGH - config)",
+    "Implement auto-unseal to eliminate manual Shamir keys (HIGH - container/unseal)",
+    "Restrict OIDC default role with bound_claims and bound_audiences (HIGH - auth)",
+    "Refine admin policy to reduce sudo scope (HIGH - policy)",
+    "Encrypt backup snapshots with AES-256 (MEDIUM - backup)",
+    "Replace static service tokens with AppRole auth (MEDIUM - secrets)",
+    "Enable validate_certs in Ansible tasks (MEDIUM - config)",
+    "Add mTLS for OpenBao injector (MEDIUM - auth)",
+    "Implement namespace isolation (MEDIUM - compliance)",
+    "Run container as non-root user (LOW - container)",
+    "Add rate limiting to API endpoints (LOW - config)",
+    "Reduce Terraform service token TTL (INFO - config)",
+    "Remove HTTP OIDC redirect URI from production (INFO - auth)"
+  ]
+}
