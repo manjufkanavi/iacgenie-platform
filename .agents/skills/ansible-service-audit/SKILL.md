@@ -5,7 +5,7 @@ description: >
   launches 6 parallel audits (Self+DevOps, Self+SecOps, Antares+DevOps,
   Antares+SecOps, VibeThinker+DevOps, VibeThinker+SecOps), consolidates
   findings, fixes genuine issues, redeploy, verify, and commit.
-version: 2.0.0
+version: 3.0.0
 tags: [ansible, audit, service, devops, secops, multi-agent, redeploy]
 ---
 
@@ -23,45 +23,68 @@ consolidates them, fixes genuine issues, redeploy, and commits.
 - Pre-deployment hardening checks
 - When the user says "audit <service>" or "fix <service>"
 
+## Environment Variables (configurable)
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `REPO_ROOT` | `/Users/manjunathkanavi/iacgenie-platform` | Git repo root |
+| `VM_HOST` | `mkanavi@192.168.0.118` | SSH target |
+| `DOCKER_PATH` | `/home/mkanavi/docker/iacgenie` | Docker compose dir |
+| `MODEL_API_URL` | `http://127.0.0.1:1234/v1/chat/completions` | Remote model API |
+| `MODEL_TIMEOUT` | `300` | Per-request timeout (seconds) |
+| `MODEL_RETRIES` | `2` | Retry attempts on failure |
+
 ## Architecture
 
 ```
-                    ┌─────────────────────────────────┐
-                    │       ansible-service-audit      │
-                    │         (this agent)             │
-                    │   Qwen3.6-35B-A3B-UD-MLX-4bit  │
-                    └──────────┬──────────────────────┘
-                               │
-              ┌────────────────┼────────────────┐
-              │                │                │
-    ┌─────────▼──────┐ ┌──────▼───────┐ ┌──────▼───────┐
-    │ delegate_task   │ │ curl (Antares)│ │ curl (Vibe)  │
-    │ Self+DevOps     │ │ Self+DevOps  │ │ Self+DevOps  │
-    └─────────┬───────┘ └──────┬───────┘ └──────┬───────┘
-              │                │                │
-    ┌─────────▼──────┐ ┌──────▼───────┐ ┌──────▼───────┐
-    │ delegate_task   │ │ curl (Antares)│ │ curl (Vibe)  │
-    │ Self+SecOps     │ │ Self+SecOps  │ │ Self+SecOps  │
-    └─────────────────┘ └──────────────┘ └──────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                    ansible-service-audit (parent)            │
+│                    whatever model this agent runs on         │
+└──────────┬─────────────────────────────────┬────────────────┘
+           │                                 │
+    ┌──────▼───────┐              ┌──────────▼──────────┐
+    │ delegate_task│              │ ThreadPoolExecutor   │
+    │ (Self+DevOps)│              │ (4 parallel curl     │
+    │ (full tools) │              │  calls: Antares×2,   │
+    └──────┬───────┘              │  VibeThinker×2)      │
+    │                    ┌────────┴──────────────────┐
+    │                    │                           │
+    │              ┌─────▼──────┐            ┌──────▼─────┐
+    │              │ Antares    │            │ VibeThinker│
+    │              │ + DevOps   │            │ + DevOps   │
+    │              └─────┬──────┘            └──────┬─────┘
+    │                    │                           │
+    │              ┌─────▼──────┐            ┌──────▼─────┐
+    │              │ Antares    │            │ VibeThinker│
+    │              │ + SecOps   │            │ + SecOps   │
+    │              └────────────┘            └────────────┘
+    │
+    └──────────────┬──────────────────────────┘
+                   │
+            ┌──────▼──────┐
+            │ Self + SecOps│
+            │ (full tools) │
+            └─────────────┘
 ```
 
-**Key insight:** Antares and VibeThinker do NOT support tool/function calling.
-They are pure text-in/text-out models via OpenAI-compatible API at
-`127.0.0.1:1234`. All context (file contents, prompts) must be passed as text
-in a single curl request. Self (this agent) uses `delegate_task` with full tool
-access.
+**Key design decisions:**
+- Self (this agent) uses `delegate_task` with full tool access (file, terminal, search)
+- Antares and VibeThinker do NOT support tool/function calling — they are pure text-in/text-out
+- All 4 remote calls run in parallel via `ThreadPoolExecutor`
+- The parent orchestrates; no model spawns sub-agents
 
 ## Prerequisites
 
-- **Repo:** `/Users/manjunathkanavi/iacgenie-platform` (already pulled)
-- **VM:** `mkanavi@192.168.0.118`
-- **Docker path:** `/home/mkanavi/docker/iacgenie`
+- **Repo:** `$REPO_ROOT` (already pulled)
+- **VM:** `$VM_HOST`
+- **Docker path:** `$DOCKER_PATH`
 - **Roles:** `infra/ansible/roles/<service>/`
 - **Remote models:** Antares (`antares-1b-mlx-8bit`) and
-  VibeThinker (`VibeThinker-3B-OptiQ-4bit`) on `127.0.0.1:1234`
+  VibeThinker (`VibeThinker-3B-OptiQ-4bit`) on `$MODEL_API_URL`
   (no tool calling, text-only)
 - **Self model:** Whatever this agent runs on (no hardcoded model names)
-- **Role SOULs:** `.agent/devops-engineer/SOUL.md`, `.agent/secops-engineer/SOUL.md`
+- **Role SOULs:** `REPO_ROOT/.agent/devops-engineer/SOUL.md`,
+  `REPO_ROOT/.agent/secops-engineer/SOUL.md`
 - **Remote model wrapper:** `~/.hermes/skills/ansible-service-audit/scripts/remote_model_caller.py`
 
 ## Phase 1: Gather Service Context
@@ -69,7 +92,7 @@ access.
 ### 1.1 Locate All Related Ansible Files
 
 ```bash
-cd /Users/manjunathkanavi/iacgenie-platform
+cd $REPO_ROOT
 SERVICE="<service-name>"
 
 # Find all ansible role files for this service
@@ -113,6 +136,24 @@ Write a JSON context file at `/tmp/<service>_audit_context.json`:
 }
 ```
 
+### 1.4 Validate Prerequisites
+
+Before launching audits, verify required files exist:
+
+```bash
+# Check SOUL files
+test -f "$REPO_ROOT/.agent/devops-engineer/SOUL.md" || echo "MISSING: devops-engineer SOUL"
+test -f "$REPO_ROOT/.agent/secops-engineer/SOUL.md" || echo "MISSING: secops-engineer SOUL"
+
+# Check wrapper script
+test -f ~/.hermes/skills/ansible-service-audit/scripts/remote_model_caller.py || echo "MISSING: remote_model_caller.py"
+
+# Check context file
+test -f /tmp/${SERVICE}_audit_context.json || echo "MISSING: audit context"
+```
+
+If any prerequisite is missing, abort or skip the affected audits.
+
 ## Phase 2: Launch 6 Parallel Audits
 
 ### 2.1 Self Audits (delegate_task — full tool access)
@@ -120,18 +161,23 @@ Write a JSON context file at `/tmp/<service>_audit_context.json`:
 Launch 2 subagents using `delegate_task`. These run with full tool access
 (file, terminal, search) and can read files and SSH to VM.
 
+**Self + DevOps:**
 ```python
-# Self + DevOps — uses delegate_task (full tools)
+# Specify exact files to read (not "all" — be explicit)
+ansible_files = $(find "$REPO_ROOT/infra/ansible/roles/${SERVICE}" -type f \( -name "*.yml" -o -name "*.yaml" -o -name "*.j2" -o -name "*.py" \) | sort | tr '\n' ',')
+
 delegate_task(
-    goal="Audit service <SERVICE> from a DevOps perspective",
-    context=f"You are a DevOps Engineer following this SOUL:\n{read('.agent/devops-engineer/SOUL.md')}\n\nAUDIT TARGET: {SERVICE}\n\nCONTEXT:\n{read('/tmp/{SERVICE}_audit_context.json')}\n\nTASK: Perform a thorough DevOps audit. Read all Ansible role files. Identify ALL problems.\n\nOUTPUT — return ONLY valid JSON:\n{{\"service\": \"{SERVICE}\", \"role\": \"devops-engineer\", \"model\": \"self\", \"findings\": [...], \"summary\": \"...\", \"priority_order\": [...]}}",
+    goal=f"Audit service {SERVICE} from a DevOps perspective",
+    context=f"You are a DevOps Engineer following this SOUL:\n{read_file('$REPO_ROOT/.agent/devops-engineer/SOUL.md')}\n\nAUDIT TARGET: {SERVICE}\n\nCONTEXT:\n{read_file('/tmp/{SERVICE}_audit_context.json')}\n\nFILES TO READ:\n{ansible_files}\n\nTASK: Read the files above and perform a thorough DevOps audit. Identify ALL configuration, resource, health, backup, automation, and operational issues.\n\nOUTPUT — return ONLY valid JSON:\n{{\"service\": \"{SERVICE}\", \"role\": \"devops-engineer\", \"model\": \"self\", \"findings\": [...], \"summary\": \"...\", \"priority_order\": [...]}}",
     toolsets=["file", "terminal", "search"]
 )
+```
 
-# Self + SecOps — uses delegate_task (full tools)
+**Self + SecOps:**
+```python
 delegate_task(
-    goal="Audit service <SERVICE> from a SecOps perspective",
-    context=f"You are a SecOps Engineer following this SOUL:\n{read('.agent/secops-engineer/SOUL.md')}\n\nAUDIT TARGET: {SERVICE}\n\nCONTEXT:\n{read('/tmp/{SERVICE}_audit_context.json')}\n\nTASK: Perform a thorough security audit. Read all Ansible role files. Identify ALL security problems.\n\nOUTPUT — return ONLY valid JSON:\n{{\"service\": \"{SERVICE}\", \"role\": \"secops-engineer\", \"model\": \"self\", \"findings\": [...], \"summary\": \"...\", \"priority_order\": [...]}}",
+    goal=f"Audit service {SERVICE} from a SecOps perspective",
+    context=f"You are a SecOps Engineer following this SOUL:\n{read_file('$REPO_ROOT/.agent/secops-engineer/SOUL.md')}\n\nAUDIT TARGET: {SERVICE}\n\nCONTEXT:\n{read_file('/tmp/{SERVICE}_audit_context.json')}\n\nFILES TO READ:\n{ansible_files}\n\nTASK: Read the files above and perform a thorough security audit. Identify ALL security problems.\n\nOUTPUT — return ONLY valid JSON:\n{{\"service\": \"{SERVICE}\", \"role\": \"secops-engineer\", \"model\": \"self\", \"findings\": [...], \"summary\": \"...\", \"priority_order\": [...]}}",
     toolsets=["file", "terminal", "search"]
 )
 ```
@@ -139,101 +185,152 @@ delegate_task(
 ### 2.2 Remote Model Audits (curl — text only, no tool calling)
 
 Antares and VibeThinker do NOT support tool calling. Use the wrapper script
-to send all context as text in a single curl request.
+with parallel execution.
 
-```bash
-WRAPPER=~/.hermes/skills/ansible-service-audit/scripts/remote_model_caller.py
+**The clean approach** — build a JSON prompt file and call all 4 in parallel:
 
-# Antares + DevOps — text-in/text-out via curl
-SERVICE="openbao"
-SYSTEM_PROMPT="You are a senior DevOps Engineer auditing infrastructure. Read the context below and identify ALL configuration, resource, health, backup, automation, and operational issues."
-USER_PROMPT=$(cat <<PROMPT
-AUDIT TARGET: ${SERVICE}
+```python
+import json
+import subprocess
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 
-CONTEXT:
-$(cat /tmp/${SERVICE}_audit_context.json)
+WRAPPER = Path.home() / ".hermes" / "skills" / "ansible-service-audit" / "scripts" / "remote_model_caller.py"
+SERVICE = "openbao"
+CONTEXT = json.loads(Path("/tmp/${SERVICE}_audit_context.json").read_text())
 
-ANSIBLE FILES:
-$(for f in $(cat /tmp/${SERVICE}_audit_context.json | python3 -c "import sys,json; [print(open(f).read()[:500]) for f in json.load(sys.stdin)['ansible_files'][:10]]" 2>/dev/null); do echo "--- $f ---"; cat $f 2>/dev/null | head -100; echo; done)
+# Build the prompt — embed file paths, not full contents
+def build_prompt(role: str, model_name: str) -> str:
+    return json.dumps({
+        "service": SERVICE,
+        "role": role,
+        "model": model_name,
+        "context": CONTEXT,
+        "ansible_files": CONTEXT.get("ansible_files", []),
+        "task": f"Perform a thorough {role.lower()} audit of {SERVICE}. Read the context and file paths above. Identify ALL issues. Return JSON: {{'service','role','model','findings':[{{'severity','category','title','description','files_affected','current_value','recommended_value','fix_command','risk_if_unfixed'}}],'summary','priority_order'}}"
+    })
 
-TASK: Perform a thorough DevOps audit of ${SERVICE}. Identify ALL problems.
+# Define the 4 remote audits
+remote_tasks = [
+    ("antares-1b-mlx-8bit", "devops-engineer", f"/tmp/{SERVICE}_devops_antares_audit.json"),
+    ("antares-1b-mlx-8bit", "secops-engineer", f"/tmp/{SERVICE}_secops_antares_audit.json"),
+    ("VibeThinker-3B-OptiQ-4bit", "devops-engineer", f"/tmp/{SERVICE}_devops_vibethinker_audit.json"),
+    ("VibeThinker-3B-OptiQ-4bit", "secops-engineer", f"/tmp/{SERVICE}_secops_vibethinker_audit.json"),
+]
 
-OUTPUT — return ONLY valid JSON:
-{
-  "service": "${SERVICE}",
-  "role": "devops-engineer",
-  "model": "antares",
-  "findings": [
-    {
-      "severity": "CRITICAL|HIGH|MEDIUM|LOW|INFO",
-      "category": "configuration|resource|healthcheck|backup|automation|best-practice",
-      "title": "Brief title",
-      "description": "Detailed description",
-      "files_affected": ["path/to/file"],
-      "current_value": "...",
-      "recommended_value": "...",
-      "fix_command": "fix command",
-      "risk_if_unfixed": "..."
-    }
-  ],
-  "summary": "Overall assessment",
-  "priority_order": ["fix 1", "fix 2"]
-}
-PROMPT
-)
+# Run in parallel
+results = {}
+with ThreadPoolExecutor(max_workers=4) as pool:
+    futures = {}
+    for model, role, output_file in remote_tasks:
+        prompt = build_prompt(role, model)
+        futures[output_file] = pool.submit(
+            subprocess.run,
+            ["python3", str(WRAPPER), model,
+             f"You are a senior {role.replace('-',' ')} auditing infrastructure.",
+             prompt],
+            capture_output=True, text=True
+        )
+    for output_file, future in futures.items():
+        try:
+            r = future.result(timeout=360)
+            results[output_file] = r.stdout.strip()
+        except Exception as e:
+            results[output_file] = json.dumps({"error": str(e), "success": False})
 
-python3 "$WRAPPER" antares-1b-mlx-8bit "$SYSTEM_PROMPT" "$USER_PROMPT" > /tmp/${SERVICE}_devops_antares_audit.json
-
-# Repeat for: antares+secops, vibethinker+devops, vibethinker+secops
-```
-
-**Simpler approach** — use the wrapper with a JSON prompt file:
-
-```bash
-# Step 1: Build prompt file with all context embedded
-cat > /tmp/${SERVICE}_devops_antares_prompt.json <<EOF
-{
-  "service": "${SERVICE}",
-  "role": "devops-engineer",
-  "model": "antares",
-  "context": $(cat /tmp/${SERVICE}_audit_context.json),
-  "files": {
-    $(for f in $(cat /tmp/${SERVICE}_audit_context.json | python3 -c "import sys,json; print(','.join(json.load(sys.stdin)['ansible_files'][:15]))" 2>/dev/null); do echo "    \"$f\": $(cat \"$f\" 2>/dev/null | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')",; done)
-  }
-}
-EOF
-
-# Step 2: Call the model
-python3 "$WRAPPER" antares-1b-mlx-8bit \
-  "You are a senior DevOps Engineer. Audit the service below." \
-  "$(cat /tmp/${SERVICE}_devops_antares_prompt.json)" \
-  > /tmp/${SERVICE}_devops_antares_audit.json
+# Write results
+for output_file, content in results.items():
+    Path(output_file).write_text(content)
 ```
 
 ### 2.3 Save Audit Results
 
 Each audit writes its JSON report to:
 
-| Audit | Output File |
-|-------|-------------|
-| Self + DevOps | `/tmp/<service>_devops_self_audit.json` |
-| Self + SecOps | `/tmp/<service>_secops_self_audit.json` |
-| Antares + DevOps | `/tmp/<service>_devops_antares_audit.json` |
-| Antares + SecOps | `/tmp/<service>_secops_antares_audit.json` |
-| VibeThinker + DevOps | `/tmp/<service>_devops_vibethinker_audit.json` |
-| VibeThinker + SecOps | `/tmp/<service>_secops_vibethinker_audit.json` |
+| # | Role | Model | Output File |
+|---|------|-------|-------------|
+| 1 | DevOps | Self | `/tmp/<service>_devops_self_audit.json` |
+| 2 | SecOps | Self | `/tmp/<service>_secops_self_audit.json` |
+| 3 | DevOps | Antares | `/tmp/<service>_devops_antares_audit.json` |
+| 4 | SecOps | Antares | `/tmp/<service>_secops_antares_audit.json` |
+| 5 | DevOps | VibeThinker | `/tmp/<service>_devops_vibethinker_audit.json` |
+| 6 | SecOps | VibeThinker | `/tmp/<service>_secops_vibethinker_audit.json` |
 
 Wait for all 6 to complete before proceeding.
 
-## Phase 3: Consolidate Audit Findings
+## Phase 3: Quality Gates
 
-### 3.1 Merge All Findings
-
-Read all 6 JSON files and merge:
+### 3.1 Validate All 6 Reports Exist and Are Valid JSON
 
 ```python
 import json
-from collections import defaultdict
+from pathlib import Path
+
+audit_files = [
+    f"/tmp/{SERVICE}_devops_self_audit.json",
+    f"/tmp/{SERVICE}_secops_self_audit.json",
+    f"/tmp/{SERVICE}_devops_antares_audit.json",
+    f"/tmp/{SERVICE}_secops_antares_audit.json",
+    f"/tmp/{SERVICE}_devops_vibethinker_audit.json",
+    f"/tmp/{SERVICE}_secops_vibethinker_audit.json",
+]
+
+missing = []
+invalid = []
+for f in audit_files:
+    if not Path(f).exists():
+        missing.append(f)
+    else:
+        try:
+            data = json.loads(Path(f).read_text())
+            if "findings" not in data:
+                invalid.append(f)
+        except json.JSONDecodeError:
+            invalid.append(f)
+
+if missing:
+    print(f"MISSING reports: {missing}")
+if invalid:
+    print(f"INVALID reports: {invalid}")
+
+if missing or invalid:
+    print("ABORTING — not all 6 reports are valid. Fix before proceeding.")
+    # Optionally retry the failed ones
+```
+
+### 3.2 Record Audit Trail
+
+```python
+import time, hashlib
+
+trail = {
+    "audit_date": time.strftime("%Y-%m-%dT%H:%M:%S"),
+    "service": SERVICE,
+    "repo_root": "$REPO_ROOT",
+    "vm_host": "$VM_HOST",
+    "models_used": {
+        "self": "auto-detect",
+        "antares": "antares-1b-mlx-8bit",
+        "vibethinker": "VibeThinker-3B-OptiQ-4bit",
+    },
+    "report_hashes": {},
+    "reports": audit_files,
+}
+
+for f in audit_files:
+    if Path(f).exists():
+        trail["report_hashes"][f] = hashlib.sha256(Path(f).read_bytes()).hexdigest()
+
+Path(f"/tmp/{SERVICE}_audit_trail.json").write_text(json.dumps(trail, indent=2))
+```
+
+## Phase 4: Consolidate Audit Findings
+
+### 4.1 Merge All Findings
+
+```python
+import json
+from pathlib import Path
 
 audit_files = [
     f"/tmp/{SERVICE}_devops_self_audit.json",
@@ -249,40 +346,57 @@ for f in audit_files:
     with open(f) as fh:
         data = json.load(fh)
         for finding in data.get("findings", []):
-            finding["source"] = f.split("/")[-1].replace("_audit.json", "")
+            finding["source"] = Path(f).stem.replace("_audit", "")
             all_findings.append(finding)
 ```
 
-### 3.2 Deduplicate
+### 4.2 Deduplicate with Fuzzy Matching
 
-Group findings by `(category, title)` — if the same issue is found by
-multiple auditors, keep it once and note which auditors flagged it:
+Group findings by normalized title similarity. If two findings have the same
+category and titles that are 80%+ similar, merge them:
 
 ```python
+import re
+
+def normalize(s: str) -> str:
+    """Normalize a string for comparison: lowercase, strip punctuation, collapse whitespace."""
+    return re.sub(r'[^a-z0-9\s]', '', s.lower()).strip()
+
+def similarity(a: str, b: str) -> float:
+    """Simple Jaccard similarity on word sets."""
+    wa, wb = set(normalize(a).split()), set(normalize(b).split())
+    if not wa or not wb:
+        return 0.0
+    return len(wa & wb) / len(wa | wb)
+
 seen = {}
 deduped = []
 for f in all_findings:
     key = (f["category"], f["title"])
-    if key not in seen:
-        seen[key] = f
+    merged = False
+    for existing in deduped:
+        if existing["category"] == f["category"] and similarity(existing["title"], f["title"]) >= 0.8:
+            existing["found_by"].append(f["source"])
+            existing["description"] = f"{existing['description']} | {f['description']}"
+            merged = True
+            break
+    if not merged:
         f["found_by"] = [f["source"]]
         deduped.append(f)
-    else:
-        seen[key]["found_by"].append(f["source"])
 
 # Sort: CRITICAL first, then HIGH, MEDIUM, LOW, INFO
 severity_order = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, "INFO": 4}
 deduped.sort(key=lambda x: severity_order.get(x["severity"], 99))
 ```
 
-### 3.3 Write Consolidated Report
+### 4.3 Write Consolidated Report
 
 Save to `/tmp/<service>_consolidated_audit.json` and
 `infra/docs/<service>-audit-report.md`.
 
-## Phase 4: Validate & Filter Findings
+## Phase 5: Validate & Filter Findings
 
-### 4.1 Review Each Finding
+### 5.1 Review Each Finding
 
 For each finding, verify it is genuine:
 
@@ -291,7 +405,7 @@ For each finding, verify it is genuine:
 3. **SSH to VM** and check the live state if needed
 4. **Cross-reference** — does the issue exist in BOTH the template AND live state?
 
-### 4.2 Classify Findings
+### 5.2 Classify Findings
 
 | Category | Action |
 |----------|--------|
@@ -301,7 +415,7 @@ For each finding, verify it is genuine:
 | **False positive** | Skip, note why |
 | **Info only** | Skip |
 
-### 4.3 Write Fix Plan
+### 5.3 Write Fix Plan
 
 Save to `/tmp/<service>_fix_plan.json`:
 
@@ -327,9 +441,45 @@ Save to `/tmp/<service>_fix_plan.json`:
 }
 ```
 
-## Phase 5: Apply Fixes
+## Phase 5.5: Dry-Run Mode
 
-### 5.1 Fix Ansible Role Files
+Before applying any fixes, run a dry-run to preview changes:
+
+```bash
+# Dry-run: show what would be changed without modifying files
+cd $REPO_ROOT
+for file in $(python3 -c "import json; import sys; print('\\n'.join(json.load(open('/tmp/${SERVICE}_fix_plan.json'))['fixes']))" | grep -o '"files_to_modify": \[[^]]*\]' | grep -o '"[^"]*\.yml"'); do
+    echo "Would modify: $file"
+done
+
+# Or use ansible --check
+cd $REPO_ROOT/infra/ansible
+ansible-playbook -i inventory/hosts.yml site.yml --check -l <service>
+```
+
+If the dry-run reveals issues, adjust the fix plan before proceeding.
+
+## Phase 6: Apply Fixes
+
+### 6.1 Snapshot Current State (for rollback)
+
+```bash
+# Create a rollback snapshot before any changes
+BACKUP_DIR="/tmp/${SERVICE}_rollback_$(date +%Y%m%d_%H%M%S)"
+mkdir -p "$BACKUP_DIR"
+
+# Snapshot Ansible role files that will be modified
+for f in $(python3 -c "import json; print('\\n'.join(json.load(open('/tmp/${SERVICE}_fix_plan.json'))['fixes']))" | grep -o '"files_to_modify": \[[^]]*\]' | grep -o '"[^"]*"' | tr -d '"'); do
+    cp "$REPO_ROOT/$f" "$BACKUP_DIR/" 2>/dev/null
+done
+
+# Snapshot docker-compose
+cp "$DOCKER_PATH/docker-compose-unified.yml" "$BACKUP_DIR/" 2>/dev/null
+
+echo "Rollback snapshot: $BACKUP_DIR"
+```
+
+### 6.2 Fix Ansible Role Files
 
 For each fix, use the `patch` tool to modify the Ansible role files:
 
@@ -339,7 +489,7 @@ patch(path="infra/ansible/roles/<service>/templates/docker-compose.service.yml.j
       new_string="new config line")
 ```
 
-### 5.2 Fix Docker Compose Templates
+### 6.3 Fix Docker Compose Templates
 
 If the issue requires docker-compose changes, update the template:
 
@@ -349,70 +499,70 @@ patch(path="infra/docker-compose/docker-compose-unified.yml.j2",
       new_string="new compose line")
 ```
 
-### 5.3 Fix Nginx/Cloudflare If Needed
+### 6.4 Fix Nginx/Cloudflare If Needed
 
 ```bash
 patch(path="infra/ansible/roles/nginx/templates/nginx-unified.conf.j2", ...)
 patch(path="infra/ansible/roles/cloudflare_tunnel/templates/config.yml.j2", ...)
 ```
 
-### 5.4 Validate Ansible Syntax
+### 6.5 Validate Ansible Syntax
 
 Before deploying, validate:
 
 ```bash
-cd /Users/manjunathkanavi/iacgenie-platform/infra/ansible
+cd $REPO_ROOT/infra/ansible
 ansible-playbook -i inventory/hosts.yml site.yml --check -l <service> --tags validate
 ```
 
-## Phase 6: Redeploy Service
+## Phase 7: Redeploy Service
 
-### 6.1 Clean Up Existing Service
+### 7.1 Clean Up Existing Service
 
 ```bash
-ssh mkanavi@192.168.0.118 "docker stop iacgenie_<service> && docker rm iacgenie_<service>"
-ssh mkanavi@192.168.0.118 "docker rmi -f <image>"  # if needed
+ssh $VM_HOST "docker stop iacgenie_<service> && docker rm iacgenie_<service>"
+ssh $VM_HOST "docker rmi -f <image>"  # if needed
 ```
 
-### 6.2 Run Ansible Playbook
+### 7.2 Run Ansible Playbook
 
 ```bash
-cd /Users/manjunathkanavi/iacgenie-platform/infra/ansible
+cd $REPO_ROOT/infra/ansible
 ansible-playbook -i inventory/hosts.yml playbooks/services.yml -l <service> --tags deploy
 ```
 
-### 6.3 Or Deploy Compose Changes Directly
+### 7.3 Or Deploy Compose Changes Directly
 
 If changes are only in docker-compose:
 
 ```bash
-scp infra/docker-compose/docker-compose-unified.yml mkanavi@192.168.0.118:/tmp/
-ssh mkanavi@127.0.0.1 "cp /tmp/docker-compose-unified.yml /home/mkanavi/docker/iacgenie/docker-compose-unified.yml && cd /home/mkanavi/docker/iacgenie && docker compose up -d <service> --force-recreate"
+scp infra/docker-compose/docker-compose-unified.yml $VM_HOST:/tmp/
+ssh $VM_HOST "cp /tmp/docker-compose-unified.yml $DOCKER_PATH/docker-compose-unified.yml && cd $DOCKER_PATH && docker compose up -d <service> --force-recreate"
 ```
 
-## Phase 7: Verify Service
+## Phase 8: Verify Service
 
-### 7.1 Container Health
+### 8.1 Container Health
 
 ```bash
-ssh mkanavi@192.168.0.118 "docker ps --filter name=iacgenie_<service> --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'"
-ssh mkanavi@192.168.0.118 "docker logs iacgenie_<service> --tail 20"
+ssh $VM_HOST "docker ps --filter name=iacgenie_<service> --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'"
+ssh $VM_HOST "docker logs iacgenie_<service> --tail 20"
 ```
 
-### 7.2 Service Reachability
+### 8.2 Service Reachability
 
 ```bash
-ssh mkanavi@192.168.0.118 "curl -sf http://127.0.0.1:<PORT>/health || echo 'UNREACHABLE'"
+ssh $VM_HOST "curl -sf http://127.0.0.1:<PORT>/health || echo 'UNREACHABLE'"
 curl -sI "https://<domain>.iacgenie.com/health" | head -5
 ```
 
-### 7.3 Health Check Endpoints
+### 8.3 Health Check Endpoints
 
 ```bash
-ssh mkanavi@192.168.0.118 "docker exec iacgenie_<service> curl -sf http://127.0.0.1:<PORT>/health"
+ssh $VM_HOST "docker exec iacgenie_<service> curl -sf http://127.0.0.1:<PORT>/health"
 ```
 
-### 7.4 Verification Checklist
+### 8.4 Verification Checklist
 
 | Check | Command | Expected |
 |-------|---------|----------|
@@ -423,16 +573,16 @@ ssh mkanavi@192.168.0.118 "docker exec iacgenie_<service> curl -sf http://127.0.
 | Cloudflare tunnel | `curl -sI https://<domain>` | 200 OK |
 | Ansible idempotent | `ansible-playbook --check` | `changed=0` |
 
-## Phase 8: Commit & Push
+## Phase 9: Commit & Push
 
 ```bash
-cd /Users/manjunathkanavi/iacgenie-platform
+cd $REPO_ROOT
 
 # Stage all changes
 git add -A
 
 # Commit with audit summary
-git commit -m "audit: <service> 6-agent multi-model audit fixes
+git commit -m "audit: <service> 6-model multi-agent audit fixes
 
 Automated audit with 6 parallel audits (Self+DevOps, Self+SecOps,
 Antares+DevOps, Antares+SecOps, VibeThinker+DevOps, VibeThinker+SecOps).
@@ -448,6 +598,21 @@ Fixes applied:
 - ..."
 
 git push origin main
+```
+
+## Rollback
+
+If fixes break the service, rollback to the snapshot:
+
+```bash
+# List latest rollback snapshot
+ls -td /tmp/${SERVICE}_rollback_* | head -1
+
+# Restore files
+cp /tmp/${SERVICE}_rollback_*/<filename> $REPO_ROOT/<filename>
+
+# Redeploy
+ansible-playbook -i $REPO_ROOT/infra/ansible/inventory/hosts.yml playbooks/services.yml -l <service> --tags deploy
 ```
 
 ## Quick Reference
@@ -482,7 +647,7 @@ git push origin main
 | keycloak | keycloak | iacgenie_keycloak | `infra/ansible/roles/keycloak/` |
 | gitea | gitea | iacgenie_gitea | `infra/ansible/roles/gitea/` |
 | lightserp-api | lightserp-api | iacgenie_lightserp_api | `infra/ansible/roles/lightserp-api/` |
-| lightserp-webui | lightserp-webui | iacgenie_lightserp_webui | `infra/ansible/roles/openbao/` |
+| lightserp-webui | lightserp-webui | iacgenie_lightserp_webui | `infra/ansible/roles/lightserp/` |
 | searxng | searxng | iacgenie_searxng | `infra/ansible/roles/searxng/` |
 | pagezen | pagezen | iacgenie_pagezen | `infra/ansible/roles/pagezen/` |
 | nginx | nginx | (systemd) | `infra/ansible/roles/nginx/` |
@@ -501,6 +666,8 @@ git push origin main
 | `/tmp/<service>_secops_vibethinker_audit.json` | VibeThinker + SecOps audit |
 | `/tmp/<service>_consolidated_audit.json` | Merged/deduped findings |
 | `/tmp/<service>_fix_plan.json` | Approved fix list |
+| `/tmp/<service>_audit_trail.json` | Audit trail (timestamps, hashes) |
+| `/tmp/<service>_rollback_*` | Rollback snapshots |
 | `infra/docs/<service>-audit-report.md` | Human-readable report |
 
 ### Pitfalls
@@ -515,10 +682,13 @@ git push origin main
 8. **Remember to update both template AND live** — Ansible SOT pattern
 9. **Remote models don't support tool calling** — pass all context as text in curl
 10. **Self model is not hardcoded** — whatever this agent runs on is "self"
+11. **Always validate prerequisites** (SOULs, wrapper, context) before launching audits
+12. **Use dry-run before applying fixes** — prevents breaking changes
+13. **Snapshot before fixing** — enables rollback if fixes break things
 
 ### Related Skills
 
-- `ansible-service-audit` — This skill (multi-agent audit with 6 reports)
+- `multi-model-service-audit` — Reference alias (load `ansible-service-audit` instead)
 - `infra-drift-audit` — Ansible template vs live VM drift comparison
 - `docker-compose-drift-remediation` — Docker compose drift detection
 - `service-security-audit` — Service-level security audit workflow

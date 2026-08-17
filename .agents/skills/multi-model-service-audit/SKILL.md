@@ -2,9 +2,8 @@
 name: multi-model-service-audit
 description: >
   Reference to ansible-service-audit skill. This is a convenience alias
-  that loads the full ansible-service-audit skill. Do NOT modify this file —
-  all logic lives in ansible-service-audit.
-version: 1.0.0
+  that delegates to the full ansible-service-audit skill.
+version: 2.0.0
 tags: [audit, service, multi-model, reference]
 ---
 
@@ -14,7 +13,7 @@ This skill is a **thin reference** to `ansible-service-audit`.
 
 ## How to Use
 
-Simply load the underlying skill:
+Load the full skill:
 
 ```
 skill_view(name='ansible-service-audit')
@@ -42,10 +41,11 @@ skill_view(name='ansible-service-audit')
 
 - **Self** uses `delegate_task` with full tool access (file, terminal, search)
 - **Antares/VibeThinker** use `curl` (text-only, no tool calling)
+- 4 remote calls run in parallel via `ThreadPoolExecutor`
 - All 6 reports saved to `/tmp/<service>_<role>_<model>_audit.json`
 
 ## Files
 
-- **Main skill:** `ansible-service-audit`
+- **Main skill:** `ansible-service-audit` (load with `skill_view`)
 - **Remote model wrapper:** `~/.hermes/skills/ansible-service-audit/scripts/remote_model_caller.py`
 - **This file:** Reference alias (do not modify)
