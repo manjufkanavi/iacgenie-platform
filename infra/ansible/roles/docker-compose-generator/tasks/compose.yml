@@ -107,6 +107,16 @@
     mode: "0644"
   notify: Reload docker compose
 
+- name: "Compose Gen | Create empty PgBouncer userlist placeholder"
+  ansible.builtin.file:
+    path: /home/mkanavi/docker/iacgenie/pgbouncer/userlist.txt
+    state: touch
+
+- name: "Compose Gen | Skip platform file copy (already built in container images)"
+  ansible.builtin.debug:
+    msg: "Skipping platform source copy. Platform code is built into container images (lightserp-api, lightserp-webui)."
+  when: skip_platform_copy | default(true)
+
 - name: "Compose Gen | Create postgres_exporter config directory"
   ansible.builtin.file:
     path: /home/mkanavi/docker/iacgenie/postgres_exporter

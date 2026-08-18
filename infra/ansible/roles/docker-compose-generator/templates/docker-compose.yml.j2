@@ -100,6 +100,9 @@ services:
     read_only: true
     tmpfs:
       - /etc/pgbouncer
+    volumes:
+      - /home/mkanavi/docker/iacgenie/pgbouncer/userlist.txt:/etc/pgbouncer/userlist.txt:ro
+      - /home/mkanavi/docker/iacgenie/pgbouncer:/etc/pgbouncer
     deploy:
       resources:
         limits:
@@ -160,7 +163,7 @@ services:
     restart: unless-stopped
     command: redis-server /etc/redis/redis.conf
     volumes:
-      - /home/mkanavi/docker/iacgenie/data/redis:/data
+      - {{ redis_data_dir | default('/home/mkanavi/docker/iacgenie/data/redis') }}:/data
       - ./templates/redis.conf:/etc/redis/redis.conf:ro
       - ./templates/server.crt:/etc/redis/tls/server.crt:ro
       - ./templates/server.key:/etc/redis/tls/server.key:ro
@@ -321,7 +324,7 @@ services:
     image: cloudflare/cloudflared:2025.6.0
     container_name: iacgenie_cloudflared
     restart: always
-    command: tunnel --no-autoupdate --credentials-file /etc/cloudflared/{{ cloudflared_tunnel_name }}.json run {{ cloudflared_tunnel_name }}
+    command: tunnel --no-autoupdate --credentials-file /etc/cloudflared/{{ cloudflared_tunnel_name }}.json run {{ cloudflared_tunnel_uuid | default(cloudflared_tunnel_name) }}
     volumes:
       - /etc/cloudflared:/etc/cloudflared:ro
       - /home/mkanavi/.cloudflared:/home/cloudflared/.cloudflared:ro
@@ -512,7 +515,7 @@ services:
     container_name: iacgenie_auth_wrapper
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:9096/"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9090/"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -966,7 +969,7 @@ services:
     networks:
       - iacgenie-backend
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://127.0.0.1:8000/docs || exit 1"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8000/docs || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

@@ -1,0 +1,48 @@
+# Redis configuration
+# Managed by Ansible — do not edit manually
+# Data directory mounted at /data via docker-compose volume
+
+# Network
+bind 0.0.0.0
+port 6379
+tcp-backlog 511
+timeout 0
+tcp-keepalive 300
+
+# General
+daemonize no
+supervised no
+pidfile /var/run/redis_6379.pid
+loglevel notice
+logfile ""
+databases 16
+
+# Snapshotting
+save 900 1
+save 300 10
+save 60 10000
+stop-writes-on-bgsave-error yes
+rdbcompression yes
+rdbchecksum no
+dbfilename dump.rdb
+
+# Critical: data directory must match docker-compose volume mount at /data
+dir /data
+
+# Append only mode
+appendonly yes
+appendfilename "appendonly.aof"
+appendfsync everysec
+no-appendfsync-on-rewrite no
+auto-aof-rewrite-percentage 100
+auto-aof-rewrite-min-size 64mb
+
+# Memory
+maxmemory 256mb
+maxmemory-policy allkeys-lru
+
+# ACL (if supported)
+# user default on nopass ~* +@all
+
+# Security
+requirepass ${REDIS_PASSWORD}

@@ -23,3 +23,32 @@ ufw_enabled: true
 docker_compose_project: iacgenie
 generate_compose_files: true
 tls_enabled: true
+
+# Data directory configuration - CRITICAL FIX
+redis_data_dir: "/home/mkanavi/docker/iacgenie/data/redis"
+
+# Service memory limits
+service_memory_defaults:
+  postgres: "2g"
+  redis: "512m"
+  minio: "1g"
+  keycloak: "1g"
+  gitea: "512m"
+  lightserp: "512m"
+  pagegen: "512m"
+  pagezen: "512m"
+  prometheus: "512m"
+  grafana: "512m"
+  clamav: "512m"
+  crowdsec: "512m"
+  loki: "512m"
+  promtail: "512m"
+
+# Service CPU limits
+service_cpu_defaults:
+  minio: "2.0"
+  postgres: "2.0"
+
+# OpenBao configuration
+openbao_cluster_addr: "${OPENBAO_CLUSTER_ADDR}"
+openbao_api_addr: "${OPENBAO_API_ADDR}"

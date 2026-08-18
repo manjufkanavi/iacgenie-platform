@@ -1,46 +1,18 @@
 ---
 # Docker Compose Generator - Deploy and verify
-# Note: Path changed from /home/mkanavi/docker/iacgenie/ to /home/mkanavi/docker/iacgenie/
 
-# --- Copy platform frontend/backend code for build contexts ---
-- name: "Compose Gen | Ensure platform source dirs exist"
-  ansible.builtin.file:
-    path: "/home/mkanavi/docker/iacgenie/{{ item }}"
-    state: directory
-    owner: mkanavi
-    group: mkanavi
-    mode: "0755"
-  loop:
-    - platform/frontend
-    - platform/backend
+# --- Platform files are built into container images, skip copying source code ---
+- name: "Compose Gen | Ensure platform source dirs exist (skipped)"
+  ansible.builtin.debug:
+    msg: "Skipping platform source copy. Platform code is built into container images."
 
-- name: "Compose Gen | Copy platform shared files to compose root"
-  ansible.builtin.copy:
-    src: "/Users/manjunathkanavi/iacgenie-platform/platform/{{ item }}"
-    dest: "/home/mkanavi/docker/iacgenie/{{ item }}"
-    owner: mkanavi
-    group: mkanavi
-    mode: "0644"
-  loop:
-    - App.tsx
-    - types.ts
-    - constants.ts
+- name: "Compose Gen | Copy frontend source and Dockerfile (skipped)"
+  ansible.builtin.debug:
+    msg: "Skipping platform frontend copy. Using pre-built container images."
 
-- name: "Compose Gen | Copy frontend source and Dockerfile"
-  ansible.builtin.copy:
-    src: "../../../platform/frontend/"
-    dest: "/home/mkanavi/docker/iacgenie/platform/frontend/"
-    owner: mkanavi
-    group: mkanavi
-    mode: "0644"
-
-- name: "Compose Gen | Copy platform backend Dockerfile and code"
-  ansible.builtin.copy:
-    src: "/Users/manjunathkanavi/iacgenie-platform/platform/backend/"
-    dest: "/home/mkanavi/docker/iacgenie/platform/backend/"
-    owner: mkanavi
-    group: mkanavi
-    mode: "0644"
+- name: "Compose Gen | Copy platform backend Dockerfile and code (skipped)"
+  ansible.builtin.debug:
+    msg: "Skipping platform backend copy. Using pre-built container images."
 
 # --- Clean up orphan containers not in compose ---
 - name: "Compose Gen | Remove unused nginx container (orphan)"
@@ -48,25 +20,18 @@
   changed_when: true
   failed_when: false
 
-- name: "Compose Gen | Remove orphan containers"
-  ansible.builtin.command: docker rm -f "{{ item }}"
-  changed_when: true
-  failed_when: false
-  loop:
-    - iacgenie_frontend
-    - iacgenie_backend
-
 # --- Check if containers are running and deploy ---
-- name: "Compose Gen | Check if containers are running"
-  ansible.builtin.command: docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.yml -p iacgenie ps --format json
-  register: compose_running
+- name: "Compose Gen | Check if compose file changed"
+  ansible.builtin.command: docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.yml config --list 2>/dev/null | head -5
+  register: compose_check
   changed_when: false
   failed_when: false
 
 - name: "Compose Gen | Deploy if compose file changed"
-  ansible.builtin.command: "docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.yml up -d"
-  when: compose_changed | default(false) | bool
-  notify: Wait for containers to be healthy
+  ansible.builtin.command: docker compose -f /home/mkanavi/docker/iacgenie/docker-compose.yml up -d
+  register: deploy_result
+  changed_when: yes
+  failed_when: false
 
 - name: "Compose Gen | Show deployment summary"
   ansible.builtin.debug:

@@ -148,7 +148,7 @@
 # =====================
 
 - name: "Keycloak | Verify Keycloak container is running"
-  ansible.builtin.command: "docker ps -a --filter 'name=iacgenie-keycloak' --format '{{ .Names }}'"
+  ansible.builtin.command: docker ps -a --filter 'name=iacgenie-keycloak'
   register: keycloak_status
   changed_when: false
   failed_when: false
