@@ -99,7 +99,7 @@ services:
       - no-new-privileges:true
     read_only: true
     tmpfs:
-      - /etc/pgbouncer
+      - /tmp
     volumes:
       - /home/mkanavi/docker/iacgenie/pgbouncer:/etc/pgbouncer
     deploy:
@@ -165,6 +165,7 @@ services:
     volumes:
       - {{ redis_data_dir | default('/home/mkanavi/docker/iacgenie/data/redis') }}:/data
       - ./templates/redis.conf:/etc/redis/redis.conf:ro
+      - ./templates/ca.crt:/etc/redis/tls/ca.crt:ro
       - ./templates/server.crt:/etc/redis/tls/server.crt:ro
       - ./templates/server.key:/etc/redis/tls/server.key:ro
       - ./templates/ca.crt:/etc/redis/tls/ca.crt:ro
@@ -556,8 +557,8 @@ services:
       MINIO_ACCESS_KEY: "${MINIO_ROOT_USER}"
       MINIO_SECRET_KEY: "${MINIO_ROOT_PASSWORD}"
       NSQD_ADDR: "nsqd:4150"
-      LIGHTSERP_PAGEZEN_API: "http://pagezen:8082"
       SEARXNG_URL: "http://searxng:8080"
+      LIGHTPANDA_BIN: /usr/local/bin/lightpanda
       LIGHTSERP_S3_BASE: "iacgenie-lightserp"
       REDIS_URL: "${REDIS_URL}"
       LIGHTSERP_API_SECRET: "${LIGHTSERP_API_SECRET}"
@@ -684,28 +685,6 @@ services:
   # =====================
   # PageZen
   # =====================
-  pagezen:
-    image: lightserp-pagezen:v1.0.0
-    container_name: iacgenie_pagezen
-    restart: unless-stopped
-    environment:
-      LIGHTSERP_API_URL: "http://lightserp-api:8000"
-      LIGHTSERP_API_SECRET: "${LIGHTSERP_API_SECRET}"
-    ports:
-      - "127.0.0.1:8081:8082"
-    networks:
-      - iacgenie-frontend
-    depends_on:
-      - lightserp-api
-    deploy:
-      resources:
-        limits:
-          memory: "{{ service_memory_defaults.pagezen }}"
-    logging:
-      driver: json-file
-      options:
-        max-size: "100m"
-        max-file: "3"
 
   # =====================
   # Logging Stack (Loki + Promtail)
@@ -894,37 +873,6 @@ services:
         max-size: "100m"
         max-file: "3"
 
-  # =====================
-  # PageGen (AI page generator)
-  # =====================
-  pagegen:
-    image: lightserp-pagegen:v1.0.0
-    container_name: iacgenie_pagegen
-    restart: unless-stopped
-    environment:
-      LIGHTSERP_API_URL: http://lightserp-api:8000
-      LIGHTSERP_API_SECRET: "${LIGHTSERP_API_SECRET}"
-    ports:
-      - "127.0.0.1:3032:3031"
-    networks:
-      - iacgenie-frontend
-    depends_on:
-      - lightserp-api
-    healthcheck:
-      test: ["CMD-SHELL", "exec 6<>/dev/tcp/127.0.0.1:3031 && exec 6>&-"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-    deploy:
-      resources:
-        limits:
-          memory: "{{ service_memory_defaults.pagegen }}"
-    logging:
-      driver: json-file
-      options:
-        max-size: "100m"
-        max-file: "3"
 
   # =====================
   # IacGenie Platform Frontend (React SPA) — proxy target: 3002

@@ -1,5 +1,15 @@
 ---
 # SearXNG role - Main entry point
+
+- name: "SearXNG | Deploy settings.yml"
+  ansible.builtin.template:
+    src: settings.yml.j2
+    dest: /home/mkanavi/docker/iacgenie/data/searxng/settings.yml
+    owner: mkanavi
+    group: mkanavi
+    mode: "0644"
+  notify: Reload docker compose
+
 - name: "SearXNG | Deploy environment file"
   ansible.builtin.template:
     src: .env.j2
@@ -10,7 +20,7 @@
   notify: Reload docker compose
 
 - name: "SearXNG | Verify SearXNG container is running"
-  ansible.builtin.command: docker ps -a --filter "name=iacgenie-searxng" --format "{{ '{{.Names}}' }}"
+  ansible.builtin.command: docker ps -a --filter "name=iacgenie-searxng" --format "{{ '{{.Names'}} }}"
   register: searxng_status
   changed_when: false
   failed_when: false

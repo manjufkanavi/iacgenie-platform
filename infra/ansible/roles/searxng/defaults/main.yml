@@ -1,2 +1,5 @@
 searxng_version: "latest"
 searxng_port: 8080
+searxng_secret_key: "CHANGE_ME_IN_VAULT"
+searxng_instance_name: "LightSERP SearXNG"
+searxng_default_lang: "en"

@@ -44,5 +44,5 @@ maxmemory-policy allkeys-lru
 # ACL (if supported)
 # user default on nopass ~* +@all
 
-# Security
-requirepass ${REDIS_PASSWORD}
+# Security — password from docker-compose environment variable
+requirepass "{{ lightserp_redis_password }}"

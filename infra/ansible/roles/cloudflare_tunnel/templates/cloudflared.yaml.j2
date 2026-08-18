@@ -49,9 +49,6 @@ ingress:
 {% elif svc_name == 'crowdsec' %}
   - hostname: crowdsec.iacgenie.com
     service: http://{{ cloudflared_origin_host }}:{{ cloudflared_origin_port }}
-{% elif svc_name == 'pagegen' %}
-  - hostname: pagegen.iacgenie.com
-    service: http://{{ cloudflared_origin_host }}:{{ cloudflared_origin_port }}
 {% endif %}
 {% endif %}
 {% endfor %}

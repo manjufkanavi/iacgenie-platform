@@ -1,0 +1,55 @@
+# SearXNG unified settings — managed by Ansible
+use_default_settings: true
+
+# Proxy configuration (Oxylabs free plan, country rotation)
+outgoing:
+  request_timeout: 3.0
+  pool_connections: 100
+  pool_maxsize: 20
+  enable_http2: true
+  proxies:
+    all://:
+      - http://customer-mkanavi_WYNlo-country-US:KszO8gBP_12x@dc.oxylabs.io:8000
+      - http://customer-mkanavi_WYNlo-country-GB:KszO8gBP_12x@dc.oxylabs.io:8000
+      - http://customer-mkanavi_WYNlo-country-DE:KszO8gBP_12x@dc.oxylabs.io:8000
+      - http://customer-mkanavi_WYNlo-country-FR:KszO8gBP_12x@dc.oxylabs.io:8000
+      - http://customer-mkanavi_WYNlo-country-JP:KszO8gBP_12x@dc.oxylabs.io:8000
+  extra_proxy_timeout: 10
+
+general:
+  instance_name: "{{ searxng_instance_name | default('LightSERP SearXNG') }}"
+  debug: false
+
+search:
+  safe_search: 0
+  autocomplete: "google"
+  default_lang: "{{ searxng_default_lang | default('en') }}"
+  formats:
+    - html
+    - json
+
+server:
+  port: {{ searxng_port | default(8080) }}
+  secret_key: "{{ searxng_secret_key | default('CHANGE_ME_IN_VAULT') }}"
+  limiter: false
+  image_proxy: true
+
+ui:
+  default_theme: simple
+  default_locale: en
+
+{% if searxng_engines is defined %}
+engines:
+{% for engine in searxng_engines %}
+  - name: {{ engine.name }}
+    engine: {{ engine.engine | default(engine.name) }}
+    shortcut: {{ engine.shortcut | default('') }}
+    disabled: {{ engine.disabled | default(false) }}
+{% endfor %}
+{% else %}
+engines:
+  - name: brave
+    engine: brave
+    shortcut: br
+    disabled: true
+{% endif %}

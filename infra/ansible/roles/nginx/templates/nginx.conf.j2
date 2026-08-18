@@ -72,6 +72,7 @@ http {
     limit_req_zone $binary_remote_addr zone=general:10m rate=10r/s;
     limit_req_zone $binary_remote_addr zone=auth:10m rate=3r/m;
     limit_req_zone $binary_remote_addr zone=api:10m rate=30r/s;
+    limit_req_zone $binary_remote_addr zone=introspection:10m rate=10r/s;
     limit_req_status 429;
 
     # SSL hardening defaults

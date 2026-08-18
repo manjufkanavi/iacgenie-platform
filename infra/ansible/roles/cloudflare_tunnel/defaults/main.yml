@@ -1,6 +1,6 @@
 ---
 cloudflared_version: "2025.6.0"
-cloudflared_tunnel_name: "iacgenie-tunnel"
+cloudflared_tunnel_name: "iacgenie-pi"
 cloudflared_account_tag: ""
 cloudflared_api_token: "CHANGE_ME_IN_VAULT"
 # Origin host for tunnel — use VM IP since Nginx is in host network mode
@@ -14,12 +14,10 @@ cloudflared_enabled_services:
   api: true           # api.iacgenie.com → LightSerp API
   app: true           # app.iacgenie.com → LightSerp WebUI
   gitea: true        # gitea.iacgenie.com → Gitea
-  page: true          # page.iacgenie.com → PageZen
   platform: true      # platform.iacgenie.com → IacGenie Platform
   lightserp: true     # lightserp.iacgenie.com → LightSerp
   vault: true         # vault.iacgenie.com → OpenBao
   grafana: true       # grafana.iacgenie.com → Grafana
   clamav: true        # clamav.iacgenie.com → ClamAV
   crowdsec: true      # crowdsec.iacgenie.com → CrowdSec
-  pagegen: true       # pagegen.iacgenie.com → PageGen
   catch_all: true     # *.iacgenie.com → 404

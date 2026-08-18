@@ -14,9 +14,69 @@
   ansible.builtin.debug:
     msg: "Skipping platform backend copy. Using pre-built container images."
 
+# --- Create required data directories ---
+- name: "Compose Gen | Ensure Redis data directory exists"
+  ansible.builtin.file:
+    path: /home/mkanavi/docker/iacgenie/data/redis
+    state: directory
+    owner: mkanavi
+    group: mkanavi
+    mode: "0755"
+
+- name: "Compose Gen | Ensure SearXNG data directory exists"
+  ansible.builtin.file:
+    path: /home/mkanavi/docker/iacgenie/data/searxng
+    state: directory
+    owner: mkanavi
+    group: mkanavi
+    mode: "0755"
+
+# --- Deploy service config templates to VM ---
+- name: "Compose Gen | Deploy Redis configuration"
+  ansible.builtin.template:
+    src: redis.conf.j2
+    dest: /home/mkanavi/docker/iacgenie/templates/redis.conf
+    owner: mkanavi
+    group: mkanavi
+    mode: "0644"
+
+- name: "Compose Gen | Deploy PgBouncer configuration"
+  ansible.builtin.template:
+    src: pgbouncer.ini.j2
+    dest: /home/mkanavi/docker/iacgenie/pgbouncer/pgbouncer.ini
+    owner: mkanavi
+    group: mkanavi
+    mode: "0644"
+
+- name: "Compose Gen | Ensure pgbouncer directory exists with correct perms"
+  ansible.builtin.file:
+    path: /home/mkanavi/docker/iacgenie/pgbouncer
+    state: directory
+    owner: mkanavi
+    group: mkanavi
+    mode: "0755"
+
+- name: "Compose Gen | Deploy PgBouncer userlist.txt with auth credentials"
+  ansible.builtin.lineinfile:
+    path: /home/mkanavi/docker/iacgenie/pgbouncer/userlist.txt
+    line: '"lightsrp" "{{ pg_root_password }}"'
+    owner: mkanavi
+    group: mkanavi
+    mode: "0644"
+
 # --- Clean up orphan containers not in compose ---
 - name: "Compose Gen | Remove unused nginx container (orphan)"
   ansible.builtin.command: docker rm -f iacgenie-nginx
+  changed_when: true
+  failed_when: false
+
+- name: "Compose Gen | Remove orphan pagezen container"
+  ansible.builtin.command: docker rm -f iacgenie_pagezen
+  changed_when: true
+  failed_when: false
+
+- name: "Compose Gen | Remove orphan pagegen container"
+  ansible.builtin.command: docker rm -f iacgenie_pagegen
   changed_when: true
   failed_when: false
 

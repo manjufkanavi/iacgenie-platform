@@ -13,10 +13,10 @@
     state: directory
     mode: "0755"
 
-- name: "Cloudflare | Deploy config.yml"
+- name: "Cloudflare | Deploy config.yml to .cloudflared directory"
   ansible.builtin.template:
     src: config.yml.j2
-    dest: "{{ cloudflared_config_dir | default('/home/mkanavi/docker/iacgenie/docker/cloudflared') }}/config.yml"
+    dest: /home/mkanavi/.cloudflared/config.yml
     owner: mkanavi
     group: mkanavi
     mode: "0644"
@@ -25,6 +25,21 @@
 - name: "Cloudflare | Ensure auth.json permissions are secure"
   ansible.builtin.file:
     path: "{{ cloudflared_credentials_file | default('/home/mkanavi/docker/iacgenie/docker/cloudflared/auth.json') }}"
+    owner: mkanavi
+    group: mkanavi
+    mode: "0600"
+  ignore_errors: true
+
+- name: "Cloudflare | Ensure cert.pem exists in .cloudflared directory"
+  ansible.builtin.file:
+    path: /home/mkanavi/.cloudflared/cert.pem
+    state: file
+  ignore_errors: true
+
+- name: "Cloudflare | Copy auth.json to .cloudflared for tunnel credentials"
+  ansible.builtin.copy:
+    src: "{{ cloudflared_credentials_file | default('/home/mkanavi/docker/iacgenie/docker/cloudflared/auth.json') }}"
+    dest: /home/mkanavi/.cloudflared/{{ cloudflared_tunnel_name | default('iacgenie-pi') }}.json
     owner: mkanavi
     group: mkanavi
     mode: "0600"
