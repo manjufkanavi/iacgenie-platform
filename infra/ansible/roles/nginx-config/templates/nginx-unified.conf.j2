@@ -5,35 +5,10 @@ map $http_upgrade $connection_upgrade {
     '' close;
 }
 
-# Rate limiting zones
-limit_req_zone $binary_remote_addr zone=general:10m rate=10r/s;
-limit_req_zone $binary_remote_addr zone=auth:10m rate=3r/m;
-limit_req_zone $binary_remote_addr zone=api:10m rate=30r/s;
+# Rate limiting — introspection zone not in nginx.conf, add here
 limit_req_zone $binary_remote_addr zone=introspection:10m rate=5r/s;
 
-# CORS headers
-map $request_method $cors_method_header {
-    OPTIONS 'GET, POST, PUT, DELETE, PATCH, OPTIONS';
-    default 'GET, POST, PUT, DELETE, PATCH';
-}
-
-# ====== Optimization: gzip compression ======
-gzip on;
-gzip_vary on;
-gzip_proxied any;
-gzip_comp_level 6;
-gzip_min_length 256;
-
-# ====== Optimization: proxy buffering ======
-proxy_buffering on;
-proxy_buffer_size 4k;
-
-# ====== Optimization: static asset caching ======
-map $sent_http_content_type $expires {
-    default                    off;
-}
-
-# ====== HTTP: Default redirect ======
+# ====== HTTP redirect (all traffic to HTTPS) ======
 server {
     listen 80 default_server;
     server_name _;
@@ -232,13 +207,7 @@ server {
     }
 }
 
-# Catch-all (must be last)
-server {
-    listen 80 default_server;
-    server_name _;
-    return 301 https://$host$request_uri;
-}
-
+# Catch-all (must be last) — HTTPS 404 for unknown hosts
 server {
     listen 443 ssl http2 default_server;
     server_name _;

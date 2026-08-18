@@ -13,7 +13,6 @@
 #   - MinIO (iacgenie-minio)
 #   - Keycloak (iacgenie-keycloak)
 #   - OpenBao (iacgenie-openbao)
-#   - PageZen (iacgenie-pagezen)
 #
 # After deployment:
 #   - API:     api.iacgenie.com → port 8000

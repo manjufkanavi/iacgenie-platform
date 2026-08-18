@@ -8,7 +8,7 @@ import { spawn } from 'child_process';
 import { log } from './logger.js';
 import type { ScrapeResult } from './types.js';
 
-const BIN = process.env.LIGHTPANDA_BIN || `${process.env.HOME}/bin/lightpanda`;
+const BIN = process.env.LIGHTPANDA_BIN || '/usr/local/bin/lightpanda';
 const MAX_CONCURRENT_SCRAPE = parseInt(process.env.MAX_CONCURRENT_SCRAPES || '10', 10);
 const CONCURRENCY_COUNTER: { current: number } = { current: 0 };
 const TO = parseInt(process.env.LIGHTPANDA_TIMEOUT_MS || '30000', 10);

@@ -51,7 +51,7 @@ export function getLightPandaHealth(): LightPandaHealth {
     available: lpAvailable,
     status: lpAvailable ? 'healthy' : 'unhealthy',
     lastCheck: new Date().toISOString(),
-    binary: process.env.LIGHTPANDA_BIN || `${process.env.HOME}/bin/lightpanda`,
+    binary: process.env.LIGHTPANDA_BIN || '/usr/local/bin/lightpanda',
     timeoutMs: parseInt(process.env.LIGHTPANDA_TIMEOUT_MS || '30000', 10),
     maxBytes: parseInt(process.env.LIGHTPANDA_MAX_BYTES || '65536', 10),
     metrics: getMetrics(),

@@ -26,11 +26,11 @@ const localEnv = {
   NSQD_URL: '127.0.0.1:8073',  // NSQD TCP port (4150 → 8073)
   NSQ_LOOKUPD_URL: '127.0.0.1:8072',  // NSQ Lookupd HTTP port (4161 → 8072)
   PROXY_URLS: '',
-  PAGEZEN_URL: 'http://127.0.0.1:8076',
+  // LightPanda native scraping — no PageZen HTTP service needed
+  LIGHTPANDA_BIN: '/usr/local/bin/lightpanda',
   JWT_SECRET: 'mcp-client-local-secret',
-  // Increase timeout for search operations
-  PAGEZEN_TIMEOUT: '30000',
-  PAGEZEN_HEALTH_INTERVAL: '60000',
+  // LightPanda native scraping config (no PageZen HTTP service)
+  LIGHTPANDA_TIMEOUT_MS: '30000',
 };
 
 const server = spawn('node', [LIGHTSERP_PATH], {

@@ -101,7 +101,6 @@ services:
     tmpfs:
       - /etc/pgbouncer
     volumes:
-      - /home/mkanavi/docker/iacgenie/pgbouncer/userlist.txt:/etc/pgbouncer/userlist.txt:ro
       - /home/mkanavi/docker/iacgenie/pgbouncer:/etc/pgbouncer
     deploy:
       resources:
@@ -132,7 +131,7 @@ services:
     depends_on:
       - postgres
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9187/metrics || exit 1"]
+      test: ["CMD-SHELL", "exec 6<>/dev/tcp/127.0.0.1/9187 && exec 6>&-"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -161,6 +160,7 @@ services:
     image: redis:7.2.4-alpine
     container_name: iacgenie_redis
     restart: unless-stopped
+    user: "0"
     command: redis-server /etc/redis/redis.conf
     volumes:
       - {{ redis_data_dir | default('/home/mkanavi/docker/iacgenie/data/redis') }}:/data
@@ -176,7 +176,7 @@ services:
     depends_on:
       - postgres
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a \"$REDIS_PASSWORD\" ping"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -226,7 +226,7 @@ services:
     depends_on:
       - redis
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9121/metrics || exit 1"]
+      test: ["CMD-SHELL", "exec 6<>/dev/tcp/127.0.0.1/9121 && exec 6>&-"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -361,7 +361,7 @@ services:
       - /home/mkanavi/docker/iacgenie/openbao_raft:/openbao/raft
       - /home/mkanavi/docker/iacgenie/data/openbao:/openbao/storage
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8200/v1/sys/health 2>&1"]
+      test: ["CMD-SHELL", "exec 6<>/dev/tcp/127.0.0.1/8200 && exec 6>&-"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -490,7 +490,7 @@ services:
     depends_on:
       - postgres
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null --spider http://127.0.0.1:3000/ || exit 1"]
+      test: ["CMD-SHELL", "exec 6<>/dev/tcp/127.0.0.1/3000 && exec 6>&-"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -515,7 +515,7 @@ services:
     container_name: iacgenie_auth_wrapper
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:9090/"]
+      test: ["CMD-SHELL", "exec 6<>/dev/tcp/127.0.0.1:9090 && exec 6>&-"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -576,7 +576,7 @@ services:
       - nsqd
       - searxng
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://127.0.0.1:3000/health || exit 1"]
+      test: ["CMD-SHELL", "exec 6<>/dev/tcp/127.0.0.1:3000 && exec 6>&-"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -605,7 +605,7 @@ services:
     depends_on:
       - lightserp-api
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3070/ || exit 1"]
+      test: ["CMD-SHELL", "exec 6<>/dev/tcp/127.0.0.1/3070 && exec 6>&-"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -637,7 +637,7 @@ services:
     networks:
       - iacgenie-frontend
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8080/"]
+      test: ["CMD-SHELL", "exec 6<>/dev/tcp/127.0.0.1/8080 && exec 6>&-"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -667,7 +667,7 @@ services:
     networks:
       - iacgenie-messaging
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:4151/ping || exit 1"]
+      test: ["CMD-SHELL", "exec 6<>/dev/tcp/127.0.0.1:4151 && exec 6>&-"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -849,7 +849,7 @@ services:
     depends_on:
       - clamav
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/ || exit 1"]
+      test: ["CMD-SHELL", "exec 6<>/dev/tcp/127.0.0.1:8080 && exec 6>&-"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -879,7 +879,7 @@ services:
       - ./data/crowdsec:/etc/crowdsec
       - ./data/crowdsec-db:/var/lib/crowdsec/data
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/health || exit 1"]
+      test: ["CMD-SHELL", "exec 6<>/dev/tcp/127.0.0.1:8080 && exec 6>&-"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -911,7 +911,7 @@ services:
     depends_on:
       - lightserp-api
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3031/health || exit 1"]
+      test: ["CMD-SHELL", "exec 6<>/dev/tcp/127.0.0.1:3031 && exec 6>&-"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -941,7 +941,7 @@ services:
     networks:
       - iacgenie-frontend
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:80/ || exit 1"]
+      test: ["CMD-SHELL", "exec 6<>/dev/tcp/127.0.0.1:80 && exec 6>&-"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -969,7 +969,7 @@ services:
     networks:
       - iacgenie-backend
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8000/docs || exit 1"]
+      test: ["CMD-SHELL", "exec 6<>/dev/tcp/127.0.0.1:8000 && exec 6>&-"]
       interval: 30s
       timeout: 10s
       retries: 3

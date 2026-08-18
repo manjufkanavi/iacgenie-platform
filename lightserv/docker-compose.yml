@@ -1,6 +1,8 @@
 # LightSerp — Docker Compose (Unified Infrastructure)
 #
-# Services: LightSerp MCP Server, Page Zen
+# Architecture: LightPanda headless browser runs as a native binary inside the
+# lightserp container, invoked via stdio JSON-RPC. No separate scraping service
+# is needed — scraping is baked into the MCP server process itself.
 #
 # Shared infrastructure provided by docker-compose-unified.yml:
 #   - PostgreSQL 15 (lightsrp schema, port 5432)
@@ -20,25 +22,10 @@
 name: lightserp-unified
 
 services:
-  # ── Page Zen (Content Extraction) ───────────────────────────────
-  # Port mapping: 127.0.0.1:8076:8082
-  pagezen:
-    build:
-      context: .
-      dockerfile: Dockerfile.pagezen
-    container_name: lightserp-pagezen
-    ports:
-      - "127.0.0.1:8076:8082"
-    environment:
-      - NODE_ENV=production
-    restart: unless-stopped
-    depends_on:
-      - lightserp
-    networks:
-      - lightserp-net
-      - unified_network
-
   # ── LightSerp MCP Server ────────────────────────────────────────
+  # Scraping: LightPanda headless binary runs natively inside this container.
+  # The lightpanda-scrape.ts module spawns `lightpanda mcp` via stdio JSON-RPC.
+  # No external scraping service required.
   # MCP on stdio, HTTP health on 127.0.0.1:3001
   lightserp:
     build: .
@@ -53,22 +40,27 @@ services:
       # Unified infrastructure service endpoints (Docker network)
       - SEARXNG_URL=http://searxng:8080/search?format=json
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/1
-      - DATABASE_URL=postgresql://lightsrp:${POSTGRES_LIGHTSERP_PASSWORD}@postgres:5432/lightsrp
+      - DATABASE_URL=postgresql://lightsrp:***@postgres:5432/lightsrp
       - NSQD_URL=nsqd:4150
       - NSQ_LOOKUPD_URL=nsqlookupd:4160
       - KEYCLOAK_URL=http://keycloak:8080/realms/unified
       - KEYCLOAK_CLIENT_ID=lightsrp
       - MINIO_ENDPOINT=http://minio:9000
       - MINIO_ACCESS_KEY=${MINIO_ROOT_USER}
-      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD}
+      - MINIO_SECRET_KEY=${MINI...ORD}
       - OPENBAO_ADDR=http://openbao:8200
-      - OPENBAO_TOKEN=${OPENBAO_TOKEN}
-      - PAGEZEN_URL=http://pagezen:8082
+      - OPENBAO_TOKEN=***
+      # LightPanda binary configuration (native, no HTTP service)
+      - LIGHTPANDA_BIN=/usr/local/bin/lightpanda
+      - MAX_CONCURRENT_SCRAPES=10
+      - LIGHTPANDA_TIMEOUT_MS=30000
+      - LIGHTPANDA_MAX_BYTES=65536
+      # Proxy configuration (optional, disabled by default)
       - PROXY_URLS=disabled
-      - JWT_SECRET=${JWT_SECRET}
+      # JWT secret for token generation
+      - JWT_SECRET=***
+      # Cache TTL for scraped content (seconds)
       - SCRAPING_CACHE_TTL=3600
-      - PAGEZEN_TIMEOUT=30000
-      - PAGEZEN_HEALTH_INTERVAL=60000
     depends_on:
       searxng:
         condition: service_healthy
@@ -76,8 +68,6 @@ services:
         condition: service_healthy
       nsqd:
         condition: service_healthy
-      pagezen:
-        condition: service_started
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]

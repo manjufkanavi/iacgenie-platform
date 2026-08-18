@@ -5,7 +5,7 @@
 #   - Redis (iacgenie-redis)
 #   - Keycloak (iacgenie-keycloak via Nginx auth.vhost)
 #
-# Own services: SearXNG, PageZen (build), lightserp-api, lightserp-webui
+# Own services: SearXNG, lightserp-api, lightserp-webui
 #
 # VM: 192.168.0.118  |  Domain: search.iacgenie.com
 # =========================================================
@@ -46,22 +46,6 @@ services:
       - NEXT_PUBLIC_CLIENT_ID=lightserp
     ports:
       - "127.0.0.1:3070:3070"
-    restart: unless-stopped
-    networks:
-      - lightserp-net
-
-  # =========================================================================
-  # PageZen — Content extraction (build from Dockerfile.pagezen)
-  # =========================================================================
-  pagezen:
-    build:
-      context: .
-      dockerfile: Dockerfile.pagezen
-    container_name: lightserp-pagezen
-    environment:
-      - PORT=8082
-    ports:
-      - "127.0.0.1:8076:8082"
     restart: unless-stopped
     networks:
       - lightserp-net

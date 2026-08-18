@@ -76,10 +76,9 @@ const localEnv = {
   NSQD_URL: 'http://127.0.0.1:8072',
   NSQ_LOOKUPD_URL: 'http://127.0.0.1:8074',
   PROXY_URLS: 'http://93.115.200.159:8001,http://93.115.200.158:8002,http://93.115.200.157:8003,http://93.115.200.156:8004,http://93.115.200.155:8005',
-  PAGEZEN_URL: 'http://127.0.0.1:8076',
+  // LightPanda native scraping — no PageZen HTTP service needed
+  LIGHTPANDA_BIN: '/usr/local/bin/lightpanda',
   JWT_SECRET: 'mcp-client-local-secret',
-  PAGEZEN_TIMEOUT: '30000',
-  PAGEZEN_HEALTH_INTERVAL: '60000',
 };
 
 function sendRequest(method, params) {

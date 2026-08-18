@@ -3,7 +3,7 @@
 # All passwords/secrets sourced from OpenBao at runtime
 
 # Cloudflare Tunnel config
-cloudflared_tunnel_name: "iacgenie-tunnel"
+cloudflared_tunnel_name: "iacgenie-pi"
 cloudflared_version: "2025.6.0"
 
 # Timezone

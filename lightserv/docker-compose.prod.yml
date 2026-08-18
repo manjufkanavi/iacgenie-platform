@@ -1,6 +1,9 @@
 # LightSerp — Docker Compose (Production — Unified Infrastructure)
 #
-# Services: LightSerp WebUI, MCP Server, PageZen, Rota, Prometheus, Grafana
+# Architecture: LightPanda headless browser runs natively inside the MCP/API containers.
+# No separate PageZen HTTP scraping service — scraping is via stdio JSON-RPC to LightPanda binary.
+#
+# Services: LightSerp WebUI, MCP Server (API), Rota, Prometheus, Grafana
 #
 # Shared infrastructure provided by docker-compose-unified.yml:
 #   - PostgreSQL 15 (lightsrp schema)
@@ -33,7 +36,7 @@ services:
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/1
       - KEYCLOAK_URL=http://keycloak:8080/realms/unified
       - KEYCLOAK_CLIENT_ID=lightsrp-web
-      - PAGEZEN_URL=http://pagezen:8082
+      # LightPanda is native to the API container — no HTTP scraping service needed
       - JWT_SECRET=${JWT_SECRET}
     depends_on:
       lightserp-api:
@@ -67,8 +70,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      pagezen:
-        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3071/health"]
@@ -76,29 +77,6 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
-    networks:
-      - lightserp-net
-      - unified_network
-
-  # ── PageZen (Content Extraction) ─────────────────────────────────────────
-  pagezen:
-    build:
-      context: .
-      dockerfile: Dockerfile.pagezen
-    container_name: lightserp-pagezen
-    ports:
-      - "127.0.0.1:8076:8082"
-    environment:
-      - NODE_ENV=production
-    restart: unless-stopped
-    depends_on:
-      lightserp-api:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8082/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
     networks:
       - lightserp-net
       - unified_network
@@ -121,7 +99,8 @@ services:
       - lightserp-net
       - unified_network
 
-  # ── MCP Server ───────────────────────────────────────────────────────────
+  # ── MCP Server (stdio transport) ─────────────────────────────────────────
+  # Scraping: LightPanda headless binary runs natively inside this container.
   mcp-server:
     build:
       context: .
@@ -135,7 +114,11 @@ services:
       - SEARXNG_URL=http://searxng:8080/search?format=json
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/1
       - NSQD_URL=nsqd:4150
-      - PAGEZEN_URL=http://pagezen:8082
+      # LightPanda native scraping — no PageZen HTTP service
+      - LIGHTPANDA_BIN=/usr/local/bin/lightpanda
+      - MAX_CONCURRENT_SCRAPES=10
+      - LIGHTPANDA_TIMEOUT_MS=30000
+      - LIGHTPANDA_MAX_BYTES=65536
       - KEYCLOAK_URL=http://keycloak:8080/realms/unified
     depends_on:
       searxng:

@@ -7,7 +7,7 @@ Self-hosted SERP (Search Engine Results Page) and content extraction MCP service
 - **MCP Server:** Node.js / TypeScript
 - **Gateway:** Go (Kono)
 - **Search:** SearXNG
-- **Scraper:** PageZen + LightPanda
+- **Scraper:** LightPanda (native stdio JSON-RPC)
 - **Cache:** Redis (with memory fallback)
 - **Queue:** NSQ (async job queuing)
 - **Auth:** a12n-server (OAuth2/OIDC) with JWT fallback
@@ -18,7 +18,7 @@ Self-hosted SERP (Search Engine Results Page) and content extraction MCP service
 3. **Redis** — Caching layer
 4. **NSQ** — Async job queue
 5. **a12n-server** — OAuth2/OIDC authentication
-6. **PageZen** — Web scraping and content extraction
+6. **LightPanda** — Headless browser for web scraping (native stdio JSON-RPC)
 
 ## Key Features
 - Privacy-focused web search via SearXNG
