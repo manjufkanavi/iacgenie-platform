@@ -1,8 +1,13 @@
-# LightSerp — Docker Compose (Unified Infrastructure)
+# LightSerp — Docker Compose (Unified Infrastructure v4.0)
 #
 # Architecture: LightPanda headless browser runs as a native binary inside the
 # lightserp container, invoked via stdio JSON-RPC. No separate scraping service
 # is needed — scraping is baked into the MCP server process itself.
+#
+# New in v4.0:
+#   - HTTP-based MCP transport (SSE) for remote client connections
+#   - Proxy rotation for search and scrape requests
+#   - Bound to 0.0.0.0 for external access via Cloudflare Tunnel
 #
 # Shared infrastructure provided by docker-compose-unified.yml:
 #   - PostgreSQL 15 (lightsrp schema, port 5432)
@@ -16,27 +21,29 @@
 # Run alongside unified stack:
 #   docker compose -f docker-compose-unified.yml -f docker-compose.yml up -d
 #
-# MCP server is exposed on stdio (for Claude Desktop, Cursor, etc.)
-# HTTP health endpoint: http://localhost:3001/health
+# MCP transports:
+#   - Stdio: stdin/stdout JSON-RPC (for local Claude Desktop, Cursor, etc.)
+#   - SSE:   http://<host>:7805/mcp (for remote HTTP-based MCP clients)
 
 name: lightserp-unified
 
 services:
   # ── LightSerp MCP Server ────────────────────────────────────────
-  # Scraping: LightPanda headless binary runs natively inside this container.
-  # The lightpanda-scrape.ts module spawns `lightpanda mcp` via stdio JSON-RPC.
-  # No external scraping service required.
-  # MCP on stdio, HTTP health on 127.0.0.1:3001
   lightserp:
     build: .
     container_name: lightserp-mcp
     ports:
-      - "127.0.0.1:3001:3001"
+      # HTTP health/API endpoint (also accessible via Cloudflare Tunnel)
+      - "0.0.0.0:3001:3001"
+      # MCP-over-SSE endpoint (HTTP-based MCP transport for remote clients)
+      - "0.0.0.0:7805:7805"
     env_file:
       - config/.env.api
     environment:
       - NODE_ENV=production
       - HTTP_PORT=3001
+      - HTTP_HOST=0.0.0.0
+      - MCP_SSE_PORT=7805
       # Unified infrastructure service endpoints (Docker network)
       - SEARXNG_URL=http://searxng:8080/search?format=json
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/1
@@ -47,7 +54,7 @@ services:
       - KEYCLOAK_CLIENT_ID=lightsrp
       - MINIO_ENDPOINT=http://minio:9000
       - MINIO_ACCESS_KEY=${MINIO_ROOT_USER}
-      - MINIO_SECRET_KEY=${MINI...ORD}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD}
       - OPENBAO_ADDR=http://openbao:8200
       - OPENBAO_TOKEN=***
       # LightPanda binary configuration (native, no HTTP service)
@@ -55,7 +62,10 @@ services:
       - MAX_CONCURRENT_SCRAPES=10
       - LIGHTPANDA_TIMEOUT_MS=30000
       - LIGHTPANDA_MAX_BYTES=65536
-      # Proxy configuration (optional, disabled by default)
+      # Proxy configuration (optional, comma-separated URLs)
+      # Examples:
+      #   - PROXY_URLS=http://proxy1:8080,http://proxy2:8080
+      #   - PROXY_URLS=http://user:pass@proxy:8080
       - PROXY_URLS=disabled
       # JWT secret for token generation
       - JWT_SECRET=***

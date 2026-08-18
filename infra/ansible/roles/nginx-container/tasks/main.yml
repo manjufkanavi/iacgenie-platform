@@ -1,0 +1,41 @@
+---
+# Nginx container role — deploy config and ensure container is running
+# Nginx runs as Docker container with network_mode: host
+# Config is generated into /home/mkanavi/docker/iacgenie/nginx/
+
+- name: "Nginx Container | Create config directories"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ nginx_config_dir }}"
+    - "{{ nginx_conf_d_dir }}"
+
+- name: "Nginx Container | Deploy base nginx.conf"
+  ansible.builtin.template:
+    src: nginx.conf.j2
+    dest: "{{ nginx_config_dir }}/nginx.conf"
+    mode: "0644"
+  notify: restart nginx container
+
+- name: "Nginx Container | Deploy vHost configuration"
+  ansible.builtin.template:
+    src: nginx-unified.conf.j2
+    dest: "{{ nginx_conf_d_dir }}/iacgenie.conf"
+    mode: "0644"
+  notify: restart nginx container
+
+- name: "Nginx Container | Remove stale host nginx configs"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/nginx/conf.d/iacgenie.conf
+    - /etc/nginx/nginx.conf
+  ignore_errors: true
+
+- name: "Nginx Container | Test container config"
+  ansible.builtin.command: docker exec {{ nginx_container_name }} nginx -t
+  changed_when: false
+  failed_when: false

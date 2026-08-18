@@ -1,12 +1,13 @@
 import http from 'http';
-import { log, httpLogger } from './logger.js';
-import { generateUuid } from './logger.js';
+import { log, httpLogger, generateUuid } from './logger.js';
 import { initializeCache } from './cache.js';
 import { initializeQueue } from './queue.js';
 import { handleApiRoutes } from './api-routes.js';
 import { getHealthStatus } from './health.js';
+import crypto from 'crypto';
 
-const PORT = process.env.HTTP_PORT ? parseInt(process.env.HTTP_PORT) : 3000;
+const PORT = process.env.HTTP_PORT ? parseInt(process.env.HTTP_PORT) : 3001;
+const BIND_HOST = process.env.HTTP_HOST || '0.0.0.0'; // Bind to all interfaces for external access
 
 export async function startHttpServer() {
   try {
@@ -16,14 +17,13 @@ export async function startHttpServer() {
     const server = http.createServer((req, res) => {
       httpLogger(req, res);
 
-      // Attach reqId for non-API routes
       const reqId = req.headers['x-request-id'] as string || generateUuid();
       (req as any).reqId = reqId;
       res.setHeader('X-Request-Id', reqId);
 
       // Handle API routes
       if (handleApiRoutes(req, res)) {
-        return; // API routes send their own response
+        return;
       }
 
       // Handle health check endpoints
@@ -44,8 +44,8 @@ export async function startHttpServer() {
 
     const listenPromise = new Promise<void>((resolve, reject) => {
       server.once('_bind_error', reject);
-      server.listen(PORT, () => {
-        log.info(`HTTP server listening on port ${PORT}`);
+      server.listen(PORT, BIND_HOST, () => {
+        log.info(`HTTP server listening on ${BIND_HOST}:${PORT}`);
         resolve();
       });
     });
@@ -55,6 +55,70 @@ export async function startHttpServer() {
   } catch (error) {
     log.error('Failed to start HTTP server', error);
     throw error;
+  }
+}
+
+/**
+ * Start the MCP-over-SSE server on a separate port.
+ * This allows MCP clients to connect via HTTP instead of stdio.
+ *
+ * @param requestHandler Custom request handler that returns true if it handled the request
+ */
+export async function startMcpsseServer(
+  requestHandler: (req: http.IncomingMessage, res: http.ServerResponse) => Promise<boolean> | boolean
+): Promise<http.Server | null> {
+  const MCP_PORT = parseInt(process.env.MCP_SSE_PORT || '7805');
+
+  try {
+    const server = http.createServer(async (req, res) => {
+      httpLogger(req, res);
+
+      const reqId = req.headers['x-request-id'] as string || generateUuid();
+      (req as any).reqId = reqId;
+      res.setHeader('X-Request-Id', reqId);
+
+      // Check for JWT auth on MCP endpoints
+      const authHeader = req.headers.authorization;
+      const mcpPath = req.url?.split('?')[0] || '';
+
+      if (mcpPath.startsWith('/mcp') && authHeader) {
+        const token = authHeader.replace('Bearer ', '');
+        try {
+          const { validateToken } = await import('./auth.js');
+          await validateToken(token);
+        } catch {
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Unauthorized', reqId }));
+          return;
+        }
+      }
+
+      // Pass to custom handler
+      const handled = await requestHandler(req, res);
+      if (handled) return;
+
+      // Default 404
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Not Found', reqId }));
+    });
+
+    server.on('error', (err) => {
+      log.warn(`MCP SSE server error: ${err.message}`);
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(MCP_PORT, '0.0.0.0', () => {
+        log.info(`MCP SSE server listening on 0.0.0.0:${MCP_PORT}`);
+        log.info(`MCP endpoint: http://0.0.0.0:${MCP_PORT}/mcp`);
+        resolve();
+      });
+    });
+
+    return server;
+  } catch (error) {
+    log.error('Failed to start MCP SSE server', error);
+    return null;
   }
 }
 
@@ -97,7 +161,9 @@ async function handleReadinessCheck(_req: http.IncomingMessage, res: http.Server
       dependencies: {
         cache: cacheStatus,
         queue: queueStatus,
-        searxng: process.env.SEARXNG_URL ? 'configured' : 'not_configured'
+        searxng: process.env.SEARXNG_URL ? 'configured' : 'not_configured',
+        proxy: process.env.PROXY_URLS ? 'configured' : 'not_configured',
+        mcpSse: process.env.MCP_SSE_PORT ? `port ${process.env.MCP_SSE_PORT}` : 'disabled',
       }
     };
 

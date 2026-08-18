@@ -2,6 +2,7 @@ import axios from "axios";
 import { getCachedSearch, setCachedSearch } from "./cache.js";
 import { SearchResult } from "./types.js";
 import { log } from "./logger.js";
+import { getProxyUrl, recordSuccess, recordFailure } from "./proxy.js";
 
 export type { SearchResult };
 
@@ -20,18 +21,71 @@ export async function search(query: string, limit?: number): Promise<SearchResul
 
     log.info(`🌐 Querying SearXNG for: "${query}"`);
 
-    const res = await axios.get(`${SEARXNG_URL}/search`, {
-      params: { q: query, format: 'json', categories: 'general' },
-      headers: { 'Accept': 'application/json' },
-      timeout: 15000,
-    });
+    // Try with proxy rotation
+    const proxyUrl = getProxyUrl();
+    let results: SearchResult[] = [];
+    let lastError: Error | null = null;
 
-    let results = res.data.results.map((r: any) => ({
-      title: r.title,
-      url: r.url,
-      snippet: r.content,
-      engine: r.engine || "unknown"
-    }));
+    if (proxyUrl) {
+      // Try with proxy first
+      try {
+        const proxyAxios = axios.create({
+          proxy: {
+            protocol: new URL(proxyUrl).protocol.replace(':', ''),
+            host: new URL(proxyUrl).hostname,
+            port: parseInt(new URL(proxyUrl).port || '8080'),
+            auth: new URL(proxyUrl).username ? {
+              username: new URL(proxyUrl).username,
+              password: new URL(proxyUrl).password,
+            } : undefined,
+          },
+          timeout: 15000,
+        });
+
+        const res = await proxyAxios.get(`${SEARXNG_URL}/search`, {
+          params: { q: query, format: 'json', categories: 'general' },
+          headers: { 'Accept': 'application/json' },
+          timeout: 15000,
+        });
+
+        results = res.data.results.map((r: any) => ({
+          title: r.title,
+          url: r.url,
+          snippet: r.content,
+          engine: r.engine || "unknown"
+        }));
+
+        recordSuccess(proxyUrl);
+        log.info(`✅ Search succeeded via proxy: ${proxyUrl}`);
+      } catch (proxyErr) {
+        lastError = proxyErr as Error;
+        recordFailure(proxyUrl);
+        log.warn(`⚠️ Proxy search failed: ${proxyErr.message}, trying direct`);
+      }
+    }
+
+    // Fallback to direct request if proxy failed or no proxy configured
+    if (results.length === 0) {
+      try {
+        const res = await axios.get(`${SEARXNG_URL}/search`, {
+          params: { q: query, format: 'json', categories: 'general' },
+          headers: { 'Accept': 'application/json' },
+          timeout: 15000,
+        });
+
+        results = res.data.results.map((r: any) => ({
+          title: r.title,
+          url: r.url,
+          snippet: r.content,
+          engine: r.engine || "unknown"
+        }));
+
+        log.info(`✅ Search succeeded via direct connection`);
+      } catch (directErr) {
+        lastError = directErr as Error;
+        log.error(`❌ Direct search also failed: ${directErr.message}`);
+      }
+    }
 
     // Apply limit
     if (limit && results.length > limit) {
@@ -40,7 +94,11 @@ export async function search(query: string, limit?: number): Promise<SearchResul
 
     if (results.length === 0) {
       log.warn(`⚠️ No search results for "${query}" — SearXNG may need configuration check`);
+      if (lastError) {
+        throw new Error(`Search failed: ${lastError.message}`);
+      }
     }
+
     log.info(`📊 Received ${results.length} search results for "${query}"`);
 
     // Cache the results

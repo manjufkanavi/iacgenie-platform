@@ -1,0 +1,44 @@
+---
+# Nginx container role defaults
+# Nginx runs as Docker container with network_mode: host
+# Config is generated into /home/mkanavi/docker/iacgenie/nginx/
+
+nginx_container_name: iacgenie-nginx
+nginx_container_image: nginx:1.27-alpine
+nginx_config_dir: /home/mkanavi/docker/iacgenie/nginx
+nginx_conf_d_dir: /home/mkanavi/docker/iacgenie/nginx/conf.d
+
+# Worker configuration
+nginx_worker_processes: auto
+nginx_worker_connections: 1024
+
+# Timeout settings
+nginx_keepalive_timeout: 65
+nginx_client_body_timeout: 30
+nginx_client_header_timeout: 30
+nginx_send_timeout: 30
+
+# Body size limits
+nginx_client_max_body_size: "10m"
+
+# Rate limiting zones
+nginx_rate_limit_general: "10r/s"
+nginx_rate_limit_auth: "3r/m"
+nginx_rate_limit_api: "30r/s"
+nginx_rate_limit_introspection: "5r/s"
+
+# SSL configuration
+nginx_ssl_protocols: "TLSv1.2 TLSv1.3"
+nginx_ssl_ciphers: "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384"
+nginx_ssl_prefer_server_ciphers: true
+nginx_ssl_session_cache: "shared:SSL:10m"
+nginx_ssl_session_timeout: "1d"
+nginx_ssl_session_tickets: false
+
+# Security settings
+nginx_server_tokens: false
+nginx_autoindex: false
+
+# TLS certificate paths (inside container — same as host via bind mount)
+ssl_certificate_path: /etc/letsencrypt/live/iacgenie.com/fullchain.pem
+ssl_certificate_key_path: /etc/letsencrypt/live/iacgenie.com/privkey.pem

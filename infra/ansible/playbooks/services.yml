@@ -67,7 +67,7 @@
     - role: pagezen
 
     # Phase 8: Edge & security
-    - role: nginx-config
+    - role: nginx-container
     - role: cloudflare_tunnel
     - role: backup
     - role: monitoring
@@ -91,8 +91,8 @@
       ansible.builtin.debug:
         var: compose_status.stdout
 
-    - name: "Services | Verify nginx is serving"
-      ansible.builtin.command: systemctl is-active nginx
+    - name: "Services | Verify nginx container is running"
+      ansible.builtin.command: docker inspect iacgenie-nginx --format '{{.State.Running}}'
       register: nginx_status
       changed_when: false
       failed_when: false

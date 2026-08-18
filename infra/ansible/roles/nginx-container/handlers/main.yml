@@ -1,0 +1,4 @@
+---
+- name: restart nginx container
+  ansible.builtin.command: docker restart {{ nginx_container_name }}
+  ignore_errors: true
