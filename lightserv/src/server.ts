@@ -84,7 +84,7 @@ try {
       if (!sessionId) {
         // Generate new session ID
         const { randomUUID } = await import('crypto');
-        const transport = new SSEServerTransport('/mcp/messages', res as http.ServerResponse);
+        const transport = new SSEServerTransport('/mcp/messages', res as any);
         const newSessionId = transport.sessionId;
         const mcpServer = new McpServer({
           name: "lightserp",
