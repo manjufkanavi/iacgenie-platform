@@ -582,7 +582,7 @@ services:
       - nsqd
       - searxng
     healthcheck:
-      test: ["CMD-SHELL", "exec 6<>/dev/tcp/127.0.0.1:3000 && exec 6>&-"]
+      test: ["CMD-SHELL", "exec 6<>/dev/tcp/127.0.0.1:3001 && exec 6>&-"]
       interval: 30s
       timeout: 10s
       retries: 3
