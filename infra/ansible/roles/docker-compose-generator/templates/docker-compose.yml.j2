@@ -566,8 +566,12 @@ services:
       LIGHTSERP_DATABASE_URL: "${LIGHTSERP_DATABASE_URL}"
       LIGHTSERP_KEYCLOAK_CLIENT_SECRET: "${LIGHTSERP_KEYCLOAK_CLIENT_SECRET}"
       DATABASE_URL: "${LIGHTSERP_DATABASE_URL}"
+      MAX_CONCURRENT_SCRAPES: "100"
+      ENABLE_MCP_SSE: "true"
+      MCP_SSE_PORT: "7805"
     ports:
       - "127.0.0.1:8000:3000"
+      - "127.0.0.1:7805:7805"
     networks:
       - iacgenie-frontend
       - iacgenie-backend

@@ -1,0 +1,9 @@
+{
+  "url": "https://aws.amazon.com/blogs/architecture/tag/performance-efficiency/",
+  "title": "",
+  "content": "## AWS Architecture Blog\n\n# Tag: performance efficiency\n\n## What\u2019s New in the Well-Architected Performance Efficiency Pillar?\n\nWe recently published a significant update to the AWS Well-Architected Framework, and as part of that update, the Performance Efficiency Pillar whitepaper has been streamlined and improved. The questions in the whitepaper are now better aligned with those in the AWS Well-Architected Tool, making it easy to cross-reference between them when reviewing workloads. With clearer [\u2026]",
+  "query": "site:aws.amazon.com/blogs/architecture performance efficiency AWS",
+  "scraped_at": "2026-08-19T02:03:18Z",
+  "content_hash": "64de40083f80cb1212d786858cccaab6",
+  "content_length": 506
+}

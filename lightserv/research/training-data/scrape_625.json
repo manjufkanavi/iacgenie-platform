@@ -1,0 +1,9 @@
+{
+  "url": "https://docs.aws.amazon.com/marketplace/latest/userguide/deploy-serverless-saas.html",
+  "title": "Deploy Serverless Saas",
+  "content": "# Deploying a serverless SaaS integration\n\nWhen you have a SaaS solution that you want to integrate with AWS Marketplace, you can use various architectural approaches for the integration.\n\nTo help you understand SaaS integration concepts, AWS provides a reference lab that demonstrates one approach using serverless architecture.\n\nAccess the reference lab: Integrate your SaaS with the Serverless SaaS Integration reference\n\n###### Note\n\nThis reference implementation is provided for learning and demonstration purposes only. It is not production-ready and should not be used as-is in production environments. Before implementing a similar solution in production, ensure you address security, scalability, monitoring, and compliance requirements specific to your use case.\n\nDocument Conventions\n\nIntegrating your SaaS contract-based product\n\nPlanning your SaaS product",
+  "query": "site:aws.amazon.com/marketplace serverless architecture example",
+  "scraped_at": "2026-08-19T02:04:55Z",
+  "content_hash": "194d30ea7becde78d547da57c0d0f0a5",
+  "content_length": 868
+}

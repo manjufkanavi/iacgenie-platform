@@ -60,7 +60,7 @@ export async function search(query: string, limit?: number): Promise<SearchResul
       } catch (proxyErr) {
         lastError = proxyErr as Error;
         recordFailure(proxyUrl);
-        log.warn(`⚠️ Proxy search failed: ${proxyErr.message}, trying direct`);
+        log.warn(`⚠️ Proxy search failed: ${(proxyErr as Error).message}, trying direct`);
       }
     }
 
@@ -83,7 +83,7 @@ export async function search(query: string, limit?: number): Promise<SearchResul
         log.info(`✅ Search succeeded via direct connection`);
       } catch (directErr) {
         lastError = directErr as Error;
-        log.error(`❌ Direct search also failed: ${directErr.message}`);
+        log.error(`❌ Direct search also failed: ${(directErr as Error).message}`);
       }
     }
 

@@ -59,7 +59,7 @@
 - name: "Compose Gen | Deploy PgBouncer userlist.txt with auth credentials"
   ansible.builtin.lineinfile:
     path: /home/mkanavi/docker/iacgenie/pgbouncer/userlist.txt
-    line: '"lightsrp" "{{ pg_root_password }}"'
+    line: '"lightsrp" "{{ pg_root_password | default(''CHANGE_ME'') }}"'
     owner: mkanavi
     group: mkanavi
     mode: "0644"

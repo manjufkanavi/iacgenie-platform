@@ -1,0 +1,7 @@
+[ERROR]: Task failed: Module failed: The command exited with a non-zero return code.
+Origin: <adhoc 'command' task>
+
+{'action': 'command', 'args': {'_raw_params': 'cat /home/mkanavi/docker/iacgenie/nginx/conf.d/iacgenie- [...]
+
+iacgenie-server | FAILED | rc=1 >>
+cat: /home/mkanavi/docker/iacgenie/nginx/conf.d/iacgenie-unified.conf: No such file or directoryThe command exited with a non-zero return code.

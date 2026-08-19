@@ -6,6 +6,6 @@
 
   roles:
     - role: openbao
-    - role: nginx
+    - role: nginx-container
     - role: cloudflare_tunnel
     - role: docker-compose-generator

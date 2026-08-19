@@ -1,0 +1,9 @@
+{
+  "url": "https://aws.amazon.com/solutions/case-studies/bmw-software-defined-vehicles/",
+  "title": "",
+  "content": "# The AWS Architecture Behind BMW Operating System 9: How the Cloud Supports the Latest in Customized In-Car Connectivity\n\n## Overview\n\nBMW Group\u2019s latest operating system\u2014Operating System 9\u2014delivers a new level of connected, personalized in-vehicle experience. But what sits behind the simple-to-use customized interface that BMW drivers see? To find out, Stefano Marzani, AWS worldwide technical lead for software-defined vehicles, talks to BMW Group connected vehicle platforms architect Philipp-Peter Altmann and Christian Mueller, principal solutions architect at AWS. Here, they discuss the AWS architecture that powers Operating System 9, and the easy web browser access that helps developers ensure customer experiences remain seamless.\n\n> Our desire for the project was to really innovate. To go beyond hardware development. [\u2026] We said we would like to make the technology, especially BMW Operating System 9, easily accessible to people. And that\u2019s where we said, we use the cloud.\n\nPhilipp-Peter Altmann\n\nConnected Vehicle Platforms Architect, BMW Group\n\n## Get Started\n\nOrganizations of all sizes across all industries are transforming their businesses and delivering on their missions every day using AWS. Contact our experts and start your own AWS journey today.\n\nContact Sales\n\n## Did you find what you were looking for today?\n\nLet us know so we can improve the quality of the content on our pages",
+  "query": "site:aws.amazon.com/solutions/case-studies production architecture",
+  "scraped_at": "2026-08-19T02:04:39Z",
+  "content_hash": "a5b93eef0779422c1e10296f550a8a85",
+  "content_length": 1412
+}

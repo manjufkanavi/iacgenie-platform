@@ -1,0 +1,9 @@
+{
+  "url": "https://aws.amazon.com/solutions/case-studies/deepset-generativeai/",
+  "title": "",
+  "content": "# Deepset Powers Production-Ready Generative AI on AWS with Open Source and Speed\n\n## Deepset and AWS\n\nDeepset uses AWS to support fast, production-ready deployments of generative AI. Its open-source Haystack framework and Deepset AI platform run fully on AWS, using services like Amazon Bedrock and Amazon SageMaker to power secure, scalable AI\u00a0infrastructure.\n\n> \"\"We've been partnering with AWS for quite some time because AWS is just the standard. With AWS, our customers are able to scale, grow their products and services, and we can bring our generative AI solutions into production within days.\"\n\nAnna Gr\u00fcndler\n\nSenior Director Strategy & Business Development, Deepset\n\n## Did you find what you were looking for today?\n\nLet us know so we can improve the quality of the content on our pages",
+  "query": "site:aws.amazon.com/solutions/case-studies production architecture",
+  "scraped_at": "2026-08-19T02:04:36Z",
+  "content_hash": "e4e1c11598ea0e8e6f5e417bee8c7099",
+  "content_length": 797
+}

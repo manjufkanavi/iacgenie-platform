@@ -70,14 +70,12 @@ try {
 }
 
 // Start MCP-over-SSE server (HTTP-based MCP transport for remote clients)
-let sseTransport: SSEServerTransport | null = null;
+let sseTransports: Record<string, SSEServerTransport> = {};
 let sseSessions: Record<string, McpServer> = {};
 let sseServer = null;
-const MCP_SESSIONS_PATH = '/mcp/sessions';
-const MCP_MESSAGES_PATH = '/mcp/messages';
 
 try {
-  sseServer = await startMcpsseServer(async (req) => {
+  sseServer = await startMcpsseServer(async (req, res) => {
     const url = new URL(req.url || '', `http://${req.headers.host}`);
     const sessionId = url.searchParams.get('sessionId');
 
@@ -85,8 +83,9 @@ try {
       // New SSE connection
       if (!sessionId) {
         // Generate new session ID
-        const newSessionId = require('crypto').randomUUID();
-        const transport = new SSEServerTransport(`/mcp/messages?sessionId=${newSessionId}`, req.res);
+        const { randomUUID } = await import('crypto');
+        const newSessionId = randomUUID();
+        const transport = new SSEServerTransport(`/mcp/messages?sessionId=${newSessionId}`, res);
         const mcpServer = new McpServer({
           name: "lightserp",
           version: "4.0.0",
@@ -96,32 +95,41 @@ try {
         // Re-register all tools on the new server instance
         registerToolsOnServer(mcpServer);
 
+        sseTransports[newSessionId] = transport;
         sseSessions[newSessionId] = mcpServer;
+
         await mcpServer.connect(transport);
 
-        req.res.writeHead(200, { 'Content-Type': 'text/event-stream' });
-        req.res.write(`event: endpoint\ndata: /mcp/messages?sessionId=${newSessionId}\n\n`);
-        req.res.write('event: open\ndata: connected\n\n');
+        res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+        res.write(`event: endpoint\ndata: /mcp/messages?sessionId=${newSessionId}\n\n`);
+        res.write('event: open\ndata: connected\n\n');
 
         // Clean up on disconnect
-        req.res.on('close', () => {
+        res.on('close', () => {
           delete sseSessions[newSessionId];
+          delete sseTransports[newSessionId];
           log.info(`SSE session ${newSessionId} disconnected`);
         });
+
+        return true;
+      } else {
+        // Handle reconnect if needed (not fully supported by basic SSEServerTransport without custom logic)
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Reconnect not implemented' }));
         return true;
       }
     }
 
-    if (req.method === 'POST' && url.pathname === `/mcp/messages` && sessionId && sseSessions[sessionId]) {
+    if (req.method === 'POST' && url.pathname === `/mcp/messages` && sessionId && sseTransports[sessionId]) {
       // Message for existing session
-      await sseSessions[sessionId].handlePostMessage(req, req.res);
+      await sseTransports[sessionId].handlePostMessage(req, res);
       return true;
     }
 
     return false;
   });
 } catch (e) {
-  log.info(`MCP SSE server not started: ${formatMcpError(e).text}`);
+  log.error('Failed to start MCP SSE server', e);
 }
 
 // ── Rate Limiters ────────────────────────────────────────────────────

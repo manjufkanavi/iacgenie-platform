@@ -108,7 +108,7 @@ export class OpenBaoClient {
     return `${this.mountPath}/metadata/${cleanPath}`;
   }
 
-  private getHeaders(): HeadersInit {
+  private getHeaders(): Record<string, string> {
     return {
       'X-Vault-Token': this.token,
       'Content-Type': 'application/json',
@@ -141,7 +141,7 @@ export class OpenBaoClient {
     }
 
     const json = await response.json();
-    return json?.data?.data || {};
+    return (json as any)?.data?.data || {};
   }
 
   /**
@@ -165,7 +165,7 @@ export class OpenBaoClient {
       throw new OpenBaoConnectionError(url, `HTTP ${response.status}: ${await response.text()}`);
     }
 
-    return response.json();
+    return response.json() as any;
   }
 
   /**
@@ -193,7 +193,7 @@ export class OpenBaoClient {
     }
 
     const json = await response.json();
-    return json?.data?.keys || [];
+    return (json as any)?.data?.keys || [];
   }
 
   /**
