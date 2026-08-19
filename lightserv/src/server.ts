@@ -100,9 +100,10 @@ try {
 
         await mcpServer.connect(transport);
 
-        res.writeHead(200, { 'Content-Type': 'text/event-stream' });
-        res.write(`event: endpoint\ndata: /mcp/messages?sessionId=${newSessionId}\n\n`);
-        res.write('event: open\ndata: connected\n\n');
+        // SSEServerTransport already writes headers and endpoint event
+        // res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+        // res.write(`event: endpoint\ndata: /mcp/messages?sessionId=${newSessionId}\n\n`);
+        // res.write('event: open\ndata: connected\n\n');
 
         // Clean up on disconnect
         res.on('close', () => {
