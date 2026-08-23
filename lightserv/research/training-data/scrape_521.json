@@ -1,9 +1,0 @@
-{
-  "url": "https://aws.amazon.com/architecture/back-to-basics/",
-  "title": "",
-  "content": "AWS Architecture Center\n\n* Video Series\n* All In Industry Series\n* Podcast\n* AWS Architecture Blog\n\n# Basic architectural building blocks and best practices\n\n'Back to Basics' is a video series that explains and examines basic cloud architecture pattern best practices. Each episode is hosted by an AWS SA (Solutions Architect) and focuses on a specific architectural building block independent of a specific cloud solution.\n\nSign in and start building\n\n## Watch | Back to Basics: Best Practices for Selecting Inference Options to Deploy SageMaker ML Models\n\nLearn how to choose the best Amazon SageMaker inferencing option for deploying your machine learning models based on your requirements like latency, throughput, payload size, and traffic patterns. Using a real-world fraud detection example, we'll walk through how to set up a SageMaker Real-Time Inference endpoint, make requests, and get predictions in real-time to meet low latency and high throughput needs.\n\nAdditional Resources:\n\n* Deploy Models for Inference\n\n## Videos\n\nLoading\n\nLoading\n\nLoading\n\nLoading\n\nLoading\n\n## Did you find what you were looking for today?\n\nLet us know so we can improve the quality of the content on our pages",
-  "query": "site:aws.amazon.com/architecture serverless architecture",
-  "scraped_at": "2026-08-19T01:56:58Z",
-  "content_hash": "d62401d7c6770a8a6a1cd7317e51d8fb",
-  "content_length": 1199
-}

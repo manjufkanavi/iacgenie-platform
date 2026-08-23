@@ -1,7 +1,0 @@
-{
-  "url": "https://docs.aws.amazon.com/wellarchitected/latest/framework/cost-optimization.html",
-  "title": "Cost optimization - AWS Well-Architected Framework",
-  "content": "Cost optimization - AWS Well-Architected Framework View a markdown version of this page Cost optimization - AWS Well-Architected Framework Documentation AWS Well-Architected Framework Cost optimization The Cost Optimization pillar includes the ability to run systems to deliver business value at the lowest price point. The cost optimization pillar provides an overview of design principles, best practices, and questions. You can find prescriptive guidance on implementation in the Cost Optimization Pillar whitepaper . Topics Design principles Definition Best practices Resources Javascript is disabled or is unavailable in your browser. To use the Amazon Web Services Documentation, Javascript must be enabled. Please refer to your browser's Help pages for instructions. Document Conventions Resources Design principles Did this page help you? - Yes Thanks for letting us know we're doing a good job! If you've got a moment, please tell us what we did right so we can do more of it. Did this page help you? - No Thanks for letting us know this page needs work. We're sorry we let you down. If you've got a moment, please tell us how we can make the documentation better.",
-  "contentLength": 1173,
-  "scrapedAt": "2026-06-16T15:32:48.440Z"
-}

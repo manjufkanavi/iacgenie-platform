@@ -1,7 +1,0 @@
-{
-  "url": "https://awstip.com/i-reviewed-100-production-systems-these-12-architecture-decisions-explain-who-became-senior-fast-66b78514803f",
-  "title": "I Reviewed 100+ Production Systems — These 12 Architecture Decisions Explain Who Became Senior Fast",
-  "content": "After analyzing real-world failures and scalable systems, one pattern was clear: the best engineers make the same architectural calls early.7 min readDec 25, 2025--Press enter or click to view image in full sizeSource: AuthorIntroduction — The Invisible Divide Between “Good” and “Great”I used to think being a good engineer was about writing clean, elegant code. I thought if I mastered algorithms, patterns, and frameworks, I’d naturally grow into a great engineer.But I learned the hard way: great engineers aren’t just better coders — they think differently. They make decisions that ripple across months, sometimes years. Their strength doesn’t come from writing the most lines of code, but from shaping systems that endure.I remember my first job where I built a feature in record time. It looked impressive. But six months later, when the company wanted to extend it, the whole thing collapsed under its own weight. My “brilliant” decisions had quietly set us up for failure.That was my first glimpse of the invisible divide between “good” and “great.” Good engineers focus on today. Great engineers design for tomorrow.",
-  "contentLength": 1127,
-  "scrapedAt": "2026-06-16T15:31:21.808Z"
-}
