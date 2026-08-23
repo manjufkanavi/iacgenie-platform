@@ -272,3 +272,19 @@ Sample recovery event:
 - [HOME-SERVER.md](./HOME-SERVER.md) — homeserver SSH setup
 - [INFRA-DESIGN.md](./INFRA-DESIGN.md) — full infrastructure overview
 - [DEPLOY.md](./DEPLOY.md) — deployment procedures
+
+### Fix 7 — Realtek USB Driver Tuning (rtw88_core / rtw88_usb)
+
+**Root Cause:**
+Kernel logs (`dmesg`) revealed hardware-level USB resets occurring under heavy network load (e.g., Docker image pulls):
+```
+[ 2847.690449] wlxe0ad4752659c: deauthenticating from 54:af:97:2c:fb:22 by local choice (Reason: 3=DEAUTH_LEAVING)
+[ 2848.650890] usb 1-8: reset high-speed USB device number 2 using xhci_hcd
+```
+This is a known issue with the `rtw88_8821cu` driver where USB 3.0 signaling causes 2.4GHz RF interference, and Deep Power State (LPS) causes firmware crashes.
+
+**Fix Applied (modprobe parameters):**
+- `/etc/modprobe.d/rtw88.conf`: `options rtw88_core disable_lps_deep=y` (Disable Deep PS)
+- `/etc/modprobe.d/rtw88_usb.conf`: `options rtw88_usb switch_usb_mode=N` (Force USB 2.0 to prevent 2.4GHz interference)
+
+These settings take effect on the next system reboot or module reload.

@@ -1,0 +1,347 @@
+networks:
+  coolify:
+    external: true
+  iacgenie-network:
+    driver: bridge
+    external: false
+    ipam:
+      config:
+      - subnet: 172.28.0.0/16
+services:
+  gitea:
+    container_name: iacgenie_gitea
+    depends_on:
+    - postgres
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    environment:
+      GITEA__database__DB_TYPE: postgres
+      GITEA__database__HOST: postgres:5432
+      GITEA__database__NAME: gitea
+      GITEA__database__PASSWORD: ${GITEA_DB_PASSWORD}
+      GITEA__database__USER: gitea
+      GITEA__mailer__ENABLED: 'true'
+      GITEA__mailer__FROM: ${SMTP_FROM}
+      GITEA__mailer__PASSWD: ${SMTP_PASS}
+      GITEA__mailer__SMTP_ADDR: ${SMTP_ADDR}
+      GITEA__mailer__SMTP_PORT: ${SMTP_PORT}
+      GITEA__mailer__USER: ${SMTP_USER}
+      GITEA__security__INSTALL_LOCK: 'true'
+      GITEA__service__DISABLE_REGISTRATION: 'false'
+      GITEA__service__ENABLE_NOTIFY_MAIL: 'true'
+      GITEA__service__REGISTER_EMAIL_CONFIRM: 'false'
+      USER: root
+    healthcheck:
+      interval: 30s
+      retries: 3
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://127.0.0.1:3000/
+      timeout: 10s
+    image: gitea/gitea:1.23.4-rootless
+    labels:
+    - traefik.enable=true
+    - traefik.http.routers.gitea.rule=Host(`gitea-prod.iacgenie.com`)
+    - traefik.http.services.gitea.loadbalancer.server.port=3000
+    - traefik.docker.network=coolify
+    networks:
+    - iacgenie-network
+    - coolify
+    ports:
+    - 127.0.0.1:3000:3000
+    - 127.0.0.1:2222:2222
+    restart: unless-stopped
+    volumes:
+    - gitea_data:/var/lib/gitea
+    - gitea_data:/etc/gitea
+  keycloak:
+    command: start --hostname-keycloak --http-enabled=true --http-port=8080 --db=postgres
+      --db-url-host=postgres --db-url-port=5432 --db-database=keycloak --db-username=keycloak
+      --db-password="${KC_DB_PASSWORD}"
+    container_name: iacgenie_keycloak
+    depends_on:
+    - postgres
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+    environment:
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER}
+      KC_DB: postgres
+      KC_DB_DATABASE: keycloak
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD}
+      KC_DB_URL_HOST: postgres
+      KC_DB_URL_PORT: 5432
+      KC_DB_USERNAME: keycloak
+      KC_HOSTNAME: auth.iacgenie.com
+      KC_PROXY: edge
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN_USER}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+    healthcheck:
+      interval: 30s
+      retries: 3
+      test:
+      - CMD-SHELL
+      - curl -f http://127.0.0.1:8080/health/ready || exit 1
+      timeout: 10s
+    image: quay.io/keycloak/keycloak:26.0
+    labels:
+    - traefik.enable=true
+    - traefik.http.routers.keycloak.rule=Host(`auth-prod.iacgenie.com`)
+    - traefik.http.services.keycloak.loadbalancer.server.port=8080
+    - traefik.docker.network=coolify
+    networks:
+    - iacgenie-network
+    - coolify
+    ports:
+    - 127.0.0.1:8080:8080
+    restart: unless-stopped
+    volumes:
+    - keycloak_data:/opt/keycloak/data
+  lightserp-api:
+    container_name: iacgenie_lightserp_api
+    depends_on:
+    - postgres
+    - minio
+    - nsqd
+    - searxng
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    environment:
+      DATABASE_URL: lightsrp@postgres:5432/lightsrp
+      LIGHTSERP_ALLOW_INSECURE: 'true'
+      LIGHTSERP_S3_BASE: iacgenie-lightserp
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_ENDPOINT: minio:9000
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      NSQD_ADDR: nsqd:4150
+      SEARXNG_URL: http://searxng:8080
+    image: mkanavi/lightserp-api:latest
+    labels:
+    - traefik.enable=true
+    - traefik.http.routers.lightserp-api.rule=Host(`api-prod.iacgenie.com`)
+    - traefik.http.services.lightserp-api.loadbalancer.server.port=8000
+    - traefik.docker.network=coolify
+    networks:
+    - iacgenie-network
+    - coolify
+    ports:
+    - 127.0.0.1:8000:8000
+    restart: unless-stopped
+  lightserp-webui:
+    container_name: iacgenie_lightserp_webui
+    depends_on:
+    - lightserp-api
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    image: mkanavi/lightserp-webui:latest
+    labels:
+    - traefik.enable=true
+    - traefik.http.routers.lightserp-webui.rule=Host(`lightserp-prod.iacgenie.com`)
+    - traefik.http.services.lightserp-webui.loadbalancer.server.port=3001
+    - traefik.docker.network=coolify
+    networks:
+    - iacgenie-network
+    - coolify
+    ports:
+    - 127.0.0.1:3001:3001
+    restart: unless-stopped
+  minio:
+    command: server /data --console-address ":9001"
+    container_name: iacgenie_minio
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+    environment:
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_ROOT_USER: iacgenie
+    healthcheck:
+      interval: 30s
+      retries: 3
+      test:
+      - CMD
+      - mc
+      - ready
+      - local
+      timeout: 10s
+    image: minio/minio:latest
+    networks:
+    - iacgenie-network
+    - coolify
+    ports:
+    - 127.0.0.1:9000:9000
+    - 127.0.0.1:9001:9001
+    restart: unless-stopped
+    volumes:
+    - minio_data:/data
+  nsqd:
+    command: nsqd --tcp-address=0.0.0.0 --http-address=0.0.0.0 --data-path=/nsq/data
+    container_name: iacgenie_nsqd
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+    image: nsqio/nsq:latest
+    networks:
+    - iacgenie-network
+    - coolify
+    ports:
+    - 127.0.0.1:4150:4150
+    - 127.0.0.1:4151:4151
+    restart: unless-stopped
+    volumes:
+    - nsqd_data:/nsq/data
+  openbao:
+    container_name: iacgenie_openbao
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    environment:
+      OPENBAO_ADDR: http://127.0.0.1:8200
+      OPENBAO_CLUSTER_ADDR: https://127.0.0.1:8201
+      OPENBAO_LOG_LEVEL: info
+      OPENBAO_STORAGE_PATH: /openbao/storage
+      OPENBAO_STORAGE_TYPE: raft
+      OPENBAO_UI: 'true'
+    healthcheck:
+      interval: 30s
+      retries: 3
+      test:
+      - CMD-SHELL
+      - curl -k -sf http://127.0.0.1:8200/v1/sys/health | python3 -c 'import sys,json;
+        d=json.load(sys.stdin); assert d["sealed"]==False or d["initialized"]==True'
+      timeout: 10s
+    image: openbao/openbao:2.6.0
+    labels:
+    - traefik.enable=true
+    - traefik.http.routers.openbao.rule=Host(`vault-prod.iacgenie.com`)
+    - traefik.http.services.openbao.loadbalancer.server.port=8200
+    - traefik.docker.network=coolify
+    networks:
+    - iacgenie-network
+    - coolify
+    ports:
+    - 127.0.0.1:8200:8200
+    - 127.0.0.1:8201:8201
+    restart: unless-stopped
+    volumes:
+    - openbao_data:/openbao/storage
+    - openbao_raft:/openbao/raft
+    - /etc/letsencrypt:/etc/letsencrypt
+  pagezen:
+    container_name: iacgenie_pagezen
+    depends_on:
+    - lightserp-api
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    environment:
+      LIGHTSERP_API_SECRET: ${LIGHTSERP_API_SECRET}
+      LIGHTSERP_API_URL: http://lightserp-api:8000
+    image: mkanavi/pagezen:latest
+    networks:
+    - iacgenie-network
+    - coolify
+    ports:
+    - 127.0.0.1:8082:8082
+    restart: unless-stopped
+  postgres:
+    container_name: iacgenie_postgres
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+    environment:
+      POSTGRES_DB: lightsrp
+      POSTGRES_PASSWORD: ${PG_ROOT_PASSWORD}
+      POSTGRES_USER: lightsrp
+    healthcheck:
+      interval: 30s
+      retries: 3
+      test:
+      - CMD-SHELL
+      - pg_isready -U lightsrp -d lightsrp
+      timeout: 10s
+    image: postgres:15-alpine
+    networks:
+    - iacgenie-network
+    - coolify
+    ports:
+    - 127.0.0.1:5432:5432
+    restart: unless-stopped
+    volumes:
+    - postgres_data:/var/lib/postgresql/data
+  redis:
+    command: redis-server --appendonly yes --maxmemory 2gb --maxmemory-policy allkeys-lru
+    container_name: iacgenie_redis
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    healthcheck:
+      interval: 30s
+      retries: 3
+      test:
+      - CMD
+      - redis-cli
+      - ping
+      timeout: 10s
+    image: redis:7-alpine
+    networks:
+    - iacgenie-network
+    - coolify
+    ports:
+    - 127.0.0.1:6379:6379
+    restart: unless-stopped
+    volumes:
+    - redis_data:/data
+  searxng:
+    container_name: iacgenie_searxng
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    environment:
+      SEARXNG_BASE_URL: http://search.iacgenie.com
+      SEARXNG_SECRET: ${SEARXNG_SECRET_KEY}
+    image: searxng/searxng:latest
+    labels:
+    - traefik.enable=true
+    - traefik.http.routers.searxng.rule=Host(`search-prod.iacgenie.com`)
+    - traefik.http.services.searxng.loadbalancer.server.port=8080
+    - traefik.docker.network=coolify
+    networks:
+    - iacgenie-network
+    - coolify
+    ports:
+    - 127.0.0.1:8080:8080
+    restart: unless-stopped
+volumes:
+  gitea_data:
+    driver: local
+  keycloak_data:
+    driver: local
+  minio_data:
+    driver: local
+  nsqd_data:
+    driver: local
+  openbao_data:
+    driver: local
+  openbao_raft:
+    driver: local
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
