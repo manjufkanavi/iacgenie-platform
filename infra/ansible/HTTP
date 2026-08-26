@@ -1,0 +1,15 @@
+Warning: Permanently added '192.168.0.118' (ED25519) to the list of known hosts.
+===== what listens on 8083 and 9003 (live server) =====
+LISTEN 0      4096       127.0.0.1:8083       0.0.0.0:*                                 
+
+===== keycloak container published ports (authoritative) =====
+{"8080/tcp":[{"HostIp":"127.0.0.1","HostPort":"8083"}]}
+
+===== direct test: keycloak on :8083 vs :9003 (via nginx container, host network) =====
+curl: option -: is unknown
+curl: try 'curl --help' or 'curl --manual' for more information
+curl: option -: is unknown
+curl: try 'curl --help' or 'curl --manual' for more information
+
+===== keycloak container logs: what HTTP port did it bind? =====
+2026-08-26 08:38:58,444 INFO  [io.quarkus] (main) Keycloak 26.0.8 on JVM (powered by Quarkus 3.15.1) started in 18.109s. Listening on: http://0.0.0.0:8080. Management interface listening on http://0.0.0.0:9000.

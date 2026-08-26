@@ -1,0 +1,15 @@
+---
+# TEMPORARY dry-run only — deleted immediately after use.
+# Focused: nginx-container + cloudflare_tunnel (config-generating roles only).
+# Read-only (--check --diff): shows what Ansible WOULD change on the live server.
+- hosts: all
+  become: true
+  serial: 1
+  gather_facts: false
+  tasks:
+    - name: "DRYRUN | nginx-container role"
+      ansible.builtin.include_role:
+        name: nginx-container
+    - name: "DRYRUN | cloudflare_tunnel role"
+      ansible.builtin.include_role:
+        name: cloudflare_tunnel

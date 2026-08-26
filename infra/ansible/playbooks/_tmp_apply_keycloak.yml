@@ -1,0 +1,19 @@
+---
+# TEMPORARY keycloak apply — targeted only:
+# Renders keycloak.conf (new hostname keycloak.iacgenie.com) + restarts the container.
+# Deliberately SKIPS the password-secret-file creation and the auth-wrapper
+# client-setup shell task (which needs OpenBao secrets and hangs).
+- hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: "KEYCLOAK APPLY | Deploy keycloak.conf (hostname keycloak.iacgenie.com)"
+      ansible.builtin.template:
+        src: /Users/manjunathkanavi/iacgenie-platform/infra/ansible/roles/keycloak/templates/keycloak.conf.j2
+        dest: /home/mkanvi/docker/iacgenie/keycloak.conf
+        owner: mkanavi
+        group: mkanavi
+        mode: "0644"
+    - name: "KEYCLOAK APPLY | Restart keycloak container"
+      ansible.builtin.command: docker restart iacgenie_keycloak
+      changed_when: true

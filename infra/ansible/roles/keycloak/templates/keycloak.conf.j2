@@ -28,9 +28,9 @@ proxy=edge
 proxy-headers=xforwarded
 
 # Hostname (external access via Cloudflare Tunnel)
-hostname={{ keycloak_hostname | default('https://auth.iacgenie.com') }}
-hostname-admin={{ keycloak_hostname | default('https://auth.iacgenie.com') }}
-hostname-admin-sts={{ keycloak_hostname | default('https://auth.iacgenie.com') }}
+hostname={{ keycloak_hostname | default('https://keycloak.iacgenie.com') }}
+hostname-admin={{ keycloak_hostname | default('https://keycloak.iacgenie.com') }}
+hostname-admin-sts={{ keycloak_hostname | default('https://keycloak.iacgenie.com') }}
 hostname-strict=false
 
 # =====================
