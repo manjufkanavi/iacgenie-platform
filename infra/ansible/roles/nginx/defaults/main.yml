@@ -7,6 +7,9 @@ nginx_ports:
   - 80
   - 443
 certbot_email: admin@iacgenie.com
+# When true, the systemd nginx service is disabled/stopped and the
+# container-based iacgenie-nginx (host network) is the runtime.
+use_container_based_infra: true
 
 # Worker configuration
 nginx_worker_processes: "auto"

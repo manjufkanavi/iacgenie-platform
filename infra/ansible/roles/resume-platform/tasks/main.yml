@@ -1,0 +1,26 @@
+---
+# Resume Platform — generate the nginx vHost served by the host-network
+# iacgenie-nginx container (which mounts nginx/conf.d read-only).
+
+- name: "Resume Platform | Ensure nginx conf.d directory exists"
+  ansible.builtin.file:
+    path: "{{ iacgenie_docker_dir }}/nginx/conf.d"
+    state: directory
+    owner: mkanavi
+    group: mkanavi
+    mode: "0755"
+
+- name: "Resume Platform | Render resume-platform.conf vHost"
+  ansible.builtin.template:
+    src: resume-platform.conf.j2
+    dest: "{{ iacgenie_docker_dir }}/nginx/conf.d/resume-platform.conf"
+    owner: mkanavi
+    group: mkanavi
+    mode: "0644"
+  notify: Reload nginx container
+
+- name: "Resume Platform | Remove stale vHost (if disabled)"
+  ansible.builtin.file:
+    path: "{{ iacgenie_docker_dir }}/nginx/conf.d/resume-platform.conf"
+    state: absent
+  when: not (resume_platform_enabled | default(true))

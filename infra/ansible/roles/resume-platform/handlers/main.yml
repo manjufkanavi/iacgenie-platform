@@ -1,0 +1,8 @@
+---
+# Reload the host-network nginx container after the resume-platform.conf vHost changes.
+# The container mounts nginx/conf.d read-only, so a file change is picked up on reload.
+
+- name: "Reload nginx container"
+  ansible.builtin.command: docker exec iacgenie-nginx nginx -s reload
+  failed_when: false
+  changed_when: false

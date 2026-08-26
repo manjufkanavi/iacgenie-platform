@@ -68,6 +68,7 @@
 
     # Phase 8: Edge & security
     - role: nginx-container
+    - role: resume-platform
     - role: cloudflare_tunnel
     - role: backup
     - role: monitoring

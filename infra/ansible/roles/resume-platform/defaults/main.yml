@@ -1,0 +1,8 @@
+---
+# defaults for the resume-platform role
+iacgenie_docker_dir: "/home/mkanavi/docker/iacgenie"
+resume_server_name: "resume.iacgenie.com"
+resume_api_port: 3006
+n8n_port: 3005
+letsencrypt_fullchain: "/etc/letsencrypt/live/iacgenie.com/fullchain.pem"
+letsencrypt_privkey: "/etc/letsencrypt/live/iacgenie.com/privkey.pem"

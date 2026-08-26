@@ -933,6 +933,86 @@ services:
         max-size: "100m"
         max-file: "3"
 
+  # =====================
+  # Resume Platform API (resume.iacgenie.com)
+  # Confidential Keycloak client + Keycloak SMTP email verification.
+  # Host-mapped to 127.0.0.1:3006 (served by host-network nginx container).
+  # =====================
+  resume-api:
+    build:
+      context: ../resume-platform/api
+      dockerfile: Dockerfile
+    container_name: iacgenie_resume_api
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://lightsrp:${PG_ROOT_PASSWORD}@postgres:5432/lightsrp
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD}
+      - MINIO_BUCKET=resume-files
+      - KEYCLOAK_URL=http://keycloak:8080
+      - KEYCLOAK_REALM=iacgenie
+      - KEYCLOAK_CLIENT_ID=resume-platform
+      - KEYCLOAK_CLIENT_SECRET=${RESUME_PLATFORM_CLIENT_SECRET}
+      # Skip auth-wrapper (unhealthy/port-mismatch); validate via Keycloak introspection directly.
+      - AUTH_WRAPPER_URL=
+      - API_SECRET=${RESUME_API_SECRET}
+      - ALLOWED_ORIGINS=https://resume.iacgenie.com
+      - OLLAMA_URL=http://127.0.0.1:11434
+      - OLLAMA_MODEL=qwen2.5:0.5b
+      - MAX_FILE_SIZE_MB=10
+    ports:
+      - "127.0.0.1:3006:3006"
+    networks:
+      - iacgenie-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: "512m"
+          cpus: "0.5"
+
+  # =====================
+  # Resume Platform n8n (pipeline: OCR -> ATS -> LLM)
+  # =====================
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: iacgenie_n8n
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    environment:
+      - N8N_HOST=0.0.0.0
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_DATABASE=lightsrp
+      - DB_POSTGRESDB_USER=lightsrp
+      - DB_POSTGRESDB_PASSWORD=${PG_ROOT_PASSWORD}
+      - EXECUTIONS_MODE=queue
+      - QUEUE_BULL_REDIS_HOST=redis
+      - QUEUE_BULL_REDIS_PORT=6379
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER}
+    ports:
+      - "127.0.0.1:3005:5678"
+    networks:
+      - iacgenie-backend
+    volumes:
+      - /home/mkanavi/docker/iacgenie/n8n/data:/home/node/.n8n
+    deploy:
+      resources:
+        limits:
+          memory: "1g"
+          cpus: "1.0"
+
 # =====================
 # Docker Network Segmentation (Phase 10.7)
 # =====================
