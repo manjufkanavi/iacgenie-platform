@@ -1,0 +1,105 @@
+---
+# Resume Platform role - initializes resume-platform infrastructure
+# Handles: MinIO bucket, PostgreSQL tables, Keycloak client, Ollama model
+
+# =====================
+# Initialize MinIO bucket
+# =====================
+
+- name: Create resume-files bucket in MinIO
+  ansible.builtin.command:
+    cmd: >
+      docker exec iacgenie_minio mc mb iacgenie/resume-files
+      --ignore-existing
+  register: mc_result
+  changed_when: "'Bucket created successfully' in mc_result.stdout"
+  failed_when: "'Bucket created successfully' not in mc_result.stdout and 'Bucket already exists' not in mc_result.stdout"
+
+# =====================
+# Initialize PostgreSQL tables
+# =====================
+
+- name: Create resume-platform tables in PostgreSQL
+  ansible.builtin.command:
+    cmd: >
+      docker exec iacgenie_postgres psql -U lightsrp
+      -d lightsrp
+      -c "{{ item }}"
+  loop:
+    - |
+      CREATE TABLE IF NOT EXISTS users (
+        id UUID PRIMARY KEY,
+        keycloak_id VARCHAR(255) UNIQUE NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        name VARCHAR(255),
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    - |
+      CREATE TABLE IF NOT EXISTS resumes (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        filename VARCHAR(500) NOT NULL,
+        file_type VARCHAR(50) NOT NULL,
+        file_size INTEGER NOT NULL DEFAULT 0,
+        minio_key VARCHAR(500) NOT NULL,
+        ocr_json JSONB DEFAULT '{}',
+        ats_score_json JSONB DEFAULT '{}',
+        improvements_json JSONB DEFAULT '{}',
+        status VARCHAR(20) DEFAULT 'pending',
+        job_title VARCHAR(255),
+        experience_years INTEGER,
+        error_message TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    - "CREATE INDEX IF NOT EXISTS idx_resumes_user ON resumes(user_id);"
+    - "CREATE INDEX IF NOT EXISTS idx_resumes_status ON resumes(status);"
+
+# =====================
+# Configure Keycloak resume-platform client
+# =====================
+
+- name: Check if resume-platform client exists in Keycloak
+  ansible.builtin.command:
+    cmd: >
+      curl -s -H "Authorization: Bearer {{ keycloak_admin_token | default('PLACEHOLDER') }}"
+      http://127.0.0.1:8083/admin/realms/iacgenie/clients/resume-platform 2>/dev/null
+      | grep -c "clientId" || echo "0"
+  register: kc_client_check
+  changed_when: false
+
+- name: Create resume-platform client in Keycloak (via admin API)
+  ansible.builtin.command:
+    cmd: >
+      curl -s -X POST http://127.0.0.1:8083/admin/realms/iacgenie/clients
+      -H "Authorization: Bearer {{ keycloak_admin_token | default('PLACEHOLDER') }}"
+      -H "Content-Type: application/json"
+      -d '{
+        "clientId": "resume-platform",
+        "name": "Resume Platform",
+        "enabled": true,
+        "clientAuthenticatorType": "client-secret",
+        "redirectUris": ["https://resume.iacgenie.com/*"],
+        "webOrigins": ["https://resume.iacgenie.com"],
+        "protocol": "openid-connect",
+        "standardFlowEnabled": true,
+        "implicitFlowEnabled": false,
+        "directAccessGrantsEnabled": false,
+        "serviceAccountsEnabled": false,
+        "publicClient": false,
+        "frontchannelLogout": true
+      }'
+  when: kc_client_check.stdout | int == 0
+  changed_when: true
+
+# =====================
+# Pull Ollama model
+# =====================
+
+- name: Pull Qwen2.5 0.5B model in Ollama
+  ansible.builtin.command:
+    cmd: docker exec ollama ollama pull qwen2.5:0.5b
+  register: ollama_pull
+  changed_when: "'Downloading' in ollama_pull.stdout or 'pulling manifest' in ollama_pull.stdout"
+  failed_when: false

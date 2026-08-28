@@ -311,3 +311,24 @@ keycloak_clients:
       - role_list
       - profile
       - email
+
+  # ── Resume Platform (Phase AUTH-0) ───────────────────────
+  - client_id: resume-platform
+    name: "Resume Platform Client"
+    enabled: true
+    clientAuthenticatorType: client-secret
+    redirectUris:
+      - "https://resume.iacgenie.com/*"
+      - "http://localhost:3070/*"
+    webOrigins:
+      - "+https://resume.iacgenie.com"
+      - "+http://localhost:3070"
+    standardFlowEnabled: true
+    implicitFlowEnabled: false
+    directAccessGrantsEnabled: true
+    serviceAccountsEnabled: false
+    consentRequired: false
+    protocol: openid-connect
+    defaultClientScopes:
+      - web-origins
+      - role_list

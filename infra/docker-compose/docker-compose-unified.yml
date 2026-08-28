@@ -839,7 +839,7 @@ services:
       SESSION_SECRET_FILE: /run/secrets/auth_wrapper_session_secret
       SERVICE_NAME: Auth-Wrapper
       SERVICE_TITLE: IaCGenie Services
-      SERVICE_BACKENDS: clamav:9092,pagegen:3032,crowdsec:3033,searxng:8084,default:9090
+      SERVICE_BACKENDS: clamav:9092,pagegen:3032,crowdsec:3033,searxng:8084,resume:3006,default:9090
       INSECURE_SKIP_VERIFY: 'false'
     secrets:
     - auth_wrapper_kc_secret
@@ -866,6 +866,107 @@ services:
     cap_drop:
     - ALL
     cap_add: []
+
+  # =====================
+  # Resume Platform API (FastAPI)
+  # =====================
+  resume-api:
+    build:
+      context: ../..
+      dockerfile: resume-platform/api/Dockerfile
+    container_name: iacgenie_resume_api
+    restart: unless-stopped
+    ports:
+    - 127.0.0.1:3006:3006
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD}
+      - KEYCLOAK_URL=http://keycloak:8080
+      - KEYCLOAK_REALM=iacgenie
+      - KEYCLOAK_CLIENT_ID=resume-platform
+      - KEYCLOAK_CLIENT_SECRET=${RESUME_PLATFORM_CLIENT_SECRET}
+      - AUTH_WRAPPER_URL=http://auth-wrapper:9096
+      - OLLAMA_URL=http://127.0.0.1:11434
+      - OLLAMA_MODEL=qwen2.5:0.5b
+      - API_SECRET=${RESUME_API_SECRET}
+      - MAX_FILE_SIZE_MB=10
+      - ALLOWED_ORIGINS=https://resume.iacgenie.com
+    depends_on:
+    - postgres
+    - minio
+    - keycloak
+    networks:
+    - iacgenie-backend
+    deploy:
+      resources:
+        limits:
+          memory: "512m"
+          cpus: "0.5"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3006/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # =====================
+  # n8n Workflow Engine
+  # =====================
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: iacgenie_n8n
+    restart: unless-stopped
+    ports:
+    - 127.0.0.1:3005:5678
+    environment:
+      - N8N_HOST=0.0.0.0
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - N8N_SECURE_COOKIE=false
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
+      - DB_POSTGRESDB_USER=${POSTGRES_USER}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_POSTGRESDB_PORT=5432
+      - EXECUTIONS_MODE=queue
+      - QUEUE_BULL_REDIS_HOST=redis
+      - QUEUE_BULL_REDIS_PORT=6379
+      - OLLAMA_URL=http://127.0.0.1:11434
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD}
+      - N8N_API_KEY=${RESUME_API_SECRET}
+    volumes:
+    - /home/mkanavi/docker/iacgenie/data/n8n:/home/node/.n8n
+    depends_on:
+    - postgres
+    - redis
+    - minio
+    networks:
+    - iacgenie-backend
+    deploy:
+      resources:
+        limits:
+          memory: "1g"
+          cpus: "1.0"
+    healthcheck:
+      test: ["CMD-SHELL", "exec 6<>/dev/tcp/127.0.0.1:5678 && exec 6>&-"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+
 networks:
   iacgenie-frontend:
     driver: bridge

@@ -1,0 +1,37 @@
+# Core
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+
+# Database
+sqlalchemy==2.0.36
+asyncpg==0.30.0
+alembic==1.14.0
+
+# Pydantic
+pydantic==2.10.3
+pydantic-settings==2.7.0
+
+# File handling
+python-docx==1.1.2
+pypdf==5.1.0
+Pillow==11.1.0
+
+# MinIO
+minio==7.2.13
+
+# Auth
+python-jose[cryptography]==3.3.0
+httpx==0.28.1
+
+# OCR
+surya-ocr==0.6.13
+torch==2.6.0
+opencv-python-headless==4.11.0.86
+
+# HTTP client for Ollama
+requests==2.32.3
+
+# Utilities
+python-dotenv==1.0.1
+aiofiles==24.1.0

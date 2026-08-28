@@ -4,10 +4,10 @@
 ---
 services:
   # =====================
-  # PostgreSQL 15 (hardened)
+  # PostgreSQL 17 (hardened)
   # =====================
   postgres:
-    image: postgres:15-alpine
+    image: postgres:17-alpine
     container_name: iacgenie_postgres
     restart: unless-stopped
     environment:

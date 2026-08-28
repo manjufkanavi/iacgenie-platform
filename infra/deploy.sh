@@ -14,8 +14,8 @@ set -euo pipefail
 
 # === Configuration ===
 ANSIBLE_DIR="$(cd "$(dirname "$0")" && pwd)/ansible"
-PLAYBOOK="$ANSIBLE_DIR/playbook.yml"
-INVENTORY="$ANSIBLE_DIR/inventory/hosts.yml"
+PLAYBOOK="$ANSIBLE_DIR/playbooks/site.yml"
+INVENTORY="$ANSIBLE_DIR/inventory/hosts.ini"
 SSH_USER="mkanavi"
 VM_IP="192.168.0.118"
 REMOTE_SCRIPT_DIR="/home/mkanavi/iacgenie-platform/infra"
@@ -88,7 +88,7 @@ run_ansible() {
     info "Running Ansible deployment..."
 
     local args=()
-    args+=("playbook.yml" "-i" "$INVENTORY")
+    args+=("playbooks/site.yml" "-i" "$INVENTORY")
 
     if [[ "$CHECK_MODE" == true ]]; then
         args+=("--check")

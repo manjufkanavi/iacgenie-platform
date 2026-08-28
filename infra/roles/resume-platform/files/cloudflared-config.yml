@@ -1,38 +1,56 @@
-tunnel: iacgenie-pi
-credentials-file: /etc/cloudflared/cert.json
+# =========================================================
+# Cloudflare Tunnel Configuration — IacGenie Unified
+# =========================================================
+# Token-based tunnel: 1291108a-4e8d-4439-9fa6-316be7da5f97
+# All *.iacgenie.com → nginx:80 (HTTP, nginx handles all vhost routing)
+# =========================================================
+
+tunnel: 1291108a-4e8d-4439-9fa6-316be7da5f97
+credentials-file: /etc/cloudflared/auth.json
 
 ingress:
+  # Keycloak (auth)
   - hostname: "auth.iacgenie.com"
     service: http://127.0.0.1:80
 
+  # Platform (platform)
   - hostname: "platform.iacgenie.com"
     service: http://127.0.0.1:80
 
+  # Base domain
   - hostname: "iacgenie.com"
     service: http://127.0.0.1:80
 
   - hostname: "www.iacgenie.com"
     service: http://127.0.0.1:80
 
+  # ClamAV (clamav)
   - hostname: "clamav.iacgenie.com"
     service: http://127.0.0.1:80
 
+  # CrowdSec (crowdsec)
   - hostname: "crowdsec.iacgenie.com"
     service: http://127.0.0.1:80
 
+  # PageGen (pagegen)
   - hostname: "pagegen.iacgenie.com"
     service: http://127.0.0.1:80
 
+  # Search (search)
   - hostname: "search.iacgenie.com"
     service: http://127.0.0.1:80
 
+  # Vault (vault)
   - hostname: "vault.iacgenie.com"
     service: http://127.0.0.1:80
 
+  # Resume Platform (resume)
   - hostname: "resume.iacgenie.com"
     service: http://127.0.0.1:80
 
+  # Catch all — route to nginx (handles all vhosts)
   - hostname: "*.iacgenie.com"
     service: http://127.0.0.1:80
 
+  # Default deny
   - service: http_status:404
