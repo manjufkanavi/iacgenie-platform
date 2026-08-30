@@ -1,7 +1,8 @@
 # Reverse-proxy config for the Kokoro TTS stack.
 # Deployed into a host-mode nginx container (network_mode: host) so it binds :80
-# and can reach the 3 kokoro replicas on 127.0.0.1:<host ports>.
-# Cloudflare tunnel routes *.iacgenie.com -> http://127.0.0.1:80 (this nginx).
+# Proxy config for the single Kokoro TTS replica. Deployed into a host-mode nginx
+# container (network_mode: host) so it binds :80 and can reach the kokoro replica
+# on 127.0.0.1:<host port>. Cloudflare tunnel routes *.iacgenie.com -> http://127.0.0.1:80 (this nginx).
 
 user  nginx;
 worker_processes  auto;
@@ -28,7 +29,7 @@ http {
     limit_req_zone $binary_remote_addr zone=kokoro_limit:10m rate={{ kokoro_rate_limit_zone }};
     limit_req_status 429;
 
-    # ---- Upstream: the N kokoro replicas (HA across replicas) ----
+    # ---- Upstream: the single kokoro replica (rate limited) ----
     upstream kokoro_backend {
 {% for i in range(kokoro_replicas) %}
         server 127.0.0.1:{{ (kokoro_host_port_start + i) }};

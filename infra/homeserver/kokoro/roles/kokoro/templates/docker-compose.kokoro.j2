@@ -1,5 +1,6 @@
 # Kokoro TTS stack — homeserver (192.168.0.116)
-# 3 replicas of hwdsl2/kokoro-server (native bearer-token auth via KOKORO_API_KEY)
+# Kokoro TTS stack — homeserver (192.168.0.116)
+# Single hwdsl2/kokoro-server container (native bearer-token auth via KOKORO_API_KEY)
 # + nginx reverse proxy with rate limiting. All backends bind 127.0.0.1 (security-first).
 # Cloudflare tunnel routes *.iacgenie.com -> http://127.0.0.1:80 (this nginx).
 
@@ -17,12 +18,14 @@ services:
       - kokoro-{{ i + 1 }}
 {% endfor %}
 
-  # ---- Kokoro TTS replicas (HA) ----
+  # ---- Kokoro TTS replica (HA) ----
 {% for i in range(kokoro_replicas) %}
   kokoro-{{ i + 1 }}:
     image: "{{ kokoro_image }}"
     container_name: "kokoro-{{ i + 1 }}"
-    network_mode: host
+    # Bridge mode; publish ONLY on 127.0.0.1 so the API is never exposed publicly.
+    # (network_mode: host would make Docker ignore this mapping and bind 0.0.0.0.)
+    # nginx (host-mode :80) proxies to 127.0.0.1:{{ (kokoro_host_port_start + i) }}.
     restart: unless-stopped
     ports:
       - "127.0.0.1:{{ (kokoro_host_port_start + i) }}:{{ kokoro_container_port }}"

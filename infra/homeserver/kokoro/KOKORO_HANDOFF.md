@@ -118,9 +118,9 @@ Expected: both print `*_OK` with paths under
   be wiped by `down` and re-created empty — defeating the offline cache. (A *previous*
   manual stack at `/home/mkanavi/docker/kokoro` used a volume; it predates the offline
   fix and is **not** what this role deploys.)
-- **`network_mode: host` + `127.0.0.1:<port>`** so nothing is exposed beyond loopback,
-  matching the security-first pattern of the other platforms. Cloudflare Tunnel routes
-  `*.iacgenie.com → http://127.0.0.1:80` (this nginx).
+|- **Bridge mode** publishes only on `127.0.0.1:<port>` so the API is never exposed
+  publicly (network_mode: host would bind `0.0.0.0`, defeating the loopback-only design).
+  Cloudflare Tunnel routes `*.iacgenie.com → http://127.0.0.1:80` (this nginx).
 - **No OpenBao dependency.** The role stores the generated API key at
   `/home/mkanavi/docker/kokoro/.api_key` (mode `0600`) and reuses it. OpenBao is not
   reachable from the homeserver, so auto-managing keys there would break offline deploys.

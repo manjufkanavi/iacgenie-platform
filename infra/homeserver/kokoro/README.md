@@ -1,18 +1,19 @@
 # Kokoro TTS — homeserver (192.168.0.116)
 
-Ansible-managed Kokoro TTS deployment: **3 HA replicas** of `hwdsl2/kokoro-server`
+Ansible-managed Kokoro TTS deployment: a **single** `hwdsl2/kokoro-server` container
 behind an nginx reverse proxy with **rate limiting** and native **API-key auth**.
 
 ## Architecture
 ```
 Cloudflare tunnel (127.0.0.1:80) → nginx proxy :80
   └─ limit_req (rate limited, per client IP)
-       └─ upstream kokoro_backend { 127.0.0.1:8881, :8882, :8883 }
-            └─ hwdsl2/kokoro-server ×3 (Bearer auth via KOKORO_API_KEY)
+       └─ upstream kokoro_backend { 127.0.0.1:8881 }
+            └─ hwdsl2/kokoro-server ×1 (Bearer auth via KOKORO_API_KEY)
 ```
 
-- **HA**: 3 replicas; nginx `upstream` load-balances. If one dies, traffic routes to the other two.
-- **Auth**: native `Authorization: Bearer <key>` enforced by hwdsl2/kokoro-server via the `KOKORO_API_KEY` env var.
+- **Single replica**: one `hwdsl2/kokoro-server` container. Set `kokoro_replicas: 3` in
+  defaults/main.yml to scale out (nginx load-balances across replicas).
+- **Auth**: native `Authorization: Bearer *** enforced by hwdsl2/kokoro-server via the `KOKORO_API_KEY` env var.
 - **Rate limiting**: nginx `limit_req_zone` (default 10r/s, burst 20).
 - **Just Docker**: single `docker-compose.yml`, no Kubernetes.
 
@@ -31,7 +32,7 @@ kokoro/
     │   └── teardown.yml     # remove stack + volumes
     ├── templates/
     │   ├── nginx.conf.j2        # reverse proxy + rate limiting + upstream
-    │   └── docker-compose.kokoro.j2  # 3 replicas + nginx
+    │   └── docker-compose.kokoro.j2  # single container + nginx
 ```
 
 ## Model cache (required before deploy)
@@ -90,7 +91,7 @@ ansible-playbook -i inventory.ini playbooks/teardown.yml
 
 ### Verify after deploy
 ```bash
-# On homeserver, check replicas + proxy:
+# On homeserver, check the container + proxy:
 docker ps --format '{{.Names}}\t{{.Status}}' | grep -i kokoro
 
 # Health check through the proxy:
@@ -111,14 +112,14 @@ for i in $(seq 1 50); do curl -s -o /dev/null -w "%{http_code}\n" \
 ## Tunables (defaults/main.yml)
 | Var | Default | Meaning |
 |-----|---------|---------|
-| `kokoro_replicas` | 3 | HA replica count |
+| `kokoro_replicas` | 1 | Replica count (set >1 to scale out; nginx load-balances) |
 | `kokoro_host_port_start` | 8881 | First host port (replicas get consecutive ports) |
 | `kokoro_rate_limit_zone` | 10r/s | Sustained rate per client IP |
 | `kokoro_rate_limit_burst` | 20 | Burst allowance (nodelay) |
 | `kokoro_voice` | im_nicola | Default voice |
 | `kokoro_speed` | 0.85 | Speech speed (matches user preference) |
-| `kokoro_cpu_limit` | 1.0 | CPU limit per replica |
-| `kokoro_mem_limit` | 512m | Memory limit per replica |
+| `kokoro_cpu_limit` | 1.0 | CPU limit per container |
+| `kokoro_mem_limit` | 2g | Memory limit per container (512m triggers OOM) |
 
 ## Notes
 - The host-downloaded model cache at `kokoro_model_cache_host_path` is bind-mounted;

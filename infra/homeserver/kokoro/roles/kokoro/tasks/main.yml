@@ -1,6 +1,6 @@
 ---
 # Kokoro TTS role — homeserver (192.168.0.116)
-# Deploys: 3x hwdsl2/kokoro-server (HA replicas, native bearer auth)
+# Deploys: single hwdsl2/kokoro-server container (native bearer auth)
 #        + nginx reverse proxy with rate limiting.
 # Self-contained: does NOT touch iacgenie-platform (newvm) stack.
 
@@ -101,7 +101,7 @@
     port: "{{ (kokoro_host_port_start + item) }}"
     timeout: 300
     delay: 5
-  loop: "{{ range(1, kokoro_replicas | int + 1) | list }}"
+  loop: "{{ range(0, kokoro_replicas | int) | list }}"
   loop_control:
     label: "port {{ (kokoro_host_port_start + item) }}"
 

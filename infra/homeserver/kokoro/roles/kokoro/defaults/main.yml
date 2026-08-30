@@ -1,16 +1,16 @@
 ---
 # Kokoro TTS deployment — homeserver (192.168.0.116)
-# Standalone, self-contained role: 3 replicas + nginx reverse proxy with rate limiting.
+# Standalone, self-contained role: single container + nginx reverse proxy with rate limiting.
 # Deploy or tear down via playbooks/deploy.yml / teardown.yml
 
-# ---- Replicas (HA within a single node — pod-level resilience + rolling updates) ----
-kokoro_replicas: 3
+# ---- Container (HA within a single node — pod-level resilience + rolling updates) ----
+kokoro_replicas: 1
 
 # ---- Image / ports ----
 kokoro_image: "hwdsl2/kokoro-server:latest"
 # Internal container HTTP port (fixed by image). Host ports are assigned sequentially.
 kokoro_container_port: 8880
-# First host port in the range (each replica gets consecutive ports).
+# First host port in the range (each container gets consecutive ports).
 kokoro_host_port_start: 8881
 
 # ---- Default voice / speed (tweak per user preference) ----
@@ -27,9 +27,9 @@ kokoro_api_key: ""
 kokoro_rate_limit_zone: "10r/s"    # sustained rate per client IP
 kokoro_rate_limit_burst: 20         # burst allowance (nodelay)
 
-# ---- Resource limits per replica ----
+# ---- Resource limits per container ----
 kokoro_cpu_limit: "1.0"
-kokoro_mem_limit: "512m"
+kokoro_mem_limit: "2g"   # torch + transformers need ~1.5-2GB to load; 512m triggers OOM kill
 
 # ---- Model cache (host bind mount, NOT a Docker volume) ----
 # Kokoro-82M is downloaded ON THE HOST via hfdl into this directory, then
