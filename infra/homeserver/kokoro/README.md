@@ -3,6 +3,10 @@
 Ansible-managed Kokoro TTS deployment: a **single** `hwdsl2/kokoro-server` container
 behind an nginx reverse proxy with **rate limiting** and native **API-key auth**.
 
+See [`USAGE.md`](./USAGE.md) for the full deployment architecture and API usage
+examples (voice list, models, error codes). See [`KOKORO_HANDOFF.md`](./KOKORO_HANDOFF.md)
+for offline/deploy internals.
+
 ## Architecture
 ```
 Cloudflare tunnel (127.0.0.1:80) → nginx proxy :80
