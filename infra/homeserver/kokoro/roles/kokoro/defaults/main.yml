@@ -4,7 +4,7 @@
 # Deploy or tear down via playbooks/deploy.yml / teardown.yml
 
 # ---- Container (HA within a single node — pod-level resilience + rolling updates) ----
-kokoro_replicas: 1
+kokoro_replicas: 5
 
 # ---- Image / ports ----
 kokoro_image: "hwdsl2/kokoro-server:latest"
