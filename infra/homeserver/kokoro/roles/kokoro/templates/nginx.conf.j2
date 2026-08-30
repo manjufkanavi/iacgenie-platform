@@ -1,0 +1,66 @@
+# Reverse-proxy config for the Kokoro TTS stack.
+# Deployed into a host-mode nginx container (network_mode: host) so it binds :80
+# and can reach the 3 kokoro replicas on 127.0.0.1:<host ports>.
+# Cloudflare tunnel routes *.iacgenie.com -> http://127.0.0.1:80 (this nginx).
+
+user  nginx;
+worker_processes  auto;
+error_log  /var/log/nginx/error.log warn;
+pid        /var/run/nginx.pid;
+
+events {
+    worker_connections  1024;
+}
+
+http {
+    include       /etc/nginx/mime.types;
+    default_type  application/octet-stream;
+
+    log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                    '$status $body_bytes_sent "$http_referer" '
+                    '"$http_user_agent"';
+    access_log  /var/log/nginx/access.log main;
+
+    sendfile        on;
+    keepalive_timeout  65;
+
+    # ---- Rate limiting: per client IP, sustained rate + burst (nodelay) ----
+    limit_req_zone $binary_remote_addr zone=kokoro_limit:10m rate={{ kokoro_rate_limit_zone }};
+    limit_req_status 429;
+
+    # ---- Upstream: the N kokoro replicas (HA across replicas) ----
+    upstream kokoro_backend {
+{% for i in range(kokoro_replicas) %}
+        server 127.0.0.1:{{ (kokoro_host_port_start + i) }};
+{% endfor %}
+    }
+
+    # ---- HTTP: accept all, rate limit + proxy to replicas ----
+    server {
+        listen 80 default_server;
+        listen [::]:80 default_server;
+        server_name _;
+
+        # Health endpoint (no rate limit) — Cloudflare/tunnel health checks land here.
+        location /health {
+            access_log off;
+            proxy_pass http://kokoro_backend/health;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        location / {
+            limit_req zone=kokoro_limit burst={{ kokoro_rate_limit_burst }} nodelay;
+            proxy_pass http://kokoro_backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+
+            # Bearer auth is enforced inside hwdsl2/kokoro-server (KOKORO_API_KEY),
+            # not at the proxy layer. Requests without a valid token get 401 from the replica.
+        }
+    }
+}

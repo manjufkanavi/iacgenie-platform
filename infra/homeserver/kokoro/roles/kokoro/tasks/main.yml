@@ -1,0 +1,115 @@
+---
+# Kokoro TTS role — homeserver (192.168.0.116)
+# Deploys: 3x hwdsl2/kokoro-server (HA replicas, native bearer auth)
+#        + nginx reverse proxy with rate limiting.
+# Self-contained: does NOT touch iacgenie-platform (newvm) stack.
+
+- name: "Kokoro | Create compose + nginx directories"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: mkanavi
+    group: mkanavi
+    mode: "0755"
+  loop:
+    - "{{ kokoro_compose_dir }}"
+    - "{{ kokoro_compose_dir }}/nginx"
+  loop_control:
+    label: "{{ item }}"
+
+# ── API key management (native to hwdsl2/kokoro-server) ─────────────────
+# Pass one explicitly via -e kokoro_api_key=... to pin a key. Otherwise,
+# the role generates a random 32-char key and stores it locally (0600)
+# for reuse across deploys. Local storage keeps this role self-contained
+# (no dependency on OpenBao, which is not reachable from homeserver).
+
+- name: "Kokoro | Read API key from local store if present"
+  ansible.builtin.command: cat "{{ kokoro_compose_dir }}/.api_key"
+  register: kokoro_local_apikey_file
+  changed_when: false
+  failed_when: false
+
+- name: "Kokoro | Set API key from local store"
+  ansible.builtin.set_fact:
+    kokoro_api_key: "{{ (kokoro_local_apikey_file.stdout | split('\n') | first).strip() }}"
+  when: >-
+    (kokoro_api_key | default('', true)) == '' and
+    (kokoro_local_apikey_file.rc | default(1) | int) == 0
+
+- name: "Kokoro | Generate API key if none set"
+  ansible.builtin.set_fact:
+    kokoro_api_key: "{{ lookup('ansible.builtin.password', '/dev/null length=32') }}"
+  when: (kokoro_api_key | default('', true)) == ''
+
+- name: "Kokoro | Store API key locally (0600) for reuse"
+  ansible.builtin.copy:
+    content: "{{ kokoro_api_key }}\n"
+    dest: "{{ kokoro_compose_dir }}/.api_key"
+    owner: mkanavi
+    group: mkanavi
+    mode: "0600"
+
+# ── Nginx reverse-proxy config (rate limited) ───────────────────────
+- name: "Kokoro | Deploy nginx.conf (rate-limited reverse proxy)"
+  ansible.builtin.template:
+    src: nginx.conf.j2
+    dest: "{{ kokoro_compose_dir }}/nginx/nginx.conf"
+    owner: mkanavi
+    group: mkanavi
+    mode: "0644"
+
+# ── Docker Compose file (idempotent) ───────────────────────────────
+- name: "Kokoro | Deploy docker-compose.yml"
+  ansible.builtin.template:
+    src: docker-compose.kokoro.j2
+    dest: "{{ kokoro_compose_dir }}/docker-compose.yml"
+    owner: mkanavi
+    group: mkanavi
+    mode: "0644"
+
+# ── Verify host model cache is present before deploy ───────────────────
+- name: "Kokoro | Check host model cache exists"
+  ansible.builtin.stat:
+    path: "{{ kokoro_model_cache_host_path }}"
+  register: kokoro_cache_stat
+
+- name: "Kokoro | Fail if model cache missing"
+  ansible.builtin.fail:
+    msg: >-
+      Model cache not found at {{ kokoro_model_cache_host_path }}.
+      Ensure the Kokoro-82M weights (kokoro-v1_0.pth, 327MB) are downloaded
+      on the host first (see README).
+
+  when: not kokoro_cache_stat.stat.exists
+
+# ── Bring up the stack (idempotent) ───────────────────────────────
+- name: "Kokoro | Pull images"
+  ansible.builtin.command: >-
+    docker compose -f {{ kokoro_compose_dir }}/docker-compose.yml pull --quiet=true
+  args:
+    chdir: "{{ kokoro_compose_dir }}"
+
+- name: "Kokoro | Start stack (up -d)"
+  ansible.builtin.command: >-
+    docker compose -f {{ kokoro_compose_dir }}/docker-compose.yml up -d
+  args:
+    chdir: "{{ kokoro_compose_dir }}"
+
+- name: "Kokoro | Wait for replicas to be reachable"
+  ansible.builtin.wait_for:
+    host: "127.0.0.1"
+    port: "{{ (kokoro_host_port_start + item) }}"
+    timeout: 300
+    delay: 5
+  loop: "{{ range(1, kokoro_replicas | int + 1) | list }}"
+  loop_control:
+    label: "port {{ (kokoro_host_port_start + item) }}"
+
+# ── Verification ───────────────────────────────────────────────
+- name: "Kokoro | Report stack status"
+  ansible.builtin.debug:
+    msg: >-
+      Kokoro TTS deployed: {{ kokoro_replicas }} replicas on ports
+      {{ (kokoro_host_port_start) }}-{{ (kokoro_host_port_start + kokoro_replicas | int - 1) }},
+      nginx proxy on :80, auth via KOKORO_API_KEY ({{ 'enabled' if kokoro_api_key | default('', true) != '' else 'disabled' }}),
+      rate limit {{ kokoro_rate_limit_zone }}, burst {{ kokoro_rate_limit_burst }}.

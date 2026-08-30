@@ -1,0 +1,12 @@
+---
+# Tear down the Kokoro TTS stack on homeserver (192.168.0.116).
+# Removes containers, compose file, and data volumes (persistent models).
+# Run from this directory:
+#   ansible-playbook -i inventory.ini playbooks/teardown.yml
+
+- name: Tear down Kokoro TTS on homeserver
+  hosts: kokoro-server
+  gather_facts: false
+  roles:
+    - role: kokoro
+      tasks_from: teardown.yml

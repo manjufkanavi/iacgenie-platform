@@ -1,0 +1,49 @@
+# Kokoro TTS stack — homeserver (192.168.0.116)
+# 3 replicas of hwdsl2/kokoro-server (native bearer-token auth via KOKORO_API_KEY)
+# + nginx reverse proxy with rate limiting. All backends bind 127.0.0.1 (security-first).
+# Cloudflare tunnel routes *.iacgenie.com -> http://127.0.0.1:80 (this nginx).
+
+services:
+  # ---- Nginx reverse proxy :80 -> kokoro replicas (rate limited) ----
+  nginx:
+    image: "nginx:1.27-alpine"
+    container_name: "{{ nginx_container_name }}"
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - "{{ kokoro_compose_dir }}/nginx/nginx.conf:/etc/nginx/nginx.conf:ro"
+    depends_on:
+{% for i in range(kokoro_replicas) %}
+      - kokoro-{{ i + 1 }}
+{% endfor %}
+
+  # ---- Kokoro TTS replicas (HA) ----
+{% for i in range(kokoro_replicas) %}
+  kokoro-{{ i + 1 }}:
+    image: "{{ kokoro_image }}"
+    container_name: "kokoro-{{ i + 1 }}"
+    network_mode: host
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:{{ (kokoro_host_port_start + i) }}:{{ kokoro_container_port }}"
+    environment:
+      KOKORO_VOICE: "{{ kokoro_voice }}"
+      KOKORO_SPEED: "{{ kokoro_speed }}"
+{% if kokoro_local_only | lower == 'true' %}
+      KOKORO_LOCAL_ONLY: "{{ kokoro_local_only }}"
+{% endif %}
+{% if kokoro_api_key %}
+      KOKORO_API_KEY: "{{ kokoro_api_key }}"
+{% endif %}
+    volumes:
+      # Bind-mount the host-downloaded model cache (offline load).
+      - "{{ kokoro_model_cache_host_path }}:{{ kokoro_model_cache_container_path }}"
+    deploy:
+      resources:
+        limits:
+          cpus: "{{ kokoro_cpu_limit }}"
+          memory: "{{ kokoro_mem_limit }}"
+{% endfor %}
+
+# Model cache is a host bind-mount (see each replica's volumes: above);
+# no named Docker volume is used.

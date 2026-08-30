@@ -1,0 +1,13 @@
+---
+# Deploy the Kokoro TTS stack on homeserver (192.168.0.116).
+# Run from this directory:
+#   ansible-playbook -i inventory.ini playbooks/deploy.yml
+# Optional overrides via -e, e.g.:
+#   ansible-playbook -i inventory.ini playbooks/deploy.yml \
+#     -e kokoro_api_key="your-pinned-key"
+
+- name: Deploy Kokoro TTS on homeserver
+  hosts: kokoro-server
+  gather_facts: false
+  roles:
+    - role: kokoro

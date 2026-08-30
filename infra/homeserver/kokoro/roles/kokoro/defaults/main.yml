@@ -1,0 +1,52 @@
+---
+# Kokoro TTS deployment — homeserver (192.168.0.116)
+# Standalone, self-contained role: 3 replicas + nginx reverse proxy with rate limiting.
+# Deploy or tear down via playbooks/deploy.yml / teardown.yml
+
+# ---- Replicas (HA within a single node — pod-level resilience + rolling updates) ----
+kokoro_replicas: 3
+
+# ---- Image / ports ----
+kokoro_image: "hwdsl2/kokoro-server:latest"
+# Internal container HTTP port (fixed by image). Host ports are assigned sequentially.
+kokoro_container_port: 8880
+# First host port in the range (each replica gets consecutive ports).
+kokoro_host_port_start: 8881
+
+# ---- Default voice / speed (tweak per user preference) ----
+kokoro_voice: "im_nicola"   # male Indian English (matches user's TTS preference)
+kokoro_speed: "0.85"
+
+# ---- API key auth (native to hwdsl2/kokoro-server) ----
+# Pass one explicitly via `-e kokoro_api_key=...` to pin a key.
+# Otherwise it is auto-managed: read from OpenBao (kokoro/api_key), or
+# generated and stored there on first deploy. Leave empty for auto-manage.
+kokoro_api_key: ""
+
+# ---- Rate limiting (nginx limit_req) ----
+kokoro_rate_limit_zone: "10r/s"    # sustained rate per client IP
+kokoro_rate_limit_burst: 20         # burst allowance (nodelay)
+
+# ---- Resource limits per replica ----
+kokoro_cpu_limit: "1.0"
+kokoro_mem_limit: "512m"
+
+# ---- Model cache (host bind mount, NOT a Docker volume) ----
+# Kokoro-82M is downloaded ON THE HOST via hfdl into this directory, then
+# bind-mounted into the container at /var/lib/kokoro. This is required for
+# offline (KOKORO_LOCAL_ONLY) model loading — the image does not ship weights.
+kokoro_local_only: "true"
+# Complete HF cache lives here (blobs/, refs/main [no trailing newline], snapshots/<hash>/).
+# hfdl creates this directory automatically under --directory as models--hexgrad--Kokoro-82M.
+kokoro_model_cache_host_path: "/home/mkanavi/kokoro_hub/hub/models--hexgrad--Kokoro-82M"
+# HF cache path inside the container. The image sets HF_HUB_CACHE=/var/lib/kokoro/hub
+# and expects the repo at <hub>/models--hexgrad--Kokoro-82M, so bind-mount the
+# host Kokoro-82M dir (blobs/refs/snapshots) to that exact location.
+kokoro_model_cache_container_path: "/var/lib/kokoro/hub/models--hexgrad--Kokoro-82M"
+
+# ---- Nginx reverse-proxy container ----
+nginx_container_name: "kokoro-nginx"
+nginx_image: "nginx:1.27-alpine"
+
+# ---- Docker compose file location on homeserver ----
+kokoro_compose_dir: "/home/mkanavi/docker/kokoro"
