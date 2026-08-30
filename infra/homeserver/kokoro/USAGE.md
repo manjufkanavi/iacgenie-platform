@@ -95,8 +95,19 @@ rate returns `429 Too Many Requests`.
 
 ## 3. API Usage Examples
 
-All examples target the **proxy** at `http://127.0.0.1:80` (or the Cloudflare URL
-`https://*.iacgenie.com`). The proxy forwards to `kokoro-1:8881`.
+Every endpoint below works **both** locally (proxy on `http://127.0.0.1:80`) and
+over the public Internet (Cloudflare Tunnel at `https://kokoro.iacgenie.com`). The
+examples below use the public HTTPS endpoint; swap `https://kokoro.iacgenie.com` for
+`http://127.0.0.1:80` to run them against the local proxy instead.
+
+```bash
+BASE="https://kokoro.iacgenie.com"        # public (Cloudflare Tunnel)
+# BASE="http://127.0.0.1:80"              # local proxy on the homeserver
+KEY=$(cat /home/mkanavi/docker/kokoro/.api_key)   # or: KEY="your-pinned-key"
+```
+
+> **Verified** (2026-08-31): `GET /health` → 200, and `POST /v1/audio/speech`
+> (voice `af_heart`) → 200 with a valid MP3 over public HTTPS.
 
 ### 3.0 Prerequisites — obtain the API key
 
@@ -116,17 +127,17 @@ echo "key length: ${#KEY}"   # 32 chars for a random key
 > **Security:** never paste this value into chat, logs, or commit it. It grants
 > full API access to the TTS engine.
 
-### 3.1 List available voices
+### 3.1 List available voices (public endpoint)
 
 ```bash
-curl -s http://127.0.0.1/v1/voices \
-  -H "Authorization: Bearer ${KEY}" | jq '.voices[]'
+curl -s https://kokoro.iacgenie.com/v1/voices \
+  -H "Authorization: Bearer $KEY" | jq '.voices[]'
 ```
 
 **Response (verified):** a JSON array of `{"id", "description"}` objects. Full list:
 
-| Voice ID | Description |
-|----------|-------------|
+| Voice ID | Description (language) |
+|----------|------------------------|
 | `af_heart` | American female — warm, natural (**recommended default**) |
 | `af_aoede` | American female |
 | `af_bella` | American female — expressive |
@@ -153,25 +164,23 @@ curl -s http://127.0.0.1/v1/voices \
 | `im_nicola` | **Italian male** (matches user preference) |
 | `pf_dora` | Brazilian Portuguese female |
 
-> See [`KOKORO_HANDOFF.md`](./KOKORO_HANDOFF.md) for the complete voice inventory.
-
-### 3.2 List available models
+### 3.2 List available models (public endpoint)
 
 ```bash
-curl -s http://127.0.0.1/v1/models \
-  -H "Authorization: Bearer ${KEY}" | jq '.data[].id'
+curl -s https://kokoro.iacgenie.com/v1/models \
+  -H "Authorization: Bearer $KEY" | jq '.data[].id'
 ```
 
 **Verified models:** `tts-1`, `tts-1-hd`, `kokoro`.
 
-### 3.3 Basic speech synthesis (minimum)
+### 3.3 Basic speech synthesis (public endpoint)
 
 ```bash
-curl -s http://127.0.0.1/v1/audio/speech \
-  -H "Authorization: Bearer ${KEY}" \
+curl -s https://kokoro.iacgenie.com/v1/audio/speech \
+  -H "Authorization: Bearer $KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "tts-1",
+    "model": "kokoro",
     "input": "Hello world. This is a test.",
     "voice": "af_heart"
   }' -o /tmp/test.mp3
@@ -184,26 +193,18 @@ file /tmp/test.mp3   # → MPEG audio (or WAV), valid file
 The `speed` parameter (0.25–4.0) controls speech rate and is supported:
 
 ```bash
-curl -s http://127.0.0.1/v1/audio/speech \
-  -H "Authorization: Bearer ${KEY}" \
+curl -s https://kokoro.iacgenie.com/v1/audio/speech \
+  -H "Authorization: Bearer $KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "tts-1",
+    "model": "kokoro",
     "input": "This speech will be read slower.",
     "voice": "af_heart",
     "speed": 0.85
   }' -o /tmp/slow.mp3
 
 # Verify speed was accepted (HTTP 200, valid audio):
-curl -s http://127.0.0.1/v1/audio/speech \
-  -H "Authorization: Bearer ${KEY}" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "tts-1",
-    "input": "This speech will be read slower.",
-    "voice": "af_heart",
-    "speed": 0.85
-  }' -o /tmp/slow.mp3 && file /tmp/slow.mp3
+file /tmp/slow.mp3
 
 # Expected: HTTP 200, valid audio (b'ID3...' header), ~7 KB for short text
 ```
@@ -213,12 +214,12 @@ curl -s http://127.0.0.1/v1/audio/speech \
 For load balancers / health probes:
 
 ```bash
-curl -s http://127.0.0.1/health   # → {"status":"ok","engine":"kokoro"}
+curl -s https://kokoro.iacgenie.com/health   # → {"status":"ok","engine":"kokoro"}
 ```
 
 > `/health` is exempt from rate limiting and does **not** require the bearer token.
 
-### 3.6 Error handling examples
+### 3.6 Error handling examples (public endpoint)
 
 | Scenario | HTTP code | Response body (`jq .detail`) |
 |----------|-----------|------------------------------|
@@ -229,18 +230,116 @@ curl -s http://127.0.0.1/health   # → {"status":"ok","engine":"kokoro"}
 
 ```bash
 # Confirm 401 without a key:
-curl -s http://127.0.0.1/v1/audio/speech \
+curl -s https://kokoro.iacgenie.com/v1/audio/speech \
   -H "Content-Type: application/json" \
   -d '{"input":"no key","voice":"af_heart"}'
 
 # Confirm 429 with a rapid burst loop (default rate limit):
 for i in $(seq 1 50); do
   curl -s -o /dev/null -w "%{http_code}\n" \
-    http://127.0.0.1/v1/audio/speech \
-    -H "Authorization: Bearer ${KEY}" \
+    https://kokoro.iacgenie.com/v1/audio/speech \
+    -H "Authorization: Bearer $KEY" \
     -d '{"input":"x","voice":"af_heart"}' | sort | uniq -c
 done
 # → mostly 200s, then a run of 429s once burst is exhausted
+```
+
+### 3.7 Voice language reference (all languages)
+
+Kokoro-82M is a multilingual model. Voices are tagged by language and gender:
+
+| Language | Female voices | Male voices |
+|----------|----------------|-------------|
+| **American English** | `af_heart`, `af_aoede`, `af_bella`, `af_jessica`, `af_kore`, `af_nicole`, `af_nova`, `af_river`, `af_sarah`, `af_sky` | `am_adam`, `am_michael`, `am_echo`, `am_eric`, `am_fenrir`, `am_liam`, `am_onyx` |
+| **British English** | — | `bm_george` |
+| **Japanese** | `jf_alpha` | `jm_kumo` |
+| **Mandarin Chinese** | `zf_xiaobei` | `zm_yunxi` |
+| **Italian** | `if_sara` | `im_nicola` |
+| **Brazilian Portuguese** | `pf_dora` | — |
+
+> Prefer a slower, clearer voice with an Italian accent? Use `im_nicola` (Italian male)
+> or `if_sara` (Italian female), with `speed: 0.85–0.95`.
+
+### 3.8 Tuning options reference
+
+| Field | Type | Range / values | Purpose |
+|-------|------|----------------|---------|
+| `model` | string | `tts-1`, `tts-1-hd`, `kokoro` | Model family to use (`kokoro` is the multilingual default) |
+| `input` | string | any text | Text to synthesize (UTF-8) |
+| `voice` | string | see §3.1 / §3.7 | Voice ID; invalid → **422** |
+| `speed` | number | 0.25–4.0 (default 1.0) | Speech rate multiplier (< 1 slower, > 1 faster) |
+
+**Tuning examples:**
+
+```bash
+# Slower, clearer delivery (user preference) — Italian male voice
+curl -s https://kokoro.iacgenie.com/v1/audio/speech \
+  -H "Authorization: Bearer $KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"kokoro","input":"Buongiorno, come stai?","voice":"im_nicola","speed":0.85}' \
+  -o /tmp/italian.mp3
+
+# Faster delivery — American female voice
+curl -s https://kokoro.iacgenie.com/v1/audio/speech \
+  -H "Authorization: Bearer $KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"kokoro","input":"Let us go! We are late.","voice":"af_jessica","speed":1.5}' \
+  -o /tmp/fast.mp3
+
+# British male voice, normal speed
+curl -s https://kokoro.iacgenie.com/v1/audio/speech \
+  -H "Authorization: Bearer $KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"kokoro","input":"A fine day, isn'"'"'t it?","voice":"bm_george"}' \
+  -o /tmp/british.mp3
+
+# Mandarin Chinese, normal speed
+curl -s https://kokoro.iacgenie.com/v1/audio/speech \
+  -H "Authorization: Bearer $KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"kokoro","input":"你好，世界。","voice":"zf_xiaobei"}' \
+  -o /tmp/mandarin.mp3
+
+# Japanese, normal speed
+curl -s https://kokoro.iacgenie.com/v1/audio/speech \
+  -H "Authorization: Bearer $KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"kokoro","input":"こんにちは世界。","voice":"jf_alpha"}' \
+  -o /tmp/japanese.mp3
+
+# Brazilian Portuguese, normal speed
+curl -s https://kokoro.iacgenie.com/v1/audio/speech \
+  -H "Authorization: Bearer $KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"kokoro","input":"Olá, mundo!","voice":"pf_dora"}' \
+  -o /tmp/portuguese.mp3
+```
+
+### 3.9 Multi-language batch synthesis (public endpoint)
+
+Generate one audio file per language in a loop:
+
+```bash
+declare -A VOICE=(
+  [en_us]=af_heart   [en_gb]=bm_george   [ja]=jf_alpha
+  [zh]=zf_xiaobei    [it]=im_nicola      [pt]=pf_dora
+)
+declare -A TEXT=(
+  [en_us]="Hello world."   [en_gb]="A fine day, is it not?"
+  [ja]="こんにちは世界。"   [zh]="你好，世界。"
+  [it]="Buongiorno."       [pt]="Olá, mundo!"
+)
+
+for lang in "${!VOICE[@]}"; do
+  curl -s https://kokoro.iacgenie.com/v1/audio/speech \
+    -H "Authorization: Bearer $KEY" \
+    -H "Content-Type: application/json" \
+    -d "{\"model\":\"kokoro\",\"input\":\"${TEXT[$lang]}\",\"voice\":\"${VOICE[$lang]}\"}" \
+    -o /tmp/$lang.mp3
+  echo "$lang -> /tmp/$lang.mp3"
+done
+
+file /tmp/*.mp3   # verify each is valid audio
 ```
 
 ---
@@ -296,21 +395,32 @@ ansible-playbook -i inventory.ini playbooks/deploy.yml \
 ## 6. Verification checklist (post-deploy)
 
 ```bash
-# On homeserver:
+# On homeserver (local proxy):
 docker ps --format '{{.Names}}\t{{.Status}}' | grep -i kokoro
 curl http://127.0.0.1/health                                   # → 200 ok
 KEY=$(cat /home/mkanavi/docker/kokoro/.api_key)
 
-# Synthesis with valid key:
+# Synthesis with valid key (local proxy):
 curl -s http://127.0.0.1/v1/audio/speech \
-  -H "Authorization: Bearer ${KEY}" \
-  -d '{"model":"tts-1","input":"Hello world.","voice":"af_heart"}' -o /tmp/test.mp3
+  -H "Authorization: Bearer $KEY" \
+  -d '{"model":"kokoro","input":"Hello world.","voice":"af_heart"}' -o /tmp/test.mp3
 file /tmp/test.mp3    # → valid audio file
 
 # Rate limit behavior:
 for i in $(seq 1 50); do curl -s -o /dev/null \
   http://127.0.0.1/v1/audio/speech -d '{"input":"x","voice":"af_heart"}'; done
+
+# Public Internet endpoint (Cloudflare Tunnel) — from any machine:
+curl https://kokoro.iacgenie.com/health                              # → 200 ok
+curl https://kokoro.iacgenie.com/v1/audio/speech \
+  -H "Authorization: Bearer $KEY" -d '{"model":"kokoro","input":"Hello.","voice":"af_heart"}' \
+  -o /tmp/test.mp3                                                   # → valid MP3
+
+# Tunnel service on the homeserver:
+systemctl status cloudflared-kokoro.service        # → active (running)
 ```
 
 Expected: `kokoro-1` + `kokoro-nginx` running; `/health` → 200; synthesis returns
 a valid audio file (b'ID3…' header for MP3); rapid bursts eventually yield 429s.
+The `kokoro.iacgenie.com` public endpoint routes through the dedicated Cloudflare
+tunnel (`cloudflared-kokoro.service`) to nginx :80 → kokoro-1:8881.
