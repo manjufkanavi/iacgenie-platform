@@ -1,0 +1,28 @@
+---
+# Kokoro TTS teardown — homeserver (192.168.0.116)
+# Removes the Kokoro stack (containers, compose file). Keeps OpenBao KV entry.
+
+- name: "Kokoro | Stop and remove stack"
+  ansible.builtin.command: >-
+    docker compose -f {{ kokoro_compose_dir }}/docker-compose.yml down
+  args:
+    chdir: "{{ kokoro_compose_dir }}"
+  register: kokoro_down
+  changed_when: "'Removed' in kokoro_down.stdout or 'Removing container' in kokoro_down.stdout"
+  failed_when: false
+
+- name: "Kokoro | Remove compose file and nginx config"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ kokoro_compose_dir }}/docker-compose.yml"
+    - "{{ kokoro_compose_dir }}/nginx/nginx.conf"
+
+# NOTE: model cache lives on the host at {{ kokoro_model_cache_host_path }}
+# (bind-mounted, not a Docker volume), so it is intentionally left in place.
+
+- name: "Kokoro | Report teardown status"
+  ansible.builtin.debug:
+    msg: >-
+      Kokoro TTS stack removed from homeserver. OpenBao KV entry (kokoro/api_key) retained for reuse.
