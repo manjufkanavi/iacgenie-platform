@@ -39,6 +39,10 @@ FROM node:22-alpine AS production
 
 WORKDIR /app
 
+# gcompat shim so the bundled (glibc) lightpanda binary can run on Alpine/musl
+# Without this, the glibc binary fails to load (missing fcntl64/backtrace_* symbols).
+RUN apk add --no-cache gcompat
+
 # Copy LightPanda from stage 1
 COPY --from=lightpanda /usr/local/bin/lightpanda /usr/local/bin/lightpanda
 
