@@ -561,7 +561,7 @@ services:
       SEARXNG_URL: "http://searxng:8080"
       LIGHTPANDA_BIN: /usr/local/bin/lightpanda
       LIGHTSERP_S3_BASE: "iacgenie-lightserp"
-      REDIS_URL: "${REDIS_URL}"
+      REDIS_URL: "redis://:${REDIS_PASSWORD}@redis:6379"
       LIGHTSERP_API_SECRET: "${LIGHTSERP_API_SECRET}"
       LIGHTSERP_DATABASE_URL: "${LIGHTSERP_DATABASE_URL}"
       LIGHTSERP_KEYCLOAK_CLIENT_SECRET: "${LIGHTSERP_KEYCLOAK_CLIENT_SECRET}"
@@ -570,7 +570,7 @@ services:
       ENABLE_MCP_SSE: "true"
       MCP_SSE_PORT: "7805"
     ports:
-      - "127.0.0.1:8000:3000"
+      - "127.0.0.1:8000:3001"
       - "127.0.0.1:7805:7805"
     networks:
       - iacgenie-frontend
