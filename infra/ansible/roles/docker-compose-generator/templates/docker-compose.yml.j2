@@ -4,10 +4,10 @@
 ---
 services:
   # =====================
-  # PostgreSQL 17 (hardened)
+  # PostgreSQL (matches on-disk data dir version — see P4.1 incident)
   # =====================
   postgres:
-    image: postgres:17-alpine
+    image: postgres:15-alpine
     container_name: iacgenie_postgres
     restart: unless-stopped
     environment:
@@ -426,7 +426,7 @@ services:
     depends_on:
       - postgres
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -T 5 -O /dev/null http://127.0.0.1:8080/ || exit 1"]
+      test: ["CMD-SHELL", "bash -c 'exec > /dev/tcp/127.0.0.1/8080' || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -999,6 +999,7 @@ services:
       - EXECUTIONS_MODE=queue
       - QUEUE_BULL_REDIS_HOST=redis
       - QUEUE_BULL_REDIS_PORT=6379
+      - QUEUE_BULL_REDIS_PASSWORD=${REDIS_PASSWORD}
       - MINIO_ENDPOINT=minio:9000
       - MINIO_ACCESS_KEY=${MINIO_ROOT_USER}
     ports:
