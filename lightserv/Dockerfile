@@ -7,11 +7,11 @@
 # =============================================================================
 
 # ---- Stage 1: Download LightPanda binary ----
-FROM node:22-alpine AS lightpanda
+FROM node:22-bookworm-slim AS lightpanda
 
 # Download platform-appropriate LightPanda binary
-RUN apk add --no-cache curl ca-certificates && \
-    ARCH=$(uname -m) && \
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
+    && ARCH=$(uname -m) && \
     if [ "$ARCH" = "x86_64" ]; then \
       TARGET="x86_64-linux"; \
     elif [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then \
@@ -24,7 +24,7 @@ RUN apk add --no-cache curl ca-certificates && \
     chmod +x /usr/local/bin/lightpanda
 
 # ---- Stage 2: Install deps ----
-FROM node:22-alpine AS builder
+FROM node:22-bookworm-slim AS builder
 
 WORKDIR /app
 
@@ -35,9 +35,15 @@ COPY . .
 RUN npm run build
 
 # ---- Stage 3: Production ----
-FROM node:22-alpine AS production
+FROM node:22-bookworm-slim AS production
 
 WORKDIR /app
+
+# LightPanda is a glibc binary. Alpine/musl cannot run it: the missing
+# fcntl64 symbol is a legacy glibc function that musl libc fundamentally
+# lacks, and no compatibility shim (gcompat/libc6-compat) can provide it.
+# Verified: the bundled binary runs on Debian/glibc but fails to load under musl.
+# Base image changed from node:22-alpine (musl) to node:22-bookworm-slim (glibc).
 
 # Copy LightPanda from stage 1
 COPY --from=lightpanda /usr/local/bin/lightpanda /usr/local/bin/lightpanda
@@ -50,7 +56,7 @@ RUN npm ci --omit=dev 2>/dev/null || npm install --omit=dev
 COPY --from=builder /app/dist ./dist
 
 # Create non-root user
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup -h /app -s /sbin/nologin && \
+RUN addgroup -S appgroup && adduser --disabled-password -G appgroup appuser && \
     chown -R appuser:appgroup /app
 USER appuser
 
