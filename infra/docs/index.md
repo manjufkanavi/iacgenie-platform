@@ -43,6 +43,7 @@ infra/
 | Deployment | [DEPLOYMENT-RUNBOOK.md](../DEPLOYMENT-RUNBOOK.md) ||
 | Health Checks | [HEALTH-CHECKS.md](../HEALTH-CHECKS.md) ||
 | OpenBao Secrets | [OPENBAO-SECRETS.md](../OPENBAO-SECRETS.md) ||
+| OpenBao/Keycloak Credentials | [OPENBAO-KEYCLOAK-CREDENTIALS.md](../docs/OPENBAO-KEYCLOAK-CREDENTIALS.md) ||
 | Disaster Recovery | [DISASTER-RECOVERY.md](../DISASTER-RECOVERY.md) ||
 | Ansible Roles | [ANSIBLE-ROLES.md](../ANSIBLE-ROLES.md) ||
 | Monitoring | [MONITORING.md](../MONITORING.md) ||
