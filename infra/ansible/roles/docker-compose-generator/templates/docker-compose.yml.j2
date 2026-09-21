@@ -517,7 +517,7 @@ services:
     container_name: iacgenie_auth_wrapper
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -T 5 -O /dev/null http://127.0.0.1:9090/ || exit 1"]
+      test: ["CMD-SHELL", "wget -q -T 5 -O /dev/null http://127.0.0.1:9096/ || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -530,6 +530,7 @@ services:
       AUTH_INTERNAL_TOKEN: "${AUTH_WRAPPER_INTERNAL_TOKEN}"
       AUTH_USER_HEADER: "X-Auth-User"
       AUTH_CROWDSEC_API_KEY: "${CROWDSEC_API_KEY}"
+      PORT: "9096"
     ports:
       - "127.0.0.1:9096:9096"
     networks:

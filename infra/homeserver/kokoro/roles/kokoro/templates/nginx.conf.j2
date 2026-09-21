@@ -25,8 +25,8 @@ http {
     sendfile        on;
     keepalive_timeout  65;
 
-    # ---- Rate limiting: per client IP, sustained rate + burst (nodelay) ----
-    limit_req_zone $binary_remote_addr zone=kokoro_limit:10m rate={{ kokoro_rate_limit_zone }};
+    # ---- Rate limiting: per real client IP (from Cloudflare tunnel) ----
+    limit_req_zone $http_cf_connecting_ip zone=kokoro_limit:10m rate={{ kokoro_rate_limit_zone }};
     limit_req_status 429;
 
     # ---- Upstream: the single kokoro replica (rate limited) ----

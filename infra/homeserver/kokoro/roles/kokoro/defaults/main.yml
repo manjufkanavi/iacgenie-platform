@@ -27,6 +27,12 @@ kokoro_api_key: ""
 kokoro_rate_limit_zone: "10r/s"    # sustained rate per client IP
 kokoro_rate_limit_burst: 20         # burst allowance (nodelay)
 
+# ---- Client IP whitelist ----
+# Public egress IP to exempt from rate limiting. Cloudflare tunnels populate
+# CF-Connecting-IP on origin requests, so this matches your real client IP.
+# Leave empty ("") to disable whitelisting entirely.
+kokoro_trusted_ip: "49.205.207.163"
+
 # ---- Resource limits per container ----
 kokoro_cpu_limit: "1.0"
 kokoro_mem_limit: "2g"   # torch + transformers need ~1.5-2GB to load; 512m triggers OOM kill
